@@ -8,6 +8,7 @@
 |------|------|------|
 | 番剧追踪 | 记录追番清单，标记已看完的番剧，支持拖拽排序 | 分包 pages/anime-checklist |
 | 光栅卡 | 选择多张图片，倾斜手机体验百叶窗切换效果 | 分包 pages/lenticular |
+| 日麻点数计算 | 输入手牌自动计算符数、役种和点数 | 分包 pages/mahjong-score |
 
 ## 技术栈
 
@@ -27,9 +28,18 @@ otakumap/
 │   ├── packageFeatures/            # 分包（功能模块）
 │   │   ├── pages/
 │   │   │   ├── anime-checklist/     # 番剧追踪
-│   │   │   └── lenticular/          # 光栅卡
+│   │   │   ├── lenticular/          # 光栅卡
+│   │   │   └── mahjong-score/       # 日麻点数计算
 │   │   └── utils/
 │   │       └── lenticular-engine.js # 光栅引擎核心算法
+│   ├── utils/
+│   │   └── mahjong/                 # 日麻计算核心模块
+│   │       ├── config/              # 配置文件
+│   │       ├── parser.js            # 手牌解析
+│   │       ├── fu-calculator.js     # 符数计算
+│   │       ├── yaku-checker.js      # 役种判定
+│   │       ├── score-calculator.js  # 点数计算
+│   │       └── engine.js            # 核心引擎
 │   ├── components/                  # 公共组件
 │   ├── app.js                      # 应用入口
 │   ├── app.json                    # 应用配置

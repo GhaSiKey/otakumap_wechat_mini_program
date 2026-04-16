@@ -2,7 +2,7 @@
 
 ## 概述
 
-OtakuMap 是一个微信小程序项目，采用「主包 + 功能分包」架构，核心是番剧追踪和光栅卡两个独立功能模块。
+OtakuMap 是一个微信小程序项目，采用「主包 + 功能分包」架构，包含番剧追踪、光栅卡和日麻点数计算三个独立功能模块。
 
 ## 架构分层
 
@@ -85,7 +85,56 @@ buildMaskStyle(fraction, axis)
         └── transparent | black | transparent
 ```
 
-### 3. 全局样式系统
+### 3. mahjong-score（日麻点数计算）
+
+**设计思想**: 配置驱动 + 模块化算法
+
+```
+手牌输入
+    │
+    ├── parser.js (手牌解析)
+    │   └── 面子分割算法 (递归回溯)
+    │
+    ├── yaku-checker.js (役种判定)
+    │   └── 40+役种检测
+    │
+    ├── fu-calculator.js (符数计算)
+    │   └── 副底/雀头/面子/听牌型
+    │
+    ├── score-calculator.js (点数计算)
+    │   └── 满贯系统/本场/供托
+    │
+    └── engine.js (核心引擎)
+        └── 选择最优和牌形式
+```
+
+**配置驱动设计**:
+
+| 配置文件 | 内容 |
+|----------|------|
+| `tiles.js` | 牌定义、工具函数 |
+| `yaku.js` | 役种配置 (名称/翻数/条件) |
+| `fu-rules.js` | 符数规则 |
+| `score-table.js` | 点数速查表 |
+| `theme.js` | UI主题配置 |
+
+**核心算法 - 面子分割**:
+
+```
+splitStandardHand(counts)
+    │
+    ├── 枚举所有可能的雀头
+    │
+    └── splitMelds() 递归分割
+        │
+        ├── 尝试取刻子 (count >= 3)
+        │
+        └── 尝试取顺子 (连续3张)
+```
+
+同一手牌可能有多种分割方式，需要全部找出并选择符数最高的。
+
+### 4. 全局样式系统
 
 基于 TDesign CSS 变量，支持深色模式：
 
@@ -150,6 +199,7 @@ wx.onDeviceMotionChange(res)
 |------|------|----------|
 | anime-checklist | 番剧追踪 | TDesign 组件 |
 | lenticular | 光栅卡 | TDesign 组件 + 传感器 |
+| mahjong-score | 日麻点数计算 | utils/mahjong 算法模块 |
 
 分包减小主包体积，用户按需加载。
 
