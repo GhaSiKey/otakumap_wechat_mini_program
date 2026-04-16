@@ -1,0 +1,137 @@
+<!-- ==================== 顶部输入区 ==================== -->
+<view class="input-area">
+  <view class="input-wrapper">
+    <t-input
+      value="{{inputValue}}"
+      placeholder="输入番剧名称，回车添加"
+      clearable
+      confirm-type="done"
+      bind:change="onInputChange"
+      bind:enter="onAddAnime"
+    />
+  </view>
+  <view class="add-btn" bind:tap="onAddAnime">
+    <t-icon name="add" size="48rpx" />
+  </view>
+</view>
+
+<!-- ==================== 工具栏 ==================== -->
+<view class="toolbar" wx:if="{{unwatchedList.length + watchedList.length > 0}}">
+  <text class="stats">已看 {{watchedCount}} / {{unwatchedList.length + watchedList.length}} 部</text>
+  <view class="edit-toggle" bind:tap="onToggleEditMode">
+    <t-icon name="{{isEditMode ? 'check' : 'edit-1'}}" size="36rpx" />
+    <text class="edit-toggle-text">{{isEditMode ? '完成' : '排序'}}</text>
+  </view>
+</view>
+
+<!-- ==================== 空状态 ==================== -->
+<t-empty wx:if="{{unwatchedList.length === 0 && watchedList.length === 0}}" description="还没有追番，快去添加吧" />
+
+<!-- ==================== 番剧列表 ==================== -->
+<view class="anime-list">
+
+  <!-- ========== 待追区块 ========== -->
+  <block wx:if="{{unwatchedList.length > 0}}">
+    <text class="section-title">待追</text>
+    <view wx:for="{{unwatchedList}}" wx:key="id">
+      <view class="anime-item {{animatingId === item.id && animPhase === 'phase1' ? 'anime-item--glow' : ''}} {{animatingId === item.id && animPhase === 'phase2' && animDirection === 'check' ? 'anime-item--fly-down' : ''}} {{animatingId === item.id && animPhase === 'phase2' && animDirection === 'uncheck' ? 'anime-item--fly-up' : ''}} {{animatingId === item.id && animPhase === 'phase3' && animDirection === 'check' ? 'anime-item--enter-from-top' : ''}} {{animatingId === item.id && animPhase === 'phase3' && animDirection === 'uncheck' ? 'anime-item--enter-from-bottom' : ''}}">
+        <t-swipe-cell disabled="{{isEditMode}}">
+          <view class="anime-card {{animatingId === item.id && animPhase === 'phase1' ? 'anime-card--flash' : ''}}" bind:tap="{{isEditMode ? '' : 'onToggleWatched'}}" data-id="{{item.id}}">
+
+            <!-- checkbox 图标 -->
+            <view
+              class="anime-checkbox {{animatingId === item.id && animPhase === 'phase1' && animDirection === 'check' ? 'anim-bounce-in' : ''}} {{animatingId === item.id && animPhase === 'phase1' && animDirection === 'uncheck' ? 'anim-bounce-out' : ''}}"
+            >
+              <t-icon
+                name="{{item.watched ? 'check-circle-filled' : 'circle'}}"
+                size="44rpx"
+                color="{{item.watched ? '#0052d9' : '#dcdcdc'}}"
+              />
+            </view>
+
+            <!-- 番剧名 -->
+            <text class="anime-name {{item.watched ? 'anime-name--watched' : ''}}">{{item.name}}</text>
+
+            <!-- 排序按钮 -->
+            <view wx:if="{{isEditMode}}" class="sort-buttons">
+              <view
+                class="sort-btn {{index === 0 ? 'sort-btn--disabled' : ''}}"
+                bind:tap="onMoveUp"
+                data-id="{{item.id}}"
+                data-group="unwatched"
+              >
+                <t-icon name="chevron-up" size="40rpx" />
+              </view>
+              <view
+                class="sort-btn {{index === unwatchedList.length - 1 ? 'sort-btn--disabled' : ''}}"
+                bind:tap="onMoveDown"
+                data-id="{{item.id}}"
+                data-group="unwatched"
+              >
+                <t-icon name="chevron-down" size="40rpx" />
+              </view>
+            </view>
+          </view>
+
+          <view slot="right" class="delete-btn" bind:tap="onDeleteAnime" data-id="{{item.id}}">
+            删除
+          </view>
+        </t-swipe-cell>
+      </view>
+    </view>
+  </block>
+
+  <!-- ========== 已看完区块 ========== -->
+  <block wx:if="{{watchedList.length > 0}}">
+    <text class="section-title">已看完</text>
+    <view wx:for="{{watchedList}}" wx:key="id">
+      <view class="anime-item {{animatingId === item.id && animPhase === 'phase1' ? 'anime-item--glow' : ''}} {{animatingId === item.id && animPhase === 'phase2' && animDirection === 'check' ? 'anime-item--fly-down' : ''}} {{animatingId === item.id && animPhase === 'phase2' && animDirection === 'uncheck' ? 'anime-item--fly-up' : ''}} {{animatingId === item.id && animPhase === 'phase3' && animDirection === 'check' ? 'anime-item--enter-from-top' : ''}} {{animatingId === item.id && animPhase === 'phase3' && animDirection === 'uncheck' ? 'anime-item--enter-from-bottom' : ''}}">
+        <t-swipe-cell disabled="{{isEditMode}}">
+          <view class="anime-card anime-card--watched {{animatingId === item.id && animPhase === 'phase1' ? 'anime-card--flash' : ''}}">
+
+            <!-- checkbox 图标 -->
+            <view
+              class="anime-checkbox {{animatingId === item.id && animPhase === 'phase1' && animDirection === 'check' ? 'anim-bounce-in' : ''}} {{animatingId === item.id && animPhase === 'phase1' && animDirection === 'uncheck' ? 'anim-bounce-out' : ''}}"
+              bind:tap="onToggleWatched"
+              data-id="{{item.id}}"
+            >
+              <t-icon
+                name="check-circle-filled"
+                size="44rpx"
+                color="#0052d9"
+              />
+            </view>
+
+            <!-- 番剧名 -->
+            <text class="anime-name anime-name--watched">{{item.name}}</text>
+
+            <!-- 排序按钮 -->
+            <view wx:if="{{isEditMode}}" class="sort-buttons">
+              <view
+                class="sort-btn {{index === 0 ? 'sort-btn--disabled' : ''}}"
+                bind:tap="onMoveUp"
+                data-id="{{item.id}}"
+                data-group="watched"
+              >
+                <t-icon name="chevron-up" size="40rpx" />
+              </view>
+              <view
+                class="sort-btn {{index === watchedList.length - 1 ? 'sort-btn--disabled' : ''}}"
+                bind:tap="onMoveDown"
+                data-id="{{item.id}}"
+                data-group="watched"
+              >
+                <t-icon name="chevron-down" size="40rpx" />
+              </view>
+            </view>
+          </view>
+
+          <view slot="right" class="delete-btn" bind:tap="onDeleteAnime" data-id="{{item.id}}">
+            删除
+          </view>
+        </t-swipe-cell>
+      </view>
+    </view>
+  </block>
+
+</view>

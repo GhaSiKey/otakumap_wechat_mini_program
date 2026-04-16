@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "番剧追踪",
+  "usingComponents": {
+    "t-icon": "tdesign-miniprogram/icon/icon",
+    "t-input": "tdesign-miniprogram/input/input",
+    "t-swipe-cell": "tdesign-miniprogram/swipe-cell/swipe-cell",
+    "t-empty": "tdesign-miniprogram/empty/empty"
+  }
+}

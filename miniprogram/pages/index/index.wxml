@@ -1,0 +1,30 @@
+<!-- 首页 — 功能入口 -->
+<view class="page">
+
+  <!-- 头部 -->
+  <view class="header">
+    <text class="header-title">OtakuMap</text>
+    <text class="header-subtitle">二次元工具箱</text>
+  </view>
+
+  <!-- 功能卡片列表 -->
+  <view class="feature-list">
+    <view
+      class="feature-card"
+      wx:for="{{features}}"
+      wx:key="id"
+      data-path="{{item.path}}"
+      bind:tap="onNavigate"
+    >
+      <view class="feature-icon-wrap">
+        <text class="feature-icon-text">{{item.emoji}}</text>
+      </view>
+      <view class="feature-info">
+        <text class="feature-title">{{item.title}}</text>
+        <text class="feature-desc">{{item.desc}}</text>
+      </view>
+      <text class="feature-arrow">›</text>
+    </view>
+  </view>
+
+</view>

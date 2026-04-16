@@ -1,0 +1,41 @@
+<!-- 光栅卡全屏预览页 -->
+<view class="preview-container">
+
+  <!-- 光栅双图叠加 -->
+  <view class="lenticular-stack" wx:if="{{images.length > 0}}">
+    <!-- 底层：下一张图 -->
+    <image
+      class="lenticular-layer"
+      src="{{images[nextIndex]}}"
+      mode="aspectFill"
+    />
+    <!-- 顶层：当前图，带条纹 mask -->
+    <image
+      class="lenticular-layer lenticular-front"
+      src="{{images[displayIndex]}}"
+      mode="aspectFill"
+      style="{{maskStyle}}"
+    />
+  </view>
+
+  <!-- 返回按钮 -->
+  <view class="back-btn" style="top:{{navBarTop}}px;" bind:tap="onBack">
+    <t-icon name="chevron-left" size="48rpx" color="#fff" />
+  </view>
+
+  <!-- 调试指示器 -->
+  <view class="debug-overlay" wx:if="{{showDebug}}">
+    <view class="debug-ball-container">
+      <view
+        class="debug-ball"
+        style="transform: translate({{debugBallX}}rpx, {{debugBallY}}rpx);"
+      />
+    </view>
+    <text class="debug-text">
+      pitch: {{filteredPitch}}° | roll: {{filteredRoll}}°
+      \naxis: {{sensingAxis}} | step: {{degreesPerImage}}°
+      \nindex: {{displayIndex + 1}} / {{images.length}}
+    </text>
+  </view>
+
+</view>

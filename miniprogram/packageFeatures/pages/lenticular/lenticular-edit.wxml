@@ -1,0 +1,195 @@
+<!-- 光栅卡编辑页 -->
+<view class="page-container">
+
+  <!-- 顶部预览区 -->
+  <view class="preview-area">
+    <block wx:if="{{images.length > 0}}">
+      <!-- G: 模糊背景层 -->
+      <image
+        class="preview-bg-blur"
+        src="{{images[displayIndex]}}"
+        mode="aspectFill"
+      />
+      <view class="preview-bg-mask" />
+
+      <!-- 光栅双图叠加 -->
+      <view class="lenticular-stack">
+        <!-- 底层：下一张图（过渡目标） -->
+        <image
+          class="lenticular-layer"
+          src="{{images[nextIndex]}}"
+          mode="aspectFit"
+        />
+        <!-- 顶层：当前图，带条纹 mask -->
+        <image
+          class="lenticular-layer lenticular-front"
+          src="{{images[displayIndex]}}"
+          mode="aspectFit"
+          style="{{maskStyle}}"
+        />
+      </view>
+
+      <!-- E: 序号指示器 -->
+      <view class="indicator-dots" wx:if="{{images.length > 1}}">
+        <view
+          wx:for="{{images}}"
+          wx:key="index"
+          class="indicator-dot {{displayIndex === index ? 'indicator-dot--active' : ''}}"
+        />
+      </view>
+    </block>
+
+    <!-- B: 空状态引导 -->
+    <block wx:else>
+      <view class="preview-placeholder">
+        <view class="placeholder-icon-group">
+          <view class="placeholder-card">
+            <t-icon name="image" size="40rpx" color="rgba(255,255,255,0.3)" />
+          </view>
+          <view class="placeholder-card">
+            <t-icon name="image" size="40rpx" color="rgba(255,255,255,0.5)" />
+          </view>
+          <view class="placeholder-card">
+            <t-icon name="image" size="40rpx" color="rgba(255,255,255,0.3)" />
+          </view>
+        </view>
+        <text class="placeholder-title">光栅卡</text>
+        <text class="placeholder-desc">选择 2 张以上图片\n倾斜手机即可体验光栅卡切换效果</text>
+      </view>
+    </block>
+
+    <!-- 调试指示器 -->
+    <view class="debug-overlay" wx:if="{{showDebug && images.length > 0}}">
+      <view class="debug-ball-container">
+        <view
+          class="debug-ball"
+          style="transform: translate({{debugBallX}}rpx, {{debugBallY}}rpx);"
+        />
+      </view>
+      <text class="debug-text">
+        pitch: {{filteredPitch}}° | roll: {{filteredRoll}}°
+        \nindex: {{displayIndex}} / {{images.length}}
+      </text>
+    </view>
+  </view>
+
+  <!-- 图片网格 -->
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">图片列表 ({{images.length}}/9)</text>
+      <text class="section-hint" wx:if="{{images.length >= 2}}">长按拖拽排序</text>
+    </view>
+    <view class="image-grid">
+      <view
+        class="grid-item-wrap"
+        wx:for="{{images}}"
+        wx:key="index"
+        data-index="{{index}}"
+        bind:longpress="onDragStart"
+        catch:touchmove="onDragMove"
+        catch:touchend="onDragEnd"
+        catch:touchcancel="onDragEnd"
+      >
+        <view class="grid-item {{displayIndex === index ? 'grid-item--active' : ''}} {{dragging && dragTargetIndex === index ? 'grid-item--drop-target' : ''}} {{dragging && dragIndex === index ? 'grid-item--dragging' : ''}}">
+          <image class="grid-thumb" src="{{item}}" mode="aspectFill" />
+          <view class="grid-delete" bind:tap="onDeleteImage" data-index="{{index}}">
+            <t-icon name="close" size="28rpx" color="#fff" />
+          </view>
+          <view class="grid-index">{{index + 1}}</view>
+        </view>
+      </view>
+
+      <!-- 添加按钮 -->
+      <view class="grid-item-wrap" wx:if="{{images.length < 9}}">
+        <view class="grid-item grid-item--add" bind:tap="onChooseImages">
+          <t-icon name="add" size="56rpx" />
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- C: 参数面板 — 图片≥2张时才显示 -->
+  <view class="section" wx:if="{{images.length >= 2}}">
+    <text class="section-title">参数设置</text>
+
+    <!-- 感应轴向 -->
+    <view class="param-row">
+      <text class="param-label">感应轴向</text>
+      <t-radio-group
+        value="{{sensingAxis}}"
+        bind:change="onAxisChange"
+        class="axis-radio-group"
+      >
+        <t-radio value="vertical" label="垂直 (前后倾)" />
+        <t-radio value="horizontal" label="水平 (左右倾)" />
+      </t-radio-group>
+    </view>
+
+    <!-- 灵敏度 -->
+    <view class="param-row">
+      <text class="param-label">灵敏度 ({{degreesPerImage}}° / 张)</text>
+      <t-slider
+        value="{{degreesPerImage}}"
+        min="{{3}}"
+        max="{{25}}"
+        step="{{1}}"
+        bind:change="onSensitivityChange"
+        class="sensitivity-slider"
+      />
+      <view class="slider-labels">
+        <text class="slider-label">灵敏</text>
+        <text class="slider-label">迟钝</text>
+      </view>
+    </view>
+
+    <!-- 调试开关 -->
+    <view class="param-row param-row--inline">
+      <text class="param-label">调试指示器</text>
+      <t-switch value="{{showDebug}}" bind:change="onToggleDebug" />
+    </view>
+  </view>
+
+  <!-- D: 底部按钮 — 文案随状态变化 -->
+  <view class="bottom-bar">
+    <t-button
+      wx:if="{{images.length === 0}}"
+      theme="primary"
+      size="large"
+      block
+      bind:tap="onChooseImages"
+    >
+      选择图片开始制作
+    </t-button>
+
+    <t-button
+      wx:elif="{{images.length === 1}}"
+      theme="primary"
+      size="large"
+      block
+      variant="outline"
+      bind:tap="onChooseImages"
+    >
+      再选 1 张即可预览
+    </t-button>
+
+    <t-button
+      wx:else
+      theme="primary"
+      size="large"
+      block
+      bind:tap="onPreview"
+    >
+      全屏预览
+    </t-button>
+  </view>
+
+  <!-- F: 拖拽幽灵元素 -->
+  <view
+    class="drag-ghost"
+    wx:if="{{dragging}}"
+    style="left:{{dragGhostX}}px; top:{{dragGhostY}}px;"
+  >
+    <image class="drag-ghost-image" src="{{dragGhostSrc}}" mode="aspectFill" />
+  </view>
+
+</view>

@@ -1,0 +1,309 @@
+view, text {
+  box-sizing: border-box;
+}
+
+page {
+  background-color: var(--td-bg-color-page, #f5f5f5);
+}
+
+/* ==================== 顶部输入区 ==================== */
+.input-area {
+  display: flex;
+  align-items: center;
+  padding: var(--td-spacer, 16rpx) var(--td-spacer-2, 32rpx);
+  background-color: var(--td-bg-color-container, #ffffff);
+  gap: var(--td-spacer, 16rpx);
+}
+
+.input-wrapper {
+  flex: 1;
+  --td-input-border-color: transparent;
+  --td-input-bg-color: var(--td-bg-color-secondarycontainer, #f3f3f3);
+  border-radius: var(--td-radius-default, 12rpx);
+  overflow: hidden;
+}
+
+.add-btn {
+  width: 72rpx;
+  height: 72rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--td-brand-color, #0052d9);
+  color: var(--td-font-white-1, #ffffff);
+  border-radius: var(--td-radius-default, 12rpx);
+}
+
+/* ==================== 工具栏 ==================== */
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--td-spacer-1, 24rpx) var(--td-spacer-2, 32rpx) var(--td-spacer, 16rpx);
+}
+
+.stats {
+  font-size: var(--td-font-size-body-medium, 28rpx);
+  color: var(--td-text-color-secondary, #666666);
+}
+
+.edit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  color: var(--td-brand-color, #0052d9);
+}
+
+.edit-toggle-text {
+  font-size: var(--td-font-size-body-medium, 28rpx);
+}
+
+/* ==================== 番剧列表 ==================== */
+.anime-list {
+  padding: 0 var(--td-spacer-2, 32rpx);
+}
+
+.anime-item {
+  margin-bottom: var(--td-spacer, 16rpx);
+  border-radius: var(--td-radius-default, 12rpx);
+  overflow: hidden;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+}
+
+/* ============================================================
+   Phase 1: 卡片上浮发光
+   ============================================================ */
+.anime-item--glow {
+  animation: itemGlow 0.4s ease forwards;
+}
+
+@keyframes itemGlow {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  }
+  40% {
+    transform: scale(1.03);
+    box-shadow: 0 8rpx 32rpx rgba(0, 82, 217, 0.2);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  }
+}
+
+/* ============================================================
+   Phase 2: 卡片从原位置飞走
+   ============================================================ */
+
+/* 勾选 → 卡片向下飞走（飞向"已看完"区域） */
+.anime-item--fly-down {
+  animation: flyDown 0.35s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
+}
+
+@keyframes flyDown {
+  0% {
+    transform: scale(1.02) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.85) translateY(120rpx);
+    opacity: 0;
+  }
+}
+
+/* 取消勾选 → 卡片向上飞走（飞向"待追"区域） */
+.anime-item--fly-up {
+  animation: flyUp 0.35s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
+}
+
+@keyframes flyUp {
+  0% {
+    transform: scale(1.02) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.85) translateY(-120rpx);
+    opacity: 0;
+  }
+}
+
+/* ============================================================
+   Phase 3: 卡片在新位置滑入
+   ============================================================ */
+
+/* 勾选后 → 从上方滑入新位置 */
+.anime-item--enter-from-top {
+  animation: enterFromTop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes enterFromTop {
+  0% {
+    transform: scale(0.9) translateY(-80rpx);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.02) translateY(8rpx);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 取消勾选后 → 从下方滑入新位置 */
+.anime-item--enter-from-bottom {
+  animation: enterFromBottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes enterFromBottom {
+  0% {
+    transform: scale(0.9) translateY(80rpx);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.02) translateY(-8rpx);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ============================================================
+   卡片内部样式
+   ============================================================ */
+.anime-card {
+  display: flex;
+  align-items: center;
+  padding: 32rpx 28rpx;
+  background-color: var(--td-bg-color-container, #ffffff);
+  min-height: 112rpx;
+  transition: background-color 0.4s ease;
+}
+
+.anime-card--watched {
+  background-color: var(--td-bg-color-container, #ffffff);
+}
+
+/* Phase 1 卡片背景闪光 */
+.anime-card--flash {
+  animation: cardFlash 0.4s ease;
+}
+
+@keyframes cardFlash {
+  0% { background-color: var(--td-bg-color-container, #ffffff); }
+  40% { background-color: rgba(0, 82, 217, 0.08); }
+  100% { background-color: var(--td-bg-color-container, #ffffff); }
+}
+
+/* ============================================================
+   Checkbox 动画
+   ============================================================ */
+.anime-checkbox {
+  flex-shrink: 0;
+  margin-right: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88rpx;
+  min-height: 88rpx;
+  transition: transform 0.15s ease;
+}
+
+.anime-checkbox:active {
+  transform: scale(0.85);
+}
+
+/* 勾选弹跳：缩小 → 放大弹过头 → 回弹，同时旋转 360° */
+.anim-bounce-in {
+  animation: bounceIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes bounceIn {
+  0%   { transform: scale(1) rotate(0deg); }
+  25%  { transform: scale(0.4) rotate(120deg); }
+  55%  { transform: scale(1.3) rotate(300deg); }
+  75%  { transform: scale(0.9) rotate(350deg); }
+  100% { transform: scale(1) rotate(360deg); }
+}
+
+/* 取消勾选：左右摇摆 */
+.anim-bounce-out {
+  animation: bounceOut 0.35s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes bounceOut {
+  0%   { transform: scale(1) rotate(0deg); }
+  30%  { transform: scale(1.2) rotate(-20deg); }
+  60%  { transform: scale(0.85) rotate(12deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+/* ============================================================
+   文字样式
+   ============================================================ */
+.anime-name {
+  flex: 1;
+  font-size: 30rpx;
+  color: var(--td-text-color-primary, #242424);
+  line-height: 1.4;
+  transition: color 0.3s ease;
+}
+
+.anime-name--watched {
+  text-decoration: line-through;
+  color: var(--td-text-color-placeholder, #bbbbbb);
+}
+
+/* ==================== 排序按钮 ==================== */
+.sort-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  margin-left: var(--td-spacer, 16rpx);
+  flex-shrink: 0;
+}
+
+.sort-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 44rpx;
+  border-radius: var(--td-radius-small, 6rpx);
+  color: var(--td-text-color-secondary, #666666);
+  background-color: var(--td-bg-color-component, #f2f3f5);
+  transition: background-color 0.2s ease;
+}
+
+.sort-btn:active {
+  background-color: var(--td-bg-color-component-hover, #e3e6eb);
+}
+
+.sort-btn--disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* ==================== 左滑删除按钮 ==================== */
+.delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 160rpx;
+  height: 100%;
+  background-color: var(--td-error-color, #e34d59);
+  color: var(--td-font-white-1, #ffffff);
+  font-size: var(--td-font-size-body-medium, 28rpx);
+}
+
+/* ==================== 分组标题 ==================== */
+.section-title {
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-text-color-placeholder, #bbbbbb);
+  padding: var(--td-spacer, 16rpx) 0 var(--td-spacer, 16rpx) 8rpx;
+}

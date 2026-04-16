@@ -1,0 +1,30 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/example/index"
+  ],
+  "subpackages": [
+    {
+      "root": "packageFeatures",
+      "name": "features",
+      "pages": [
+        "pages/lenticular/lenticular-edit",
+        "pages/lenticular/lenticular-preview",
+        "pages/anime-checklist/anime-checklist"
+      ]
+    }
+  ],
+  "darkmode": true,
+  "themeLocation": "theme.json",
+  "window": {
+    "backgroundColor": "@backgroundColor",
+    "backgroundTextStyle": "@backgroundTextStyle",
+    "navigationBarBackgroundColor": "@navigationBarBackgroundColor",
+    "navigationBarTitleText": "OtakuMap",
+    "navigationBarTextStyle": "@navigationBarTextStyle"
+  },
+  "usingComponents": {},
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}
