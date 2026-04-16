@@ -16,6 +16,13 @@ Page({
         emoji: '📋',
         path: '/packageFeatures/pages/anime-checklist/anime-checklist',
       },
+      {
+        id: 'mahjong-score',
+        title: '日麻点数计算',
+        desc: '输入手牌自动计算符数、役种和点数',
+        emoji: '🀄',
+        path: '/packageFeatures/pages/mahjong-score/mahjong-score',
+      },
     ],
   },
 
