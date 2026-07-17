@@ -1,0 +1,11 @@
+/* 比赛详情页样式
+ * 直接复用列表页样式表：CSS 变量、背景、对阵头、价值分析、AI点评、完整赔率/矩阵等
+ * 全部在 worldcup.wxss 中定义，import 进来保证视觉一致、避免重复维护。 */
+@import "../worldcup.wxss";
+
+/* 作为独立页面：detail-inner 用正常文档流（列表页里它在 fixed 面板内，这里覆盖为页面内边距）。 */
+.detail-inner {
+  padding: 40rpx 32rpx 100rpx;
+  position: relative;
+  min-height: 100vh;
+}

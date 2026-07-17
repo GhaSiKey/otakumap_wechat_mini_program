@@ -23,6 +23,13 @@ Page({
         emoji: '🀄',
         path: '/packageFeatures/pages/mahjong-score/mahjong-score',
       },
+      {
+        id: 'worldcup',
+        title: '世界杯赔率',
+        desc: '2026 FIFA 世界杯赔率、赛程与赛事详情',
+        emoji: '🏆',
+        path: '/packageFeatures/pages/worldcup/worldcup',
+      },
     ],
   },
 

@@ -1,0 +1,137 @@
+<!-- 比赛详情页 · 由 worldcup 列表 navigateTo 打开 -->
+<view class="bg-gradient"></view>
+<view class="bg-orb bg-orb-1"></view>
+<view class="bg-orb bg-orb-2"></view>
+
+<view class="detail-inner" wx:if="{{detail}}">
+  <!-- 对阵头 -->
+  <view class="detail-head">
+    <text class="detail-meta">{{detail.metaLine}}</text>
+    <view class="detail-teams">
+      <view class="dteam">
+        <image
+          wx:if="{{detail.home.logo && !logoFailed[detail.home.logo]}}"
+          class="team-logo"
+          src="{{detail.home.logo}}"
+          mode="aspectFit"
+          data-url="{{detail.home.logo}}"
+          binderror="onLogoError"
+        />
+        <view wx:else class="team-logo team-logo--ph">⚽</view>
+        <text>{{detail.home.name}}</text>
+      </view>
+      <text class="dvs">VS</text>
+      <view class="dteam">
+        <image
+          wx:if="{{detail.away.logo && !logoFailed[detail.away.logo]}}"
+          class="team-logo"
+          src="{{detail.away.logo}}"
+          mode="aspectFit"
+          data-url="{{detail.away.logo}}"
+          binderror="onLogoError"
+        />
+        <view wx:else class="team-logo team-logo--ph">⚽</view>
+        <text>{{detail.away.name}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="detail-body">
+    <!-- 价值分析 -->
+    <view class="detail-analysis">
+      <view class="sec-title">价值分析 <text class="sec-note">客观 · 由赔率计算</text></view>
+      <view class="tags" wx:if="{{detail.tags.length}}">
+        <text class="tag tag--{{tag.cls}}" wx:for="{{detail.tags}}" wx:key="name" wx:for-item="tag">{{tag.icon}} {{tag.name}}</text>
+      </view>
+      <!-- 去水概率三色条 -->
+      <view wx:if="{{detail.probBar}}" class="prob-bar">
+        <view class="prob-seg prob-h" style="width:{{detail.probBar.h.w}}%">主 {{detail.probBar.h.pct}}%</view>
+        <view class="prob-seg prob-d" style="width:{{detail.probBar.d.w}}%">平 {{detail.probBar.d.pct}}%</view>
+        <view class="prob-seg prob-a" style="width:{{detail.probBar.a.w}}%">客 {{detail.probBar.a.pct}}%</view>
+      </view>
+      <text wx:else class="na-hint">该场未开胜平负，无去水概率</text>
+      <!-- 返还率徽章 -->
+      <view class="ret-badges" wx:if="{{detail.badges.length}}">
+        <text class="ret-badge ret-{{b.level}}" wx:for="{{detail.badges}}" wx:key="label" wx:for-item="b">{{b.label}} 返还 {{b.pct}}%</text>
+      </view>
+    </view>
+
+    <!-- AI 点评 -->
+    <view class="detail-comment">
+      <view class="sec-title">AI 点评 <text class="sec-note">主观 · 仅供参考</text></view>
+      <view wx:if="{{detail.commentary.empty}}" class="comment comment--empty">暂无 AI 点评</view>
+      <view wx:else class="comment">
+        <text wx:if="{{detail.commentary.summary}}" class="comment-summary">{{detail.commentary.summary}}</text>
+        <view wx:if="{{detail.commentary.value}}" class="comment-value">💡 {{detail.commentary.value}}</view>
+        <!-- 购买方案 -->
+        <view wx:if="{{detail.commentary.plan}}" class="plan">
+          <view class="plan-head">📝 娱乐方案 · 预算 {{detail.commentary.plan.budget}}元</view>
+          <view class="bet-list">
+            <view class="bet" wx:for="{{detail.commentary.plan.bets}}" wx:key="market" wx:for-item="bet">
+              <text class="bet-market">{{bet.market}}</text>
+              <text class="bet-odds">@{{bet.odds}}</text>
+              <text class="bet-stake">投 {{bet.stake}}元</text>
+              <text class="bet-potential">中回 {{bet.potential}}元</text>
+            </view>
+          </view>
+          <text wx:if="{{detail.commentary.plan.note}}" class="plan-note">{{detail.commentary.plan.note}}</text>
+          <text class="plan-warn">⚠ 仅为娱乐示意，非投注建议。竞彩为负和游戏，长期期望为负。</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 完整赔率 -->
+    <view class="detail-odds">
+      <view class="sec-title">完整赔率</view>
+
+      <!-- 行式玩法：胜平负/让球/总进球 -->
+      <view class="orow" wx:for="{{detail.odds.rows}}" wx:key="label" wx:for-item="row">
+        <text class="orow-label">{{row.label}}</text>
+        <view class="orow-cells">
+          <view class="orow-cell {{cell.heat}} {{cell.hot ? 'orow-cell--hot' : ''}}" wx:for="{{row.cells}}" wx:key="k" wx:for-item="cell">
+            <text class="orow-cell-i">{{cell.k}}</text>
+            <text class="orow-cell-b">{{cell.v}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 半全场：一行平铺 -->
+      <view class="orow" wx:if="{{detail.odds.hafuRow}}">
+        <text class="orow-label">{{detail.odds.hafuRow.label}}</text>
+        <view class="orow-cells">
+          <view class="orow-cell {{cell.heat}} {{cell.hot ? 'orow-cell--hot' : ''}}" wx:for="{{detail.odds.hafuRow.cells}}" wx:key="k" wx:for-item="cell">
+            <text class="orow-cell-i">{{cell.k}}</text>
+            <text class="orow-cell-b">{{cell.v}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 比分 6×6 热力矩阵 -->
+      <view wx:if="{{detail.odds.crs}}" class="odds-block">
+        <view class="odds-block-title">比分 <text class="block-hint">暖=热门 · 冷=冷门</text></view>
+        <scroll-view class="matrix-scroll" scroll-x="true">
+          <view class="matrix">
+            <view class="matrix-row matrix-head">
+              <text class="matrix-th matrix-corner">主\客</text>
+              <text class="matrix-th" wx:for="{{detail.odds.crs.head}}" wx:key="*this">{{item}}</text>
+            </view>
+            <view class="matrix-row" wx:for="{{detail.odds.crs.rows}}" wx:key="h" wx:for-item="mrow">
+              <text class="matrix-th">{{mrow.h}}</text>
+              <block wx:for="{{mrow.cells}}" wx:key="index" wx:for-item="cell">
+                <text wx:if="{{cell.empty}}" class="matrix-td cell--empty">·</text>
+                <text wx:else class="matrix-td {{cell.heat}} {{cell.hot ? 'cell--hot' : ''}}">{{cell.v}}</text>
+              </block>
+            </view>
+          </view>
+        </scroll-view>
+        <!-- 胜/平/负其它 -->
+        <view class="crs-others" wx:if="{{detail.odds.crs.others.length}}">
+          <view class="crs-other {{o.heat}}" wx:for="{{detail.odds.crs.others}}" wx:key="name" wx:for-item="o">
+            <text class="crs-other-i">{{o.name}}</text>
+            <text class="crs-other-b">{{o.odds}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

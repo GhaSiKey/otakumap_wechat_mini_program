@@ -10,7 +10,9 @@
         "pages/lenticular/lenticular-edit",
         "pages/lenticular/lenticular-preview",
         "pages/anime-checklist/anime-checklist",
-        "pages/mahjong-score/mahjong-score"
+        "pages/mahjong-score/mahjong-score",
+        "pages/worldcup/worldcup",
+        "pages/worldcup/detail/detail"
       ]
     }
   ],

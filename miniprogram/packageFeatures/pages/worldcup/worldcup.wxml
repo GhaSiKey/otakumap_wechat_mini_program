@@ -1,0 +1,204 @@
+<!-- 世界杯赔率页 · 复刻 H5 worldcup.html -->
+<view class="theme-root theme-{{theme}}">
+<view class="bg-gradient"></view>
+<view class="bg-orb bg-orb-1"></view>
+<view class="bg-orb bg-orb-2"></view>
+<view class="bg-shine"></view>
+
+<!-- 主题切换（调试用）：点击循环切换背景色系 -->
+<view class="theme-switch" bindtap="onSwitchTheme">
+  <text class="theme-switch-icon">🎨</text>
+  <text class="theme-switch-name">{{themeName}}</text>
+</view>
+
+<view class="container">
+  <!-- Header -->
+  <view class="header">
+    <view class="logo">
+      <text class="logo-icon">🏆</text>
+      <view class="logo-text">
+        <text class="logo-title">世界杯赔率</text>
+        <text class="logo-sub">2026 · FIFA WORLD CUP</text>
+      </view>
+    </view>
+    <view class="header-meta" wx:if="{{meta}}">
+      <text class="meta-stamp">🕐 赔率截止 {{meta.crawledStamp}}</text>
+      <text class="meta-stamp" wx:if="{{meta.analyzedStamp}}">🧠 分析于 {{meta.analyzedStamp}}</text>
+    </view>
+  </view>
+
+  <view class="title-rule"></view>
+
+  <!-- 赛程总览日历 -->
+  <view class="calendar" wx:if="{{calendar}}">
+    <view class="cal-head">
+      <view class="cal-title">📅 赛程总览
+        <text class="cal-sub">{{calendar.title}}</text>
+      </view>
+      <view class="cal-view-toggle">
+        <view class="cal-vt {{calView === 'strip' ? 'active' : ''}}" data-cv="strip" bindtap="onSwitchCalView">日期条</view>
+        <view class="cal-vt {{calView === 'grid' ? 'active' : ''}}" data-cv="grid" bindtap="onSwitchCalView">月历</view>
+      </view>
+    </view>
+
+    <!-- 图例 -->
+    <view class="cal-legend">
+      <text class="cal-leg {{item.c}}" wx:for="{{calendar.legend}}" wx:key="c">{{item.label}}</text>
+    </view>
+
+    <!-- 方案A：横向日期条 -->
+    <scroll-view
+      wx:if="{{calView === 'strip'}}"
+      class="cal-strip"
+      scroll-x="true"
+      scroll-left="{{stripLeft}}"
+      scroll-with-animation="true"
+    >
+      <view
+        class="cal-cell {{item.colorClass}} {{item.hasList ? '' : 'cal-cell--nolist'}} {{item.isToday ? 'cal-today' : ''}}"
+        wx:for="{{calendar.strip}}"
+        wx:key="date"
+        data-date="{{item.date}}"
+        data-haslist="{{item.hasList}}"
+        bindtap="onTapCalDay"
+      >
+        <text class="cal-today-tag" wx:if="{{item.isToday}}">今天</text>
+        <text class="cal-md">{{item.md}}</text>
+        <text class="cal-wd">{{item.weekday}}</text>
+        <text class="cal-ph">{{item.shortLabel}}</text>
+        <text class="cal-cnt">{{item.total}}场</text>
+      </view>
+    </scroll-view>
+
+    <!-- 方案B：月历网格 -->
+    <view wx:else class="cal-grid-wrap">
+      <view class="cal-month" wx:for="{{calendar.months}}" wx:key="title" wx:for-item="month">
+        <view class="cal-month-title">{{month.title}}</view>
+        <view class="cal-week-head">
+          <text>一</text><text>二</text><text>三</text><text>四</text><text>五</text><text>六</text><text>日</text>
+        </view>
+        <view class="cal-days">
+          <block wx:for="{{month.cells}}" wx:key="index" wx:for-item="cell">
+            <view wx:if="{{cell.empty}}" class="cal-day cal-day--empty"></view>
+            <view wx:elif="{{cell.off}}" class="cal-day cal-day--off">{{cell.num}}</view>
+            <view
+              wx:else
+              class="cal-day {{cell.colorClass}} {{cell.hasList ? '' : 'cal-day--nolist'}} {{cell.isToday ? 'cal-today' : ''}}"
+              data-date="{{cell.date}}"
+              data-haslist="{{cell.hasList}}"
+              bindtap="onTapCalDay"
+            >
+              <text class="cal-day-num">{{cell.num}}</text>
+              <text class="cal-day-cnt">{{cell.total}}场</text>
+              <text class="cal-day-ph">{{cell.shortLabel}}</text>
+            </view>
+          </block>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 主内容：按日期分组 + 卡片 -->
+  <view class="groups">
+    <view
+      class="group {{group.isToday ? 'group--today' : ''}} {{flashAnchor === group.anchor ? 'day-flash' : ''}}"
+      wx:for="{{groups}}"
+      wx:key="anchor"
+      wx:for-item="group"
+      id="day-{{group.anchor}}"
+    >
+      <view class="group-title">
+        <text class="group-key">{{group.key}}</text>
+        <text class="group-today" wx:if="{{group.isToday}}">今天</text>
+        <text class="group-phase {{group.phaseClass}}" wx:if="{{group.phaseLabel}}">{{group.phaseLabel}}</text>
+        <text class="group-count">{{group.count}}场</text>
+      </view>
+
+      <view class="cards">
+        <view
+          class="card {{m.finished ? 'card--finished' : ''}}"
+          wx:for="{{group.items}}"
+          wx:key="mid"
+          wx:for-item="m"
+          data-mid="{{m.mid}}"
+          bindtap="onOpenDetail"
+        >
+          <view class="card-head">
+            <text class="card-num">{{m.matchNum}}</text>
+            <text class="card-group">{{m.group}}</text>
+            <text wx:if="{{m.finished}}" class="card-status card-status--done">✓ 完场</text>
+            <text wx:else class="card-time">{{m.time}}</text>
+          </view>
+
+          <view class="card-teams">
+            <view class="team">
+              <image
+                wx:if="{{m.home.logo && !logoFailed[m.home.logo]}}"
+                class="team-logo"
+                src="{{m.home.logo}}"
+                mode="aspectFit"
+                data-url="{{m.home.logo}}"
+                binderror="onLogoError"
+              />
+              <view wx:else class="team-logo team-logo--ph">⚽</view>
+              <text class="team-name">{{m.home.name}}</text>
+            </view>
+            <!-- 已结束显示比分，否则显示 VS -->
+            <view wx:if="{{m.finished}}" class="card-score">
+              <text class="card-score-v">{{m.score.h}}</text>
+              <text class="card-score-sep">-</text>
+              <text class="card-score-v">{{m.score.a}}</text>
+              <text wx:if="{{m.halfScore}}" class="card-score-half">半 {{m.halfScore.h}}-{{m.halfScore.a}}</text>
+            </view>
+            <text wx:else class="vs">VS</text>
+            <view class="team">
+              <image
+                wx:if="{{m.away.logo && !logoFailed[m.away.logo]}}"
+                class="team-logo"
+                src="{{m.away.logo}}"
+                mode="aspectFit"
+                data-url="{{m.away.logo}}"
+                binderror="onLogoError"
+              />
+              <view wx:else class="team-logo team-logo--ph">⚽</view>
+              <text class="team-name">{{m.away.name}}</text>
+            </view>
+          </view>
+
+          <!-- 胜平负 -->
+          <view wx:if="{{m.had}}" class="card-odds">
+            <view class="odd"><text class="odd-k">主胜</text><text class="odd-v">{{m.had.h}}</text></view>
+            <view class="odd"><text class="odd-k">平</text><text class="odd-v">{{m.had.d}}</text></view>
+            <view class="odd"><text class="odd-k">客胜</text><text class="odd-v">{{m.had.a}}</text></view>
+          </view>
+          <view wx:else class="card-odds card-odds--none">未开胜平负</view>
+
+          <!-- 让球核心盘 -->
+          <view wx:if="{{m.hhad}}" class="card-hhad">
+            <text class="hhad-label">让{{m.hhad.goalLine}}</text>
+            <text class="hhad-v">{{m.hhad.h}}</text>
+            <text class="hhad-v">{{m.hhad.d}}</text>
+            <text class="hhad-v">{{m.hhad.a}}</text>
+          </view>
+
+          <!-- 底部：标签 + 方案徽章 -->
+          <view class="card-foot">
+            <view class="tags" wx:if="{{m.tags.length}}">
+              <text class="tag tag--{{tag.cls}}" wx:for="{{m.tags}}" wx:key="name" wx:for-item="tag">{{tag.icon}} {{tag.name}}</text>
+            </view>
+            <text class="card-plan-badge" wx:if="{{m.hasPlan}}">📝 有方案</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 免责声明 -->
+  <view class="disclaimer" wx:if="{{meta}}">⚠ {{meta.disclaimer}}</view>
+</view>
+
+<!-- 返回顶部 -->
+<view class="back-top {{showBackTop ? 'show' : ''}}" bindtap="onBackTop">
+  <text class="back-top-icon">↑</text>
+</view>
+</view>
