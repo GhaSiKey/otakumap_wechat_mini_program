@@ -253,7 +253,9 @@ function countTile(tiles, target) {
 }
 
 /**
- * 统计手牌中宝牌的数量
+ * 统计手牌中由指示牌命中的宝牌数量
+ * 注意: 只统计「指示牌 → 实际宝牌」命中的张数，不含赤宝牌。
+ * 赤宝牌是独立维度 (tile.isRed)，由调用方单独统计，避免表/里宝牌重复计入。
  * @param {Array} tiles - 手牌
  * @param {Array} doraIndicators - 宝牌指示牌数组
  * @returns {number}
@@ -265,9 +267,6 @@ function countDora(tiles, doraIndicators) {
     const dora = getDoraFromIndicator(indicator);
     count += countTile(tiles, dora);
   }
-
-  // 赤宝牌
-  count += tiles.filter((t) => t.isRed).length;
 
   return count;
 }

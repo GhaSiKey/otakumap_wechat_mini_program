@@ -172,12 +172,12 @@ const result = {
     { name: '一盃口', han: 1, isYakuman: false },
   ],
 
-  // 宝牌明细
+  // 宝牌明细（三个维度各自独立统计，互不重叠，相加得 total）
   doraCount: {
-    dora: 2,               // 表宝牌数
-    uraDora: 1,            // 里宝牌数
-    akaDora: 1,            // 赤宝牌数
-    total: 4,              // 宝牌合计
+    dora: 2,               // 表宝牌数（指示牌命中，不含赤）
+    uraDora: 1,            // 里宝牌数（仅立直时计算，不含赤）
+    akaDora: 1,            // 赤宝牌数（tile.isRed，独立维度）
+    total: 4,              // 宝牌合计 = dora + uraDora + akaDora
   },
 
   // 点数计算
@@ -645,6 +645,22 @@ export const THEME = {
 - [ ] 单元测试：点数计算
 - [ ] 集成测试：完整流程
 - [ ] 性能优化：面子分割算法
+
+## 宝牌计数约定
+
+宝牌分三个**互不重叠**的维度统计，最终 `total = dora + uraDora + akaDora`：
+
+| 维度 | 来源 | 计数方式 | 计入条件 |
+|------|------|----------|----------|
+| 表宝牌 dora | 表宝牌指示牌的下一张 | `countDora(手牌, 表指示牌)` 命中张数 | 总是 |
+| 里宝牌 uraDora | 里宝牌指示牌的下一张 | `countDora(手牌, 里指示牌)` 命中张数 | 仅立直时 |
+| 赤宝牌 akaDora | 牌自身 `isRed` 标记 | 手牌中 `isRed === true` 的张数 | 总是 |
+
+实现要点（修复后）：
+
+- `config/tiles.js` 的 `countDora` **只统计指示牌命中的宝牌**，不含赤宝牌——赤宝牌是独立维度，否则会被表/里宝牌重复计入。
+- `engine.js` 的 `countAllDoraForHand` 三维度各自独立统计后相加，不做任何减法补偿。
+- 非立直时，即使传入了里宝牌指示牌也一律忽略（`uraDora = 0`）。
 
 ## 参考资料
 

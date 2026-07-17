@@ -1,0 +1,9 @@
+{
+  "name": "otakumap-dev",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OtakuMap 开发辅助（测试入口），不参与小程序打包",
+  "scripts": {
+    "test": "node tests/mahjong.test.js"
+  }
+}

@@ -161,33 +161,7 @@ function formatScoreDisplay(scoreResult) {
   };
 }
 
-/**
- * 计算宝牌数量
- * @param {Array} tiles - 手牌 (包括副露)
- * @param {Array} doraIndicators - 表宝牌指示牌
- * @param {Array} uraIndicators - 里宝牌指示牌
- * @returns {Object} 宝牌详情
- */
-function countAllDora(tiles, doraIndicators = [], uraIndicators = []) {
-  const { countDora } = require('./config/tiles');
-
-  const dora = countDora(tiles, doraIndicators);
-  const uraDora = countDora(tiles, uraIndicators);
-  const akaDora = tiles.filter((t) => t.isRed).length;
-
-  // 注意: akaDora 已经在 countDora 中计算过了，这里单独列出是为了显示
-  // 实际总数不需要再加 akaDora
-
-  return {
-    dora: dora - akaDora, // 表宝牌 (不含赤)
-    uraDora: uraDora - tiles.filter((t) => t.isRed).length, // 里宝牌 (不含赤)
-    akaDora,
-    total: dora + (uraIndicators.length > 0 ? uraDora - akaDora : 0),
-  };
-}
-
 module.exports = {
   calculateScore,
   formatScoreDisplay,
-  countAllDora,
 };

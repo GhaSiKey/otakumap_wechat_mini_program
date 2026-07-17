@@ -233,7 +233,7 @@ function splitMelds(counts, suit, value, currentMelds, results) {
  * @param {Object} counts - 计数对象
  * @returns {Array} 所有可能的分割方式
  */
-function splitStandardHand(counts) {
+function splitStandardHand(counts, requiredMelds = 4) {
   const results = [];
 
   // 枚举所有可能的雀头
@@ -258,9 +258,9 @@ function splitStandardHand(counts) {
         const meldResults = [];
         splitMelds(newCounts, 'm', 1, [], meldResults);
 
-        // 只保留正好4个面子的结果
+        // 只保留正好 requiredMelds 个面子的结果
         for (const melds of meldResults) {
-          if (melds.length === 4) {
+          if (melds.length === requiredMelds) {
             results.push({ head, melds });
           }
         }
@@ -335,18 +335,40 @@ function determineWaitType(pattern, agariTile, isTsumo) {
 function parseHand(hand) {
   const { closed, melds = [], agariTile, isTsumo } = hand;
 
-  // 合并门前手牌和和牌张
+  // 转换副露类型为内部格式
+  const normalizedMelds = melds.map((m) => {
+    let type;
+    if (m.type === 'chi') {
+      type = MELD_TYPES.SHUNTSU;
+    } else if (m.type === 'pon') {
+      type = MELD_TYPES.KOUTSU;
+    } else if (m.type === 'kan' || m.type === 'minkan') {
+      type = MELD_TYPES.KANTSU;
+    } else if (m.type === 'ankan') {
+      type = MELD_TYPES.KANTSU;
+    } else {
+      // 已经是内部格式
+      type = m.type;
+    }
+    return {
+      ...m,
+      type,
+      isOpen: m.type !== 'ankan' && m.isOpen !== false,
+    };
+  });
+
+  // 合并门前手牌和和牌张（无论自摸还是荣和，和牌张都要参与牌型分析）
   const allClosed = [...closed];
-  if (agariTile && isTsumo) {
+  if (agariTile) {
     allClosed.push(agariTile);
   }
 
   const counts = tilesToCounts(allClosed);
   const results = [];
 
-  // 检查特殊牌型
-  const isChiitoi = melds.length === 0 && isChiitoitsu(counts);
-  const isKokushiHand = melds.length === 0 && isKokushi(counts);
+  // 检查特殊牌型（只有门前才可能）
+  const isChiitoi = normalizedMelds.length === 0 && isChiitoitsu(counts);
+  const isKokushiHand = normalizedMelds.length === 0 && isKokushi(counts);
 
   if (isChiitoi) {
     // 七对子
@@ -377,7 +399,7 @@ function parseHand(hand) {
   }
 
   // 标准和牌形式
-  if (melds.length === 0) {
+  if (normalizedMelds.length === 0) {
     // 门前: 分割所有14张
     const standardPatterns = splitStandardHand(counts);
     for (const pattern of standardPatterns) {
@@ -391,8 +413,7 @@ function parseHand(hand) {
     }
   } else {
     // 有副露: 只分割门前部分
-    // 副露的面子数
-    const openMeldCount = melds.length;
+    const openMeldCount = normalizedMelds.length;
     const closedMeldCount = 4 - openMeldCount;
 
     if (closedMeldCount === 0) {
@@ -409,40 +430,38 @@ function parseHand(hand) {
             results.push({
               type: 'standard',
               head: { suit, value, tiles: [{ suit, value }, { suit, value }] },
-              melds: melds.map((m) => ({ ...m, isOpen: true })),
+              melds: normalizedMelds.map((m) => ({ ...m })),
               waitType,
             });
           }
         }
       }
     } else {
-      // 部分副露
-      const standardPatterns = splitStandardHand(counts);
+      // 部分副露：分割门前部分，需要 closedMeldCount 个面子
+      const standardPatterns = splitStandardHand(counts, closedMeldCount);
       for (const pattern of standardPatterns) {
-        if (pattern.melds.length === closedMeldCount) {
-          const allMelds = [
-            ...pattern.melds.map((m) => ({ ...m, isOpen: false })),
-            ...melds.map((m) => ({ ...m, isOpen: true })),
-          ];
-          const waitType = determineWaitType(
-            { head: pattern.head, melds: allMelds },
-            agariTile,
-            isTsumo
-          );
-          results.push({
-            type: 'standard',
-            head: pattern.head,
-            melds: allMelds,
-            waitType,
-          });
-        }
+        const allMelds = [
+          ...pattern.melds.map((m) => ({ ...m, isOpen: false })),
+          ...normalizedMelds.map((m) => ({ ...m })),
+        ];
+        const waitType = determineWaitType(
+          { head: pattern.head, melds: allMelds },
+          agariTile,
+          isTsumo
+        );
+        results.push({
+          type: 'standard',
+          head: pattern.head,
+          melds: allMelds,
+          waitType,
+        });
       }
     }
   }
 
   return {
     patterns: results,
-    isMenzen: melds.length === 0 || melds.every((m) => m.type === 'ankan'),
+    isMenzen: normalizedMelds.length === 0 || normalizedMelds.every((m) => !m.isOpen),
   };
 }
 

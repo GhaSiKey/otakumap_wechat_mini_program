@@ -6,7 +6,7 @@
 const { parseHand, parseHandFromString } = require('./parser');
 const { calculateFu } = require('./fu-calculator');
 const { checkAllYaku, calculateTotalHan } = require('./yaku-checker');
-const { calculateScore, formatScoreDisplay, countAllDora } = require('./score-calculator');
+const { calculateScore, formatScoreDisplay } = require('./score-calculator');
 const { countDora, parseTiles } = require('./config/tiles');
 
 /**
@@ -139,6 +139,7 @@ function getAllHandTiles(hand) {
 
 /**
  * 计算手牌中的宝牌数量
+ * 三个维度各自独立统计后相加: 表宝牌、里宝牌、赤宝牌互不重叠。
  * @param {Array} tiles - 所有牌
  * @param {Object} dora - 宝牌信息
  * @param {boolean} isRiichi - 是否立直 (决定是否计算里宝牌)
@@ -147,21 +148,20 @@ function getAllHandTiles(hand) {
 function countAllDoraForHand(tiles, dora, isRiichi) {
   const { indicators = [], uraIndicators = [] } = dora;
 
-  // 表宝牌
-  const doraCount = indicators.length > 0 ? countDora(tiles, indicators) : 0;
+  // 表宝牌 (指示牌命中, 不含赤)
+  const doraCount = countDora(tiles, indicators);
 
-  // 里宝牌 (只有立直才计算)
-  const uraDoraCount =
-    isRiichi && uraIndicators.length > 0 ? countDora(tiles, uraIndicators) : 0;
+  // 里宝牌 (只有立直才计算, 不含赤)
+  const uraDoraCount = isRiichi ? countDora(tiles, uraIndicators) : 0;
 
-  // 赤宝牌
+  // 赤宝牌 (独立维度)
   const akaDoraCount = tiles.filter((t) => t.isRed).length;
 
   return {
-    dora: doraCount - akaDoraCount, // 表宝牌不含赤
-    uraDora: uraDoraCount - (isRiichi ? akaDoraCount : 0),
+    dora: doraCount,
+    uraDora: uraDoraCount,
     akaDora: akaDoraCount,
-    total: doraCount + (isRiichi ? uraDoraCount - akaDoraCount : 0),
+    total: doraCount + uraDoraCount + akaDoraCount,
   };
 }
 
