@@ -2,7 +2,7 @@
 
 ## 概述
 
-OtakuMap 是一个微信小程序项目，采用「主包 + 功能分包」架构，包含番剧追踪、光栅卡和日麻点数计算三个独立功能模块。
+OtakuMap 是一个微信小程序项目，采用「主包 + 功能分包」架构，包含番剧追踪、光栅卡、日麻点数计算和世界杯赔率四个独立功能模块。
 
 ## 架构分层
 
@@ -18,7 +18,7 @@ OtakuMap 是一个微信小程序项目，采用「主包 + 功能分包」架�
 │   API调用 + 数据转换 + 缓存策略         │
 ├─────────────────────────────────────────┤
 │              基础层                      │
-│   微信API + TDesign组件 + 云开发        │
+│   微信API + TDesign组件 + 本地Storage   │
 └─────────────────────────────────────────┘
 ```
 
@@ -134,7 +134,26 @@ splitStandardHand(counts)
 
 同一手牌可能有多种分割方式，需要全部找出并选择符数最高的。
 
-### 4. 全局样式系统
+### 4. worldcup（世界杯赔率）
+
+**设计思想**: 静态快照 + 数据驱动渲染
+
+```
+worldcup-data.js (冻结快照, CommonJS)
+    │
+    └── transform.js (预处理)
+        │
+        ├── buildGroups()    → 按日期分组 + 阶段徽章 + 今天标记
+        ├── buildCalendar()  → 日期条 / 月历两版视图模型
+        └── buildDetail()    → 价值分析 + AI点评 + 完整赔率
+            │
+            ├── buildOddsSection() → 行式玩法 + 半全场排序
+            └── buildCrsMatrix()   → 比分 6×6 热力矩阵
+```
+
+**关键差异（H5 → 小程序）**: Web 版在渲染时用 innerHTML 拼接计算色温 class、比分矩阵、最低赔率高亮；小程序是数据驱动，这些计算全部前移到 transform.js，输出可直接被 WXML `wx:for` 消费的结构。详见 [worldcup.md](worldcup.md)。
+
+### 5. 全局样式系统
 
 基于 TDesign CSS 变量，支持深色模式：
 
@@ -199,7 +218,8 @@ wx.onDeviceMotionChange(res)
 |------|------|----------|
 | anime-checklist | 番剧追踪 | TDesign 组件 |
 | lenticular | 光栅卡 | TDesign 组件 + 传感器 |
-| mahjong-score | 日麻点数计算 | utils/mahjong 算法模块 |
+| mahjong-score | 日麻点数计算 | packageFeatures/utils/mahjong 算法模块 |
+| worldcup | 世界杯赔率 | packageFeatures/utils/worldcup 数据模块 |
 
 分包减小主包体积，用户按需加载。
 

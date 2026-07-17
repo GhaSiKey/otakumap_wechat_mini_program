@@ -9,13 +9,14 @@
 | 番剧追踪 | 记录追番清单，标记已看完的番剧，支持拖拽排序 | 分包 pages/anime-checklist |
 | 光栅卡 | 选择多张图片，倾斜手机体验百叶窗切换效果 | 分包 pages/lenticular |
 | 日麻点数计算 | 输入手牌自动计算符数、役种和点数 | 分包 pages/mahjong-score |
+| 世界杯赔率 | 2026 FIFA 世界杯赔率、赛程日历与赛事详情（静态快照） | 分包 pages/worldcup |
 
 ## 技术栈
 
-- **框架**: 微信小程序 (miniprogram)
-- **UI库**: TDesign Miniprogram ^1.5.0
-- **云开发**: 微信云开发 (CloudBase)
+- **框架**: 微信小程序 (miniprogram)，纯原生，无云开发依赖
+- **UI库**: TDesign Miniprogram ^1.5.0（仅分包使用）
 - **分包策略**: 功能模块放入 subpackages 减小主包体积
+- **数据存储**: 本地 Storage（番剧清单等）
 
 ## 项目结构
 
@@ -23,28 +24,29 @@
 otakumap/
 ├── miniprogram/                    # 小程序主体
 │   ├── pages/                      # 主包页面
-│   │   ├── index/                  # 首页（功能入口）
-│   │   └── example/                # 示例页
+│   │   └── index/                  # 首页（功能入口，纯 CSS 日夜间适配）
 │   ├── packageFeatures/            # 分包（功能模块）
 │   │   ├── pages/
 │   │   │   ├── anime-checklist/     # 番剧追踪
 │   │   │   ├── lenticular/          # 光栅卡
-│   │   │   └── mahjong-score/       # 日麻点数计算
+│   │   │   ├── mahjong-score/       # 日麻点数计算
+│   │   │   └── worldcup/            # 世界杯赔率
 │   │   └── utils/
-│   │       └── lenticular-engine.js # 光栅引擎核心算法
-│   ├── utils/
-│   │   └── mahjong/                 # 日麻计算核心模块
-│   │       ├── config/              # 配置文件
-│   │       ├── parser.js            # 手牌解析
-│   │       ├── fu-calculator.js     # 符数计算
-│   │       ├── yaku-checker.js      # 役种判定
-│   │       ├── score-calculator.js  # 点数计算
-│   │       └── engine.js            # 核心引擎
-│   ├── components/                  # 公共组件
+│   │       ├── lenticular-engine.js # 光栅引擎核心算法
+│   │       ├── mahjong/             # 日麻计算核心模块
+│   │       │   ├── config/          # 配置文件
+│   │       │   ├── parser.js        # 手牌解析
+│   │       │   ├── fu-calculator.js # 符数计算
+│   │       │   ├── yaku-checker.js  # 役种判定
+│   │       │   ├── score-calculator.js # 点数计算
+│   │       │   └── engine.js        # 核心引擎
+│   │       └── worldcup/            # 世界杯数据模块
+│   │           ├── data/worldcup-data.js # 赔率数据快照
+│   │           └── transform.js     # 数据预处理（分组/色温/矩阵）
 │   ├── app.js                      # 应用入口
 │   ├── app.json                    # 应用配置
 │   └── app.wxss                    # 全局样式（TDesign CSS变量）
-├── cloudfunctions/                  # 云函数
+├── tests/                          # 纯算法模块的 Node 测试（零依赖）
 ├── docs/                           # 项目文档
 └── project.config.json             # 微信开发者工具配置
 ```
@@ -62,6 +64,15 @@ otakumap/
 # 安装依赖（已内置 node_modules）
 cd miniprogram
 npm install
+```
+
+### 测试
+
+纯算法模块（`packageFeatures/utils/mahjong/`）有零依赖的 Node 回归测试，详见 [tests/README.md](../tests/README.md)：
+
+```bash
+# 项目根目录
+npm test
 ```
 
 ### 分包配置说明

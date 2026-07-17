@@ -1,12 +1,25 @@
-# 云开发 quickstart
+# OtakuMap
 
-这是云开发的快速启动指引，其中演示了如何上手使用云开发的三大基础能力：
+二次元爱好者的工具箱微信小程序，提供番剧追踪、光栅卡、日麻点数计算等实用功能。
 
-- 数据库：一个既可在小程序前端操作，也能在云函数中读写的 JSON 文档型数据库
-- 文件存储：在小程序前端直接上传/下载云端文件，在云开发控制台可视化管理
-- 云函数：在云端运行的代码，微信私有协议天然鉴权，开发者只需编写业务逻辑代码
+## 文档
 
-## 参考文档
+完整文档见 [`docs/`](docs/)：
 
-- [云开发文档](https://developers.weixin.qq.com/miniprogram/dev/wxcloud/basis/getting-started.html)
+- [项目说明与功能列表](docs/README.md)
+- [架构设计](docs/architecture.md)
+- [日麻点数计算器](docs/mahjong-score.md)
+- [光栅卡](docs/lenticular.md)
+- [番剧追踪](docs/anime-checklist.md)
+- [变更日志](docs/changelog.md)
 
+## 开发
+
+```bash
+# 纯算法模块测试（零依赖，Node 直接跑）
+npm test
+```
+
+小程序在微信开发者工具中打开 `miniprogram/`。修改 npm 依赖后需在开发者工具「工具 → 构建 npm」。
+
+开发约束见 [CLAUDE.md](CLAUDE.md)。
