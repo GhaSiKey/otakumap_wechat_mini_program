@@ -154,6 +154,68 @@ view, text, scroll-view, image { box-sizing: border-box; }
   border-radius: 4rpx;
 }
 
+/* ── 冠军收官条（赛事闭幕）── */
+.champion-banner {
+  position: relative; overflow: hidden;
+  margin: 0 0 44rpx; padding: 36rpx 44rpx;
+  border-radius: var(--radius);
+  border: 1rpx solid rgba(232, 196, 119, 0.35);
+  background:
+    radial-gradient(120% 140% at 15% 0%, rgba(255, 217, 138, 0.16) 0%, transparent 55%),
+    linear-gradient(135deg, rgba(232, 196, 119, 0.10) 0%, rgba(184, 147, 47, 0.05) 100%),
+    var(--surface);
+  box-shadow: 0 16rpx 64rpx rgba(184, 147, 47, 0.18), inset 0 2rpx 0 rgba(255, 217, 138, 0.15);
+}
+/* 斜向流光扫过 */
+.champion-banner::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 217, 138, 0.14) 50%, transparent 70%);
+  animation: champShine 5.5s ease-in-out infinite;
+}
+@keyframes champShine {
+  0%,100% { transform: translateX(-40%); opacity: 0.5; }
+  50% { transform: translateX(40%); opacity: 1; }
+}
+.champ-top { display: flex; align-items: center; gap: 28rpx; position: relative; }
+.champ-trophy {
+  font-size: 80rpx; line-height: 1; flex-shrink: 0;
+  animation: trophyGlow 3.5s ease-in-out infinite;
+}
+.champ-lines { display: flex; flex-direction: column; gap: 6rpx; min-width: 0; }
+.champ-headline {
+  font-size: 26rpx; font-weight: 600; letter-spacing: 3rpx;
+  color: var(--gold); opacity: 0.85;
+}
+.champ-name {
+  font-size: 48rpx; font-weight: 800; letter-spacing: 1rpx;
+  background: linear-gradient(120deg, var(--gold-bright) 0%, var(--gold) 50%, var(--gold-deep) 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: var(--gold);
+}
+/* 四强晋级路径 */
+.champ-podium {
+  display: flex; flex-wrap: wrap; gap: 16rpx; margin-top: 28rpx;
+  padding-top: 28rpx; border-top: 1rpx solid rgba(232, 196, 119, 0.18);
+  position: relative;
+}
+.champ-rank {
+  display: inline-flex; align-items: center; gap: 12rpx;
+  padding: 10rpx 24rpx; border-radius: 9999rpx;
+  font-size: 26rpx; font-weight: 600;
+  background: var(--surface-2); border: 1rpx solid var(--border);
+  color: var(--text);
+}
+.champ-medal { font-size: 28rpx; }
+.champ-rank--1 {
+  border-color: rgba(232, 196, 119, 0.45);
+  background: rgba(232, 196, 119, 0.10);
+  color: var(--gold-bright);
+}
+.champ-note {
+  width: 100%; margin-top: 8rpx;
+  font-size: 24rpx; color: var(--text-faint);
+}
+
 /* ── 赛程日历 ── */
 .calendar {
   margin: 0 0 44rpx; padding: 32rpx 36rpx;

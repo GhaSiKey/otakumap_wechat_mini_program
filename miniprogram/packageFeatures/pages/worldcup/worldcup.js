@@ -10,6 +10,7 @@ const T = require('../../utils/worldcup/transform');
 Page({
   data: {
     meta: null,        // 页头元信息（赔率截止时间、免责声明）
+    tournament: null,  // 冠军收官条（赛事闭幕才有，否则 null 不渲染）
     calendar: null,    // 赛程日历视图模型
     groups: [],        // 按日期分组的卡片列表
     calView: 'strip',  // 日历视图：strip 日期条 / grid 月历
@@ -36,6 +37,7 @@ Page({
     const page = T.buildPageModel(WC_DATA);
     this.setData({
       meta: page.meta,
+      tournament: page.tournament,
       calendar: page.calendar,
       groups: page.groups,
     }, () => {

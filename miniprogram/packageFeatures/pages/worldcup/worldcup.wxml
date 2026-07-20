@@ -29,6 +29,24 @@
 
   <view class="title-rule"></view>
 
+  <!-- 冠军收官条：赛事闭幕才渲染 -->
+  <view class="champion-banner" wx:if="{{tournament}}">
+    <view class="champ-top">
+      <text class="champ-trophy">🏆</text>
+      <view class="champ-lines">
+        <text class="champ-headline">{{tournament.headline}}</text>
+        <text class="champ-name">👑 {{tournament.champion}}</text>
+      </view>
+    </view>
+    <view class="champ-podium">
+      <view class="champ-rank {{r.top ? 'champ-rank--1' : ''}}" wx:for="{{tournament.podium}}" wx:for-item="r" wx:key="name">
+        <text class="champ-medal">{{r.medal}}</text>
+        <text>{{r.name}}</text>
+      </view>
+      <text class="champ-note" wx:if="{{tournament.note}}">{{tournament.note}}</text>
+    </view>
+  </view>
+
   <!-- 赛程总览日历 -->
   <view class="calendar" wx:if="{{calendar}}">
     <view class="cal-head">

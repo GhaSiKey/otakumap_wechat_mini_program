@@ -371,6 +371,34 @@ function buildDetail(m) {
   };
 }
 
+// ── 冠军收官条（赛事闭幕时展示）──
+
+/** 四强名次配置：奖牌 emoji + 对应 tournament 字段名（顺序即展示顺序）。
+ *  抽成配置而非散落在拼接逻辑里，新增/调整名次只改这一处。 */
+const PODIUM_RANKS = [
+  { medal: '🥇', field: 'champion', top: true },
+  { medal: '🥈', field: 'runnerUp' },
+  { medal: '🥉', field: 'third' },
+  { medal: '4️⃣', field: 'fourth' },
+];
+
+/** 冠军收官条视图模型。仅赛事 status==='finished' 时返回对象，否则 null（页面据此 wx:if）。 */
+function buildTournament(t) {
+  if (!t || t.status !== 'finished') return null;
+  // 四强路径：过滤掉缺失名次，组装成可直接 wx:for 的列表
+  const podium = PODIUM_RANKS
+    .filter((r) => t[r.field])
+    .map((r) => ({ medal: r.medal, name: t[r.field], top: !!r.top }));
+  // 收官备注：决赛比分 + 季军赛比分（后者可选），用 " · " 连接
+  const note = [t.finalNote, t.thirdNote].filter(Boolean).join(' · ');
+  return {
+    headline: t.headline || '赛事已闭幕',
+    champion: t.champion || '',
+    podium,
+    note,
+  };
+}
+
 // ── 顶层：构建整页视图模型 ──
 
 /** 由原始数据构建整页视图模型。 */
@@ -381,6 +409,7 @@ function buildPageModel(data) {
       analyzedStamp: data.meta.analyzedAt ? fmtStamp(data.meta.analyzedAt) : '',
       disclaimer: data.meta.disclaimer || '',
     },
+    tournament: buildTournament(data.meta.tournament),
     calendar: buildCalendar(data.schedule, data.matches),
     groups: buildGroups(data.matches, data.schedule),
   };
@@ -395,6 +424,7 @@ module.exports = {
   buildGroups,
   buildCalendar,
   buildDetail,
+  buildTournament,
   buildPageModel,
 };
 
