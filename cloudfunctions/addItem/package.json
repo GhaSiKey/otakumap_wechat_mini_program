@@ -1,0 +1,9 @@
+{
+  "name": "addItem",
+  "version": "1.0.0",
+  "description": "向共享番单添加番剧条目，成员校验 + 同板去重",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

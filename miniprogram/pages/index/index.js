@@ -30,6 +30,13 @@ Page({
         emoji: '🏆',
         path: '/packageFeatures/pages/worldcup/worldcup',
       },
+      {
+        id: 'shared-board',
+        title: '共享追番板',
+        desc: '和 TA 共享一份番单，一起追番、同步进度',
+        emoji: '👫',
+        path: '/packageFeatures/pages/shared-board/board-list',
+      },
     ],
   },
 

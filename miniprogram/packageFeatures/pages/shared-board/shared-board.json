@@ -1,0 +1,17 @@
+{
+  "navigationBarTitleText": "共享番单",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "t-avatar": "tdesign-miniprogram/avatar/avatar",
+    "t-button": "tdesign-miniprogram/button/button",
+    "t-fab": "tdesign-miniprogram/fab/fab",
+    "t-popup": "tdesign-miniprogram/popup/popup",
+    "t-input": "tdesign-miniprogram/input/input",
+    "t-notice-bar": "tdesign-miniprogram/notice-bar/notice-bar",
+    "t-picker": "tdesign-miniprogram/picker/picker",
+    "t-picker-item": "tdesign-miniprogram/picker-item/picker-item",
+    "t-action-sheet": "tdesign-miniprogram/action-sheet/action-sheet",
+    "t-tag": "tdesign-miniprogram/tag/tag",
+    "t-icon": "tdesign-miniprogram/icon/icon"
+  }
+}

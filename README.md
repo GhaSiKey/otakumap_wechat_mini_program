@@ -1,6 +1,6 @@
 # OtakuMap
 
-二次元爱好者的工具箱微信小程序，提供番剧追踪、光栅卡、日麻点数计算等实用功能。
+二次元爱好者的工具箱微信小程序，提供番剧追踪、共享追番板、光栅卡、日麻点数计算等实用功能。
 
 ## 文档
 
@@ -11,6 +11,7 @@
 - [日麻点数计算器](docs/mahjong-score.md)
 - [光栅卡](docs/lenticular.md)
 - [番剧追踪](docs/anime-checklist.md)
+- [共享追番板](docs/shared-board.md)（PRD）· [UI 设计](docs/shared-board-ui.md) · [数据层设计](docs/shared-board-data.md)
 - [变更日志](docs/changelog.md)
 
 ## 开发

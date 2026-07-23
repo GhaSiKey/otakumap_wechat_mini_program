@@ -2,8 +2,11 @@
   "name": "otakumap-dev",
   "version": "1.0.0",
   "private": true,
-  "description": "OtakuMap 开发辅助（测试入口），不参与小程序打包",
+  "description": "OtakuMap 开发辅助（测试入口 + 小程序 npm 依赖源）。node_modules 装在根，不落 miniprogramRoot，避免被算进主包",
   "scripts": {
-    "test": "node tests/mahjong.test.js && node tests/worldcup.test.js"
+    "test": "node tests/mahjong.test.js && node tests/worldcup.test.js && node tests/shared-board.test.js"
+  },
+  "dependencies": {
+    "tdesign-miniprogram": "^1.5.0"
   }
 }

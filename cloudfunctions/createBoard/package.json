@@ -1,0 +1,9 @@
+{
+  "name": "createBoard",
+  "version": "1.0.0",
+  "description": "创建共享追番板，建者为 owner，生成一次性配对 token",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

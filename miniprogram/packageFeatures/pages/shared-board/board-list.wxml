@@ -1,0 +1,72 @@
+<view class="page">
+  <!-- 加载骨架屏 -->
+  <view wx:if="{{loading}}" class="board-list">
+    <view class="skeleton-card" wx:for="{{[1,2,3]}}" wx:key="*this">
+      <view class="skeleton-line skeleton-line--title"></view>
+      <view class="skeleton-line skeleton-line--meta"></view>
+    </view>
+  </view>
+
+  <!-- 空态：一个板都没有 -->
+  <view wx:elif="{{boards.length === 0}}" class="empty-wrap">
+    <t-empty icon="folder-open" description="还没有共享的番单" />
+    <view class="empty-sub">和 TA 开一个，一起追番吧</view>
+    <t-button theme="primary" size="large" bindtap="onCreateTap">建第一个板</t-button>
+  </view>
+
+  <!-- 板列表 -->
+  <view wx:else class="board-list">
+    <view
+      wx:for="{{boards}}"
+      wx:key="boardId"
+      class="board-card {{item.archived ? 'board-card--archived' : ''}}"
+      data-board-id="{{item.boardId}}"
+      bindtap="onBoardTap"
+    >
+      <view class="board-card__main">
+        <view class="board-name">
+          <view wx:if="{{item.hasUnread && !item.archived}}" class="unread-dot"></view>
+          <text wx:if="{{item.archived}}" class="archived-tag">📁 </text>{{item.name}}
+        </view>
+        <view class="board-meta">
+          <text>{{item.itemCount}} 部番</text>
+          <text wx:if="{{item.waitingHint}}" class="waiting-hint"> · {{item.waitingHint}}</text>
+          <text wx:elif="{{item.peerName}}"> · 和 {{item.peerName}}</text>
+        </view>
+      </view>
+      <!-- 对方头像 / 虚位 -->
+      <view class="board-card__avatar">
+        <t-avatar wx:if="{{item.peerAvatar}}" image="{{item.peerAvatar}}" size="small" />
+        <view
+          wx:elif="{{item.peerFallback}}"
+          class="avatar-fallback"
+          style="background:{{item.peerFallback.color}}"
+        >{{item.peerFallback.char}}</view>
+        <view wx:else class="avatar-ghost">?</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 建板 FAB（t-fab 抛 click 事件，不是 tap） -->
+  <t-fab wx:if="{{boards.length > 0}}" icon="add" bind:click="onCreateTap" />
+
+  <!-- 建板弹层 -->
+  <t-popup visible="{{showCreate}}" placement="bottom" bind:visible-change="onCreateVisibleChange">
+    <view class="create-panel">
+      <view class="create-title">新建共享番单</view>
+      <t-input
+        placeholder="给这个板起个名（可留空）"
+        value="{{newBoardName}}"
+        maxlength="20"
+        bind:change="onBoardNameInput"
+      />
+      <t-button
+        theme="primary"
+        size="large"
+        block
+        loading="{{creating}}"
+        bindtap="onConfirmCreate"
+      >建板</t-button>
+    </view>
+  </t-popup>
+</view>

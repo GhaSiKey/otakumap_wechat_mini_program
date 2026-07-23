@@ -1,5 +1,6 @@
 {
   "miniprogramRoot": "miniprogram/",
+  "cloudfunctionRoot": "cloudfunctions/",
   "setting": {
     "urlCheck": true,
     "es6": true,
@@ -34,7 +35,7 @@
     "packNpmManually": true,
     "packNpmRelationList": [
       {
-        "packageJsonPath": "miniprogram/package.json",
+        "packageJsonPath": "package.json",
         "miniprogramNpmDistDir": "miniprogram/packageFeatures"
       }
     ],
@@ -71,7 +72,12 @@
   "compileType": "miniprogram",
   "srcMiniprogramRoot": "miniprogram/",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "node_modules"
+      }
+    ],
     "include": []
   },
   "editorSetting": {

@@ -1,0 +1,9 @@
+{
+  "name": "getBoardDetail",
+  "version": "1.0.0",
+  "description": "一次返回一个板及其未删番单，供 P2 门面渲染",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

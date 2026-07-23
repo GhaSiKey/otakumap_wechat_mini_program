@@ -1,0 +1,9 @@
+{
+  "name": "updateMemberProfile",
+  "version": "1.0.0",
+  "description": "更新当前成员在板内的头像昵称快照（只改自己那条 members）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

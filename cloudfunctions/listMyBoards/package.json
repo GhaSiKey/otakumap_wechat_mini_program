@@ -1,0 +1,9 @@
+{
+  "name": "listMyBoards",
+  "version": "1.0.0",
+  "description": "查询当前用户参与的所有共享板，附每个板的番剧数摘要",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

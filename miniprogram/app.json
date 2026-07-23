@@ -12,7 +12,9 @@
         "pages/anime-checklist/anime-checklist",
         "pages/mahjong-score/mahjong-score",
         "pages/worldcup/worldcup",
-        "pages/worldcup/detail/detail"
+        "pages/worldcup/detail/detail",
+        "pages/shared-board/board-list",
+        "pages/shared-board/shared-board"
       ]
     }
   ],

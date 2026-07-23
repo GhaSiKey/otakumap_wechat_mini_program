@@ -1,0 +1,9 @@
+{
+  "name": "deleteItem",
+  "version": "1.0.0",
+  "description": "软删除/恢复番剧条目，绝不物理删，避免对方进度蒸发",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

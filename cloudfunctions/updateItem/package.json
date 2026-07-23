@@ -1,0 +1,9 @@
+{
+  "name": "updateItem",
+  "version": "1.0.0",
+  "description": "修改番剧共享字段（番名/总集数/放送状态/封面），白名单防越权",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

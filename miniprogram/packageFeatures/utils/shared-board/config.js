@@ -1,0 +1,162 @@
+/**
+ * config.js — 共享追番板配置（权威源）
+ *
+ * 所有集合名 / 人数上限 / 状态枚举 / 错误码 / 阈值 / 文案一律集中于此，
+ * 业务代码只引符号名，不写字面量（对齐项目「禁止硬编码」约束）。
+ *
+ * 纯 CommonJS，不依赖小程序 API，可被前端页面、transform.js、Node 测试共同 require。
+ * 云函数无法 require 本文件（各云函数目录独立打包），采用「服务端子集拷贝 + 深比较守卫测试」
+ * 保持同源，详见 docs/shared-board-data.md §5.2。
+ */
+
+// ── 集合名 ──
+const COLLECTION = {
+  BOARD: 'shared_boards',
+  ITEM: 'shared_board_items',
+  NUDGE: 'shared_board_nudges', // Should：催更事件流，MVP 不建
+};
+
+// ── 人数上限（固定 2 人配对，不写死数字 2）──
+const BOARD_MEMBER_LIMIT = 2;
+
+// ── 状态枚举 ──
+const BOARD_STATUS = { ACTIVE: 'active', FULL: 'full', ARCHIVED: 'archived' };
+const MEMBER_ROLE = { OWNER: 'owner', GUEST: 'guest' };
+const AIR_STATUS = { AIRING: 'airing', FINISHED: 'finished', UNKNOWN: 'unknown' };
+// 放送状态中文标签（卡片信息密度用；unknown 不显示，不硬造文案）
+const AIR_STATUS_LABELS = { airing: '放送中', finished: '已完结', unknown: '' };
+
+// 进度状态机（PRD §5.2）：想看 / 在追 / 追平待更 / 暂缓 / 看完 / 弃番
+const PROGRESS_STATUS = ['want', 'watching', 'caught_up', 'paused', 'done', 'dropped'];
+const PROGRESS_STATUS_DEFAULT = 'want';
+
+// ── 集数边界 ──
+const EP_MIN = 0; // 0 = 未开追
+const EP_MAX_WHEN_UNKNOWN = 9999; // 无 totalEp 时的上限兜底（后端 clamp 用）
+const EP_PICKER_MAX_UNKNOWN = 99; // 无 totalEp 时选集器展示上限（滚轮别太长，够用即可）
+
+// ── 配对 token ──
+const PAIR_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 有效期 24h
+
+// ── 文案 / 长度 ──
+const DEFAULT_BOARD_NAME = '我俩的番单';
+const BOARD_NAME_MAX = 20;
+const ITEM_NAME_MAX = 60;
+
+// updateItem 可改的共享字段白名单（防越权改私有/受控字段）
+const ITEM_SHARED_FIELDS = ['name', 'totalEp', 'airStatus', 'cover'];
+
+// 催更冷却（Should）
+const NUDGE_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+
+// ── 错误码 ──
+const ERR = {
+  OK: 'OK',
+  UNAUTHENTICATED: 'ERR_UNAUTHENTICATED',
+  INTERNAL: 'ERR_INTERNAL',
+  INVALID_PARAM: 'ERR_INVALID_PARAM',
+  BOARD_NOT_FOUND: 'ERR_BOARD_NOT_FOUND',
+  NOT_MEMBER: 'ERR_NOT_MEMBER',
+  BOARD_FULL: 'ERR_BOARD_FULL',
+  TOKEN_INVALID: 'ERR_TOKEN_INVALID',
+  TOKEN_EXPIRED: 'ERR_TOKEN_EXPIRED',
+  TOKEN_USED: 'ERR_TOKEN_USED',
+  ITEM_NOT_FOUND: 'ERR_ITEM_NOT_FOUND',
+  DUPLICATE_ITEM: 'ERR_DUPLICATE_ITEM',
+  INVALID_EP: 'ERR_INVALID_EP',
+  INVALID_STATUS: 'ERR_INVALID_STATUS',
+};
+
+// 「加入板」场景各错误码对应的用户提示（标题 + 内容），集中配置不硬编码进页面
+const JOIN_ERR_MESSAGES = {
+  [ERR.BOARD_FULL]: { title: '来晚一步', content: '这个板已经满啦' },
+  [ERR.BOARD_NOT_FOUND]: { title: '板不存在', content: '这个板可能已被解散' },
+  [ERR.TOKEN_INVALID]: { title: '邀请无效', content: '链接不完整，让 TA 重新分享' },
+  [ERR.TOKEN_EXPIRED]: { title: '邀请过期', content: '邀请链接已过期，让 TA 重新分享' },
+  [ERR.TOKEN_USED]: { title: '邀请失效', content: '这个邀请已被使用，让 TA 重新分享' },
+  _default: { title: '加入失败', content: '请稍后重试' },
+};
+
+// ── 视图层阈值（transform.js 用，UI 规格 §8）──
+const VIEW = {
+  AXIS_LEAD_ANCHOR: 75, // 无分母时领先者游标锚定在轴的百分比位置
+  OVERLAP_PCT: 3, // 两游标间距 < 此值 → 判定追平重叠 ◉
+  BREAK_GAP: 12, // 集数差 > 此值 → 轴断裂波浪，不等比拉伸
+  BLUR_GAP: 5, // 集数差 > 此值 → 领先幅度显模糊档（防剧透）
+};
+
+// ── 分区（UI 规格 §P2，顺序即展示顺序，不硬编码）──
+const SECTION = {
+  TOGETHER: 'together', // 一起追
+  NOT_STARTED: 'not_started', // 还没开追
+  PAUSED: 'paused', // 暂缓 / 下车了
+  DONE: 'done', // 一起追完了
+};
+const SECTION_ORDER = [SECTION.TOGETHER, SECTION.NOT_STARTED, SECTION.PAUSED, SECTION.DONE];
+
+// 分区标题文案（配对态：含关系词，UI 层展示，集中配置不硬编码进 wxml）
+const SECTION_TITLES = {
+  [SECTION.TOGETHER]: '一起追',
+  [SECTION.NOT_STARTED]: '还没开追',
+  [SECTION.PAUSED]: '暂缓 / 下车了',
+  [SECTION.DONE]: '一起追完了 🎉',
+};
+
+// 筹备态（单人，对方未加入）分区标题：去关系词，中性化（会议决策 §5.5）
+const SECTION_TITLES_SOLO = {
+  [SECTION.TOGETHER]: '在追',
+  [SECTION.NOT_STARTED]: '想看',
+  [SECTION.PAUSED]: '暂缓 / 弃番',
+  [SECTION.DONE]: '看完了',
+};
+
+// 进度状态中文标签
+const STATUS_LABELS = {
+  want: '想看',
+  watching: '在追',
+  caught_up: '追平待更',
+  paused: '暂缓',
+  done: '看完',
+  dropped: '弃番',
+};
+
+// ── 首字色块调色板（封面为空时占位）──
+// JS 侧取不到 WXSS 的 --td-* 变量，故从 TDesign 品牌色阶人工派生并集中于此，
+// 属「配置层集中管理」而非「散落硬编码」。真按变量取色需 wx.getComputedStyle，MVP 不做。
+const COVER_PALETTE = ['#0052D9', '#0594FA', '#00A870', '#ED7B2A', '#E34D59', '#834EC2', '#EBB105'];
+
+// ── 成员身份色（固定 2 人）──
+// 我=品牌蓝，TA=紫。TA 刻意不用成功绿(#00A870)：绿是「追平/看完」的奖章色，
+// TA 恒绿会让里程碑绿失去高光、且在进度语境易读成「TA 领先」，踩碎「陪伴不排名」。
+// 同 COVER_PALETTE：JS 侧驱动 inline style 取不到 --td-* 变量，故集中配置于此。
+const MEMBER_COLORS = { me: '#0052D9', peer: '#834EC2' };
+
+module.exports = {
+  COLLECTION,
+  BOARD_MEMBER_LIMIT,
+  BOARD_STATUS,
+  MEMBER_ROLE,
+  AIR_STATUS,
+  PROGRESS_STATUS,
+  PROGRESS_STATUS_DEFAULT,
+  EP_MIN,
+  EP_MAX_WHEN_UNKNOWN,
+  EP_PICKER_MAX_UNKNOWN,
+  PAIR_TOKEN_TTL_MS,
+  DEFAULT_BOARD_NAME,
+  BOARD_NAME_MAX,
+  ITEM_NAME_MAX,
+  ITEM_SHARED_FIELDS,
+  NUDGE_COOLDOWN_MS,
+  ERR,
+  JOIN_ERR_MESSAGES,
+  VIEW,
+  SECTION,
+  SECTION_ORDER,
+  SECTION_TITLES,
+  SECTION_TITLES_SOLO,
+  STATUS_LABELS,
+  COVER_PALETTE,
+  MEMBER_COLORS,
+  AIR_STATUS_LABELS,
+};

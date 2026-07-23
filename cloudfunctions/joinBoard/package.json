@@ -1,0 +1,9 @@
+{
+  "name": "joinBoard",
+  "version": "1.0.0",
+  "description": "第二人凭 boardId + 一次性 token 配对入板，防抢坑防并发",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

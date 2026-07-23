@@ -153,7 +153,37 @@ worldcup-data.js (冻结快照, CommonJS)
 
 **关键差异（H5 → 小程序）**: Web 版在渲染时用 innerHTML 拼接计算色温 class、比分矩阵、最低赔率高亮；小程序是数据驱动，这些计算全部前移到 transform.js，输出可直接被 WXML `wx:for` 消费的结构。详见 [worldcup.md](worldcup.md)。
 
-### 5. 全局样式系统
+### 5. shared-board（共享追番板）
+
+**设计思想**: 首个后端功能——共享条目 + openid 私有进度，读走权限规则、写走云函数
+
+这是项目**首次引入微信云开发**（前 4 个功能全是纯客户端）。核心难点是「番剧条目两人共享，但进度各自独立、互不覆盖」。
+
+```
+微信云数据库
+    ├── shared_boards      (板 + 成员 members[] + 配对 token)
+    └── shared_board_items (共享条目 + progress:{openid:{ep,status}} 私有进度)
+              │
+云函数（写全走云函数，getWXContext 取可信 openid）
+    ├── createBoard / joinBoard   建板 / 配对入板（一次性 token 防抢坑 + 原子条件更新防并发）
+    ├── addItem / updateItem / deleteItem   加番去重 / 改共享字段 / 软删除
+    ├── updateProgress            只改 progress.${OPENID} 子键（动态 key 保私有性）
+    └── listMyBoards / getBoardDetail   读（也走云函数，逻辑集中服务端）
+              │
+utils/shared-board/transform.js (纯逻辑，可 Node 测试)
+    ├── buildProgressPair()   同轴双游标百分比 + 领先关系 + 防剧透模糊档
+    ├── groupItems()          按状态分区（一起追/还没开追/暂缓/追完），排序各存各的
+    └── buildBoardViewModel() 整板视图模型 + 筹备态(单人)/配对态判定
+```
+
+**关键设计决策**：
+- **进度内嵌非拆表**：微信安全规则是「文档级」权限、管不到字段级，故「只准改自己子键」靠云函数（动态 key `progress.${OPENID}` + 可信身份）实现，是官方标准「读走规则、写走云函数」。
+- **筹备态**：单人可先用（加番、追进度），双人 UI 靠 `hasPeer`/`vm.peer` 天然隐藏，只留虚位空椅 + 邀请入口。定位是「候场室」非「单人模式」，避免稀释「共享」命根。
+- **数据来源无关**：cover/totalEp 谁填都行，不绑定外部源 ID（Bangumi/TMDB 被墙，MVP 全手动输入）。
+
+详见 [shared-board.md](shared-board.md)（PRD）、[shared-board-ui.md](shared-board-ui.md)（UI）、[shared-board-data.md](shared-board-data.md)（数据层）。
+
+### 6. 全局样式系统
 
 基于 TDesign CSS 变量，支持深色模式：
 

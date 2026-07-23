@@ -2,6 +2,31 @@
 
 格式: `[日期] 版本 - 变更描述`
 
+## [2026-07-23] v1.4.0 - 共享追番板（首个云开发功能）
+
+### 新增
+
+- 共享追番板 (shared-board)：两人共享一份番单，各自维护进度，同轴双头像对比「能安全聊到第几集」
+  - **首次引入微信云开发**（前 4 个功能纯客户端）：环境 `cloudbase-d1gtv92iac778b581`
+  - 数据层 (packageFeatures/utils/shared-board/)
+    - config.js：集合名/人数上限/状态枚举/错误码/阈值/配色全集中，禁硬编码
+    - transform.js：进度对比、分区、首字色块、集数轴百分比等纯逻辑（可 Node 测试，63 断言）
+    - cloud-api.js：云函数调用统一封装
+  - 云函数 (cloudfunctions/)：createBoard/joinBoard/addItem/updateProgress/updateItem/deleteItem/listMyBoards/getBoardDetail/updateMemberProfile/markViewed + getMyOpenid
+    - 读走权限规则、写全走云函数；进度私有靠动态 key `progress.${OPENID}` + 可信身份
+    - joinBoard 一次性 token + 原子条件更新防抢坑防并发
+  - 页面 (packageFeatures/pages/shared-board/)
+    - P1 板列表（我参与的板 + 建板 + 未读红点 + 骨架屏）
+    - P2 单板门面（同轴双头像集数轴 + 分区 + 加番 + 筹备态单人可用）
+    - P3 进度详情弹层（+1 主手势 + 选集器 + 状态切换 + 弃番确认）
+    - 头像昵称设置（chooseAvatar + nickname，微信不能自动读取）
+    - 追平/对方加入里程碑动效（复用 anime-checklist 动画基因）
+  - 数据来源无关设计：Bangumi/TMDB 被墙，MVP 手动输入，接入做成可替换适配层
+
+### 说明
+
+- 外部数据源调研：Bangumi(api.bgm.tv)、TMDB 均被墙（云函数在境内也够不着）；弹弹play 国内可用但禁未授权商用。详见 shared-board.md §6.3
+
 ## [2026-06-16] v1.3.0 - 世界杯赔率页
 
 ### 新增

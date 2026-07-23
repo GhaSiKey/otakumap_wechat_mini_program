@@ -1,0 +1,9 @@
+{
+  "name": "updateProgress",
+  "version": "1.0.0",
+  "description": "更新自己的追番进度，只改自己 openid 子键，收绝对集数保证幂等",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

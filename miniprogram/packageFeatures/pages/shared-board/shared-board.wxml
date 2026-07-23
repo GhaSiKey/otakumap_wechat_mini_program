@@ -1,0 +1,226 @@
+<view class="page" wx:if="{{vm}}">
+
+  <!-- ============ 成员条 ============ -->
+  <view class="member-bar">
+    <view class="member member--tappable" bindtap="onEditProfileTap">
+      <view wx:if="{{vm.me.avatar}}" class="m-avatar"><t-avatar image="{{vm.me.avatar}}" size="small" /></view>
+      <view wx:else class="m-fallback identity--me {{vm.me.openid ? '' : 'identity--pending'}}">
+        {{vm.me.nickname ? vm.me.nickname[0] : '我'}}<view wx:if="{{!vm.me.avatar}}" class="m-set-badge">+</view>
+      </view>
+      <text class="m-name">{{vm.me.nickname || '设置我' }}</text>
+    </view>
+    <!-- 配对后：对方；筹备态：虚位空椅（钩子，非灰置） -->
+    <view class="member {{justJoined ? 'member-joined' : ''}}" wx:if="{{vm.peer}}">
+      <text class="m-name">{{vm.peer.nickname || 'TA'}}</text>
+      <view wx:if="{{vm.peer.avatar}}" class="m-avatar"><t-avatar image="{{vm.peer.avatar}}" size="small" /></view>
+      <view wx:else class="m-fallback identity--peer">TA</view>
+    </view>
+    <view class="member" wx:else>
+      <text class="m-name hint">等 TA 加入</text>
+      <view class="ghost-seat">?</view>
+    </view>
+  </view>
+
+  <!-- ============ 筹备态邀请横幅（单人，紧凑不挡番单）============ -->
+  <view wx:if="{{vm.phase === 'waiting'}}" class="invite-banner">
+    <view class="invite-banner__text">
+      <view class="invite-banner__title">就等 TA 来一起追</view>
+      <view class="invite-banner__sub">先把想追的番堆进来，TA 加入就能看到</view>
+    </view>
+    <button class="invite-banner__btn" open-type="share">邀请 TA</button>
+  </view>
+
+  <!-- ============ 归档态提示 ============ -->
+  <t-notice-bar wx:if="{{vm.phase === 'archived'}}" theme="warning" content="这个板已归档，只能查看" />
+
+  <!-- ============ 番单（分区 + 同轴集数轴）============ -->
+  <!-- 筹备态也显示番单（能加番、追进度）；双人 UI 靠 it.pair.hasPeer 天然隐藏 -->
+  <block>
+    <!-- 番单空：引导加番 -->
+    <view wx:if="{{vm.sections.length === 0}}" class="list-empty">
+      <view class="list-empty__text">{{vm.peer ? '还没加番，点右下角加一部吧' : '先把想追的番加进来'}}</view>
+    </view>
+
+    <view class="section" wx:for="{{vm.sections}}" wx:key="sectionKey" wx:for-item="sec">
+      <view class="section-title">{{sec.title}}</view>
+
+      <view
+        class="item-card {{it.itemId === syncItemId ? 'item-card--sync' : ''}}"
+        wx:for="{{sec.items}}"
+        wx:key="itemId"
+        wx:for-item="it"
+        data-item-id="{{it.itemId}}"
+        bindtap="onItemTap"
+      >
+        <!-- 番名 + 状态标签 -->
+        <view class="item-head">
+          <view class="item-cover" style="background:{{it.coverFallback.color}}">{{it.coverFallback.char}}</view>
+          <view class="item-head__main">
+            <text class="item-name">{{it.name}}</text>
+            <text wx:if="{{it.subtitle}}" class="item-sub">{{it.subtitle}}</text>
+          </view>
+          <t-tag wx:if="{{statusLabels[it.pair.mine.status]}}" size="small" variant="light" theme="primary">{{statusLabels[it.pair.mine.status]}}</t-tag>
+        </view>
+
+        <!-- 同轴集数轴 -->
+        <view class="axis">
+          <view class="axis-track"></view>
+          <view class="axis-common" style="width:{{it.pair.commonPercent}}%"></view>
+          <view
+            wx:if="{{it.pair.hasPeer}}"
+            class="axis-lead"
+            style="left:{{it.pair.minePercent < it.pair.peerPercent ? it.pair.minePercent : it.pair.peerPercent}}%;width:{{it.pair.leadWidth}}%"
+          ></view>
+          <!-- 我的游标 -->
+          <view class="axis-cursor cursor--mine" style="left:{{it.pair.minePercent}}%">
+            <view class="cursor-dot identity--me">我</view>
+          </view>
+          <!-- 对方游标 -->
+          <view wx:if="{{it.pair.hasPeer}}" class="axis-cursor cursor--peer" style="left:{{it.pair.peerPercent}}%">
+            <view class="cursor-dot identity--peer">TA</view>
+          </view>
+          <!-- 无分母右端渐隐 -->
+          <view wx:if="{{!it.pair.hasTotalEp}}" class="axis-fade"></view>
+        </view>
+
+        <!-- 进度摘要：配对态显示双人对比（正向措辞+防剧透模糊档）；筹备态只显示自己 -->
+        <view class="item-diff">
+          <text>我 E{{it.pair.mine.ep}}</text>
+          <block wx:if="{{vm.peer}}">
+            <text wx:if="{{it.pair.hasPeer}}"> · TA E{{it.pair.peer.ep}}</text>
+            <text wx:else class="hint"> · TA 还没翻牌</text>
+            <text wx:if="{{it.pair.lead === 'even' && it.pair.hasPeer}}" class="sync"> · 同步 🎉</text>
+            <text wx:elif="{{it.pair.gapMode === 'exact' && it.pair.lead !== 'none'}}" class="lead-txt"> · {{it.pair.lead === 'mine' ? 'TA 还差 ' + it.pair.diff + ' 集追上' : 'TA 领先 ' + it.pair.diff + ' 集'}}</text>
+            <text wx:elif="{{it.pair.gapMode !== 'exact' && it.pair.lead !== 'none'}}" class="lead-txt"> · {{it.pair.lead === 'mine' ? 'TA 落后不少' : 'TA 领先不少'}}</text>
+          </block>
+          <!-- 核心价值：能安全聊到第几集（双方都追了才有意义）-->
+          <text wx:if="{{it.pair.hasPeer && it.pair.safeTalkEp > 0}}" class="safe-talk"> · 能一起聊到 E{{it.pair.safeTalkEp}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 加番 FAB：筹备态和配对态都能加，仅归档态隐藏（t-fab 抛 click 事件） -->
+    <t-fab wx:if="{{vm.phase !== 'archived'}}" icon="add" text="加番" bind:click="onAddTap" />
+  </block>
+
+
+</view>
+
+<!-- 加载骨架屏 -->
+<view wx:if="{{loading}}" class="sb-skeleton">
+  <view class="skeleton-memberbar"></view>
+  <view class="skeleton-card" wx:for="{{[1,2,3]}}" wx:key="*this">
+    <view class="skeleton-line skeleton-line--title"></view>
+    <view class="skeleton-axis"></view>
+    <view class="skeleton-line skeleton-line--meta"></view>
+  </view>
+</view>
+
+<!-- ============ 加番弹层 ============ -->
+<t-popup visible="{{showAdd}}" placement="bottom" bind:visible-change="onAddVisibleChange">
+  <view class="add-panel">
+    <view class="panel-title">添加番剧</view>
+    <t-input placeholder="输入番剧名称" value="{{newItemName}}" maxlength="60" bind:change="onItemNameInput" />
+    <t-button theme="primary" size="large" block loading="{{adding}}" bindtap="onConfirmAdd">添加</t-button>
+  </view>
+</t-popup>
+
+<!-- ============ P3 进度详情弹层 ============ -->
+<t-popup visible="{{showDetail}}" placement="bottom" bind:visible-change="onDetailVisibleChange">
+  <view class="detail-panel" wx:if="{{detailItem}}">
+    <view class="detail-name" bindtap="onEditItemTap">
+      {{detailItem.name}}<t-icon name="edit-1" size="32rpx" class="detail-name__edit" />
+    </view>
+    <view class="detail-sub" wx:if="{{detailItem.totalEp}}">共 {{detailItem.totalEp}} 集</view>
+
+    <!-- 左右对峙（仅详情页允许） -->
+    <view class="duel">
+      <view class="duel-col">
+        <view class="m-fallback big identity--me">我</view>
+        <view class="duel-ep">E{{detailItem.pair.mine.ep}}</view>
+        <view class="duel-status">{{statusLabels[detailItem.pair.mine.status] || '未设'}}</view>
+      </view>
+      <view class="duel-col" wx:if="{{detailItem.pair.hasPeer}}">
+        <view class="m-fallback big identity--peer">TA</view>
+        <view class="duel-ep">E{{detailItem.pair.peer.ep}}</view>
+        <view class="duel-status">{{statusLabels[detailItem.pair.peer.status] || '未设'}}</view>
+      </view>
+      <view class="duel-col" wx:else>
+        <view class="ghost-breathing">?</view>
+        <view class="duel-ep hint">{{vm.peer ? '还没翻牌' : '等 TA 加入'}}</view>
+      </view>
+    </view>
+
+    <!-- 主手势：+1（最高频，乐观 UI 无确认） -->
+    <t-button theme="primary" size="large" block bindtap="onEpInc">我看完这集 +1</t-button>
+
+    <!-- 低频入口：改集数（跳集/补集/纠错）、改状态 -->
+    <view class="detail-actions">
+      <view class="detail-action" bindtap="onEpTap">
+        <text class="detail-action__label">看到第几集</text>
+        <text class="detail-action__value">E{{detailItem.pair.mine.ep}} ›</text>
+      </view>
+      <view class="detail-action" bindtap="onStatusTap">
+        <text class="detail-action__label">状态</text>
+        <text class="detail-action__value">{{statusLabels[detailItem.pair.mine.status] || '未设'}} ›</text>
+      </view>
+    </view>
+  </view>
+</t-popup>
+
+<!-- ============ 编辑番剧弹层（共享字段，MVP 只做改名）============ -->
+<t-popup visible="{{showEdit}}" placement="bottom" bind:visible-change="onEditVisibleChange">
+  <view class="edit-panel" wx:if="{{detailItem}}">
+    <view class="panel-title">编辑番剧</view>
+    <view class="edit-note">番名两人共享，改了 TA 也会看到</view>
+    <t-input placeholder="番剧名称" value="{{editName}}" maxlength="60" bind:change="onEditNameInput" />
+    <t-button theme="primary" size="large" block loading="{{savingEdit}}" bindtap="onConfirmEdit">保存</t-button>
+  </view>
+</t-popup>
+
+<!-- ============ 设置我的头像昵称弹层（微信不能自动读取，用户主动设）============ -->
+<t-popup visible="{{showProfile}}" placement="bottom" bind:visible-change="onProfileVisibleChange">
+  <view class="profile-panel">
+    <view class="panel-title">设置我的头像昵称</view>
+    <view class="profile-avatar-row">
+      <button
+        class="avatar-choose-btn"
+        open-type="chooseAvatar"
+        bind:chooseavatar="onChooseAvatar"
+      >
+        <t-avatar wx:if="{{profileAvatar}}" image="{{profileAvatar}}" size="large" />
+        <view wx:else class="avatar-choose-placeholder">＋<text class="avatar-choose-hint">选头像</text></view>
+      </button>
+    </view>
+    <input
+      class="nickname-input"
+      type="nickname"
+      placeholder="输入昵称（或用微信昵称）"
+      value="{{profileNickname}}"
+      bind:input="onNicknameInput"
+      bind:blur="onNicknameInput"
+    />
+    <t-button theme="primary" size="large" block loading="{{savingProfile}}" bindtap="onSaveProfile">保存</t-button>
+    <view class="profile-note">设置后 TA 也能看到你的头像</view>
+  </view>
+</t-popup>
+
+<!-- 集数选择器（跳集/补集/纠错，范围从 0 开始能回退到未开追）-->
+<t-picker
+  visible="{{showEpPicker}}"
+  value="{{epPickerValue}}"
+  bind:confirm="onEpPickerConfirm"
+  bind:cancel="onEpPickerCancel"
+>
+  <t-picker-item options="{{epOptions}}"></t-picker-item>
+</t-picker>
+
+<!-- 状态选择器（六选一）-->
+<t-action-sheet
+  id="statusSheet"
+  visible="{{showStatusSheet}}"
+  items="{{statusSheetItems}}"
+  bind:selected="onStatusSelected"
+  bind:cancel="onStatusSheetCancel"
+/>
+
