@@ -34,6 +34,9 @@ const PROGRESS_STATUS_DEFAULT = 'want';
 const EP_MIN = 0; // 0 = 未开追
 const EP_MAX_WHEN_UNKNOWN = 9999; // 无 totalEp 时的上限兜底（后端 clamp 用）
 const EP_PICKER_MAX_UNKNOWN = 99; // 无 totalEp 时选集器展示上限（滚轮别太长，够用即可）
+// 滚轮/数字输入分界：总集数 ≤ 此值用滚轮（一季标准番 12/24 集），> 此值或无分母（长番/连续放送，
+// 如凡人 183、柯南上千）改数字键盘直接输入——让人滚一两百格选集数是反人类的（纯前端展示阈值）
+const EP_ROLL_MAX = 24;
 
 // ── 配对 token ──
 const PAIR_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 有效期 24h
@@ -142,6 +145,7 @@ module.exports = {
   EP_MIN,
   EP_MAX_WHEN_UNKNOWN,
   EP_PICKER_MAX_UNKNOWN,
+  EP_ROLL_MAX,
   PAIR_TOKEN_TTL_MS,
   DEFAULT_BOARD_NAME,
   BOARD_NAME_MAX,

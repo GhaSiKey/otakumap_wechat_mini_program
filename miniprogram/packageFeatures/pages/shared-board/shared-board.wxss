@@ -1,3 +1,5 @@
+@import "./sheet.wxss";
+
 view, text {
   box-sizing: border-box;
 }
@@ -224,6 +226,10 @@ page {
 
 /* ==================== 番剧卡片 ==================== */
 .item-card {
+  /* position+z-index 建立层叠上下文：把卡内游标 z-index 关进卡片，
+     否则游标会逃到根层级盖住 fixed 的加番 FAB（层级 bug 根因） */
+  position: relative;
+  z-index: 0;
   background-color: var(--td-bg-color-container, #ffffff);
   border-radius: var(--td-radius-large, 18rpx);
   padding: var(--td-spacer-2, 32rpx);
@@ -365,22 +371,13 @@ page {
   font-weight: 500;
 }
 
-/* ==================== 加番 / 详情弹层 ==================== */
-.add-panel,
-.detail-panel,
-.edit-panel {
-  padding: var(--td-spacer-3, 48rpx) var(--td-spacer-2, 32rpx);
-  display: flex;
-  flex-direction: column;
-  gap: var(--td-spacer-2, 32rpx);
-}
-
-.panel-title,
+/* ==================== 详情弹层（外壳由 .sheet 提供，此处只补内容样式）==================== */
+/* 番名可点改名（展示态） */
 .detail-name {
-  font-size: var(--td-font-size-title-large, 36rpx);
-  font-weight: 600;
-  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
-  text-align: center;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .detail-name__edit {
@@ -389,18 +386,41 @@ page {
   vertical-align: middle;
 }
 
-.edit-note {
-  font-size: var(--td-font-size-body-small, 24rpx);
+/* 番名内联编辑态：输入框 + 取消/保存，占满标题栏（替代原独立编辑弹层） */
+.detail-name-edit {
+  display: flex;
+  align-items: center;
+  gap: var(--td-spacer, 16rpx);
+  width: 100%;
+}
+
+.detail-name-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.name-edit-btn {
+  flex-shrink: 0;
+  font-size: var(--td-font-size-body-medium, 28rpx);
+}
+
+.name-edit-btn--cancel {
   color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
-  text-align: center;
-  margin-top: -16rpx;
+}
+
+.name-edit-btn--save {
+  color: var(--td-brand-color, #0052d9);
+  font-weight: 600;
+}
+
+.name-edit-btn.is-loading {
+  opacity: 0.5;
 }
 
 .detail-sub {
   font-size: var(--td-font-size-body-small, 24rpx);
   color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
   text-align: center;
-  margin-top: -16rpx;
 }
 
 .duel {
@@ -489,6 +509,12 @@ page {
   position: relative;
 }
 
+/* 头像容器：角标定位基准，无论头像/首字母分支角标都常驻 */
+.m-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
 .m-set-badge {
   position: absolute;
   right: -4rpx;
@@ -504,17 +530,9 @@ page {
   border: 2rpx solid var(--td-bg-color-container, #fff);
 }
 
-.m-fallback {
-  position: relative;
-}
-
-/* ==================== 设置头像昵称弹层 ==================== */
-.profile-panel {
-  padding: var(--td-spacer-3, 48rpx) var(--td-spacer-2, 32rpx);
-  display: flex;
-  flex-direction: column;
+/* ==================== 设置头像昵称弹层（外壳由 .sheet 提供，仅内容居中）==================== */
+.profile-body {
   align-items: center;
-  gap: var(--td-spacer-2, 32rpx);
 }
 
 .profile-avatar-row {
@@ -550,7 +568,8 @@ page {
   font-size: 22rpx;
 }
 
-.nickname-input {
+.nickname-input,
+.ep-number-input {
   width: 100%;
   height: 88rpx;
   padding: 0 var(--td-spacer-2, 32rpx);
@@ -561,9 +580,12 @@ page {
   box-sizing: border-box;
 }
 
-.profile-note {
-  font-size: var(--td-font-size-body-small, 24rpx);
-  color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
+/* ==================== 成员条头像图（失败回退首字母，见 wxml binderror）==================== */
+.m-avatar-img {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 

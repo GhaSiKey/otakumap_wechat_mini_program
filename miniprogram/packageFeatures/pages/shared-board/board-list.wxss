@@ -1,3 +1,5 @@
+@import "./sheet.wxss";
+
 view, text {
   box-sizing: border-box;
 }
@@ -121,6 +123,12 @@ page {
   margin-left: var(--td-spacer, 16rpx);
 }
 
+.avatar-img {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+}
+
 .avatar-fallback {
   width: 64rpx;
   height: 64rpx;
@@ -144,16 +152,4 @@ page {
   font-size: 28rpx;
 }
 
-/* ==================== 建板弹层 ==================== */
-.create-panel {
-  padding: var(--td-spacer-3, 48rpx) var(--td-spacer-2, 32rpx);
-  display: flex;
-  flex-direction: column;
-  gap: var(--td-spacer-2, 32rpx);
-}
-
-.create-title {
-  font-size: var(--td-font-size-title-large, 36rpx);
-  font-weight: 600;
-  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
-}
+/* 建板弹层外壳走 ./sheet.wxss，无需专属样式 */

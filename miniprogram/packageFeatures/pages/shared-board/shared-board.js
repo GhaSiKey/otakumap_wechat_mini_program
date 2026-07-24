@@ -10,7 +10,7 @@ const T = require('../../utils/shared-board/transform');
 const {
   STATUS_LABELS,
   PROGRESS_STATUS,
-  EP_PICKER_MAX_UNKNOWN,
+  EP_ROLL_MAX,
   JOIN_ERR_MESSAGES,
 } = require('../../utils/shared-board/config');
 
@@ -34,21 +34,27 @@ Page({
     // 进度编辑弹层（P3）
     showDetail: false,
     detailItem: null,
-    // 集数选择器
+    // 集数滚轮（短番，totalEp ≤ EP_ROLL_MAX）
     showEpPicker: false,
     epOptions: [],        // [{label:'E0',value:0}, ...]
     epPickerValue: [0],
+    // 集数数字输入（长番/无分母，滚轮太长改直接输入）
+    showEpInput: false,
+    epInputValue: '',
     // 状态选择器
     showStatusSheet: false,
     statusSheetItems: STATUS_SHEET_ITEMS,
     // 追平动效：当前要播 sync 动画的 itemId（播完清空）
     syncItemId: '',
-    // 编辑番剧弹层（共享字段，MVP 只改名）
-    showEdit: false,
+    // 番名内联改名（在详情弹层内原地编辑，不再叠独立弹层）
+    editingName: false,
     editName: '',
     savingEdit: false,
     // 对方加入动画标记
     justJoined: false,
+    // 头像加载失败标记（不开云存储时对方常读不到，回退首字母；换头像后 _load 重置重试）
+    meAvatarError: false,
+    peerAvatarError: false,
     // 设置头像昵称弹层
     showProfile: false,
     profileAvatar: '',    // chooseAvatar 拿到的临时路径
@@ -109,7 +115,15 @@ Page({
     // 检测「对方刚加入」：本次从 waiting 变 paired（上一次还没配对，这次有对方了）
     const wasWaiting = this.data.vm && this.data.vm.phase === 'waiting';
     const nowPaired = vm.phase === 'paired';
-    this.setData({ vm, rawBoard: board, rawItems: items, loading: false });
+    // 头像 error 标记不在此重置：不开云存储时对方头像恒失败，每次 _load（含每次 +1）重置会导致
+    // 反复重试闪烁。仅在「换了对方 / 我改了头像」这类 URL 真变化时才清（见下方 peerUrl 比较 + onSaveProfile）
+    const prevPeerUrl = this._lastPeerAvatarUrl;
+    const curPeerUrl = (vm.peer && vm.peer.avatar) || '';
+    const peerUrlChanged = curPeerUrl !== prevPeerUrl;
+    this._lastPeerAvatarUrl = curPeerUrl;
+    const patch = { vm, rawBoard: board, rawItems: items, loading: false };
+    if (peerUrlChanged) patch.peerAvatarError = false; // 对方头像换了新 URL，给一次加载机会
+    this.setData(patch);
     wx.setNavigationBarTitle({ title: board.name });
     if (wasWaiting && nowPaired) this._celebrateJoin(vm.peer);
     // 记录本人查看时间，清未读红点（不阻塞渲染，失败无妨）
@@ -122,6 +136,16 @@ Page({
     this.setData({ justJoined: true });
     wx.showToast({ title: `${(peer && peer.nickname) || 'TA'} 来了 🎬`, icon: 'none' });
     setTimeout(() => this.setData({ justJoined: false }), 500);
+  },
+
+  // ==================== 头像加载失败兜底 ====================
+  // 不开云存储时对方读不到 cloud:// 头像，image binderror 触发 → 回退首字母色块
+  onMeAvatarError() {
+    this.setData({ meAvatarError: true });
+  },
+
+  onPeerAvatarError() {
+    this.setData({ peerAvatarError: true });
   },
 
   // ==================== 设置头像昵称（微信不能自动读，用户主动设）====================
@@ -166,20 +190,22 @@ Page({
       wx.showToast({ title: '保存失败', icon: 'none' });
       return;
     }
-    this.setData({ showProfile: false });
+    // 我换了头像 → 清失败标记给新 URL 一次加载机会（自己的头像自己一般能读到）
+    this.setData({ showProfile: false, meAvatarError: false });
     wx.showToast({ title: '已更新', icon: 'success' });
     this._load();
   },
 
   // ==================== 编辑番剧（共享字段，MVP 只改名）====================
+  // 番名改为在详情弹层内原地编辑（editingName 切换），不再叠第二层弹窗
   onEditItemTap() {
     const d = this.data.detailItem;
     if (!d) return;
-    this.setData({ showEdit: true, editName: d.name });
+    this.setData({ editingName: true, editName: d.name });
   },
 
-  onEditVisibleChange(e) {
-    this.setData({ showEdit: e.detail.visible });
+  onCancelEditName() {
+    this.setData({ editingName: false });
   },
 
   onEditNameInput(e) {
@@ -195,7 +221,7 @@ Page({
       return;
     }
     if (name === d.name) {
-      this.setData({ showEdit: false });
+      this.setData({ editingName: false });
       return;
     }
     this.setData({ savingEdit: true });
@@ -206,8 +232,8 @@ Page({
       wx.showToast({ title: msg, icon: 'none' });
       return;
     }
-    // 同步刷新详情弹层标题 + 列表
-    this.setData({ showEdit: false, 'detailItem.name': name });
+    // 退出编辑态 + 同步详情标题 + 重拉列表
+    this.setData({ editingName: false, 'detailItem.name': name });
     this._load();
   },
 
@@ -264,6 +290,7 @@ Page({
     const pair = T.buildProgressPair(raw, this.data.myOpenid, peerOpenid);
     this.setData({
       showDetail: true,
+      editingName: false, // 每次打开回到展示态
       detailItem: {
         itemId,
         name: raw.name,
@@ -275,7 +302,8 @@ Page({
   },
 
   onDetailVisibleChange(e) {
-    this.setData({ showDetail: e.detail.visible });
+    // 关闭详情时一并退出番名编辑态，避免下次打开残留
+    this.setData({ showDetail: e.detail.visible, editingName: false });
   },
 
   // +1：乐观 UI 本地先加，云函数回来对账（被 clamp 则 snap 到权威值）
@@ -292,41 +320,85 @@ Page({
     return currentStatus || 'watching';
   },
 
-  // ==================== 集数选择器（跳集/补集/纠错）====================
+  // ==================== 集数编辑（短番滚轮 / 长番数字输入）====================
+  // 分流：有明确总集数且 ≤ EP_ROLL_MAX（短番）走滚轮，可视化好；
+  // 长番或无分母（滚一两百格反人类）走数字键盘直接输入。
   onEpTap() {
     const d = this.data.detailItem;
     if (!d) return;
-    // 范围从 0 开始（0=未开追，支持回退纠错）；有 totalEp 用它，否则用展示上限
-    const max = d.totalEp && d.totalEp > 0 ? d.totalEp : EP_PICKER_MAX_UNKNOWN;
-    const epOptions = [];
-    for (let i = 0; i <= max; i++) epOptions.push({ label: `E${i}`, value: i });
-    this.setData({
-      showEpPicker: true,
-      epOptions,
-      epPickerValue: [d.pair.mine.ep],
-    });
+    const useRoll = d.totalEp && d.totalEp > 0 && d.totalEp <= EP_ROLL_MAX;
+    if (useRoll) {
+      const epOptions = [];
+      for (let i = 0; i <= d.totalEp; i++) epOptions.push({ label: `E${i}`, value: i });
+      // 收起详情遮罩再叠滚轮，避免两层遮罩叠暗 + 两张白卡摞
+      this.setData({
+        showDetail: false,
+        showEpPicker: true,
+        epOptions,
+        epPickerValue: [d.pair.mine.ep],
+      });
+    } else {
+      this.setData({
+        showDetail: false,
+        showEpInput: true,
+        epInputValue: String(d.pair.mine.ep),
+      });
+    }
   },
 
+  // 注意：t-picker 的 confirm/cancel 不发 visible-change（只有点遮罩才发），与 t-action-sheet 机制不同，
+  // 故这两条路径必须自己恢复 showDetail，不能像 action-sheet 那样统一交给 visible-change。
   onEpPickerConfirm(e) {
     const ep = e.detail.value[0];
     const d = this.data.detailItem;
-    this.setData({ showEpPicker: false });
+    this.setData({ showEpPicker: false, showDetail: true });
     if (!d) return;
     this._commitProgress(d.itemId, ep, this._deriveStatus(d.pair.mine.status, ep));
   },
 
   onEpPickerCancel() {
-    this.setData({ showEpPicker: false });
+    this.setData({ showEpPicker: false, showDetail: true });
+  },
+
+  // 兜住「点遮罩关闭」这条 confirm/cancel 覆盖不到的额外路径（幂等，与上面重复设置无害）
+  onEpPickerVisibleChange(e) {
+    if (!e.detail.visible) this.setData({ showEpPicker: false, showDetail: true });
+  },
+
+  // ── 集数数字输入（长番/无分母）──
+  onEpInputVisibleChange(e) {
+    // 点遮罩关闭 → 回详情
+    if (!e.detail.visible) this.setData({ showEpInput: false, showDetail: true });
+  },
+
+  onEpInputChange(e) {
+    this.setData({ epInputValue: e.detail.value });
+  },
+
+  onEpInputConfirm() {
+    const d = this.data.detailItem;
+    const raw = (this.data.epInputValue || '').trim();
+    const ep = parseInt(raw, 10);
+    if (!raw || Number.isNaN(ep) || ep < 0) {
+      wx.showToast({ title: '输入有效集数', icon: 'none' });
+      return;
+    }
+    this.setData({ showEpInput: false, showDetail: true });
+    if (!d) return;
+    // 上限交给云函数 clampEp 兜底（有 totalEp 截到最后一集，无则截到 EP_MAX_WHEN_UNKNOWN）
+    this._commitProgress(d.itemId, ep, this._deriveStatus(d.pair.mine.status, ep));
   },
 
   // ==================== 状态选择器（六选一）====================
   onStatusTap() {
-    this.setData({ showStatusSheet: true });
+    // 同样先收起详情遮罩再叠 action-sheet
+    this.setData({ showDetail: false, showStatusSheet: true });
   },
 
   onStatusSelected(e) {
     const status = e.detail.selected.value;
     const d = this.data.detailItem;
+    // 只收 sheet + 提交；「弹回详情」统一交给 onStatusSheetVisibleChange
     this.setData({ showStatusSheet: false });
     if (!d) return;
     // 弃番给一次轻确认（去批判感文案）；其余直接改
@@ -347,6 +419,11 @@ Page({
 
   onStatusSheetCancel() {
     this.setData({ showStatusSheet: false });
+  },
+
+  // 统一的状态选择器关闭出口：selected/cancel/点遮罩关闭都触发，同步父级状态并弹回详情
+  onStatusSheetVisibleChange(e) {
+    if (!e.detail.visible) this.setData({ showStatusSheet: false, showDetail: true });
   },
 
   async _commitProgress(itemId, ep, status) {

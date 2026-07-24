@@ -34,9 +34,16 @@
           <text wx:elif="{{item.peerName}}"> · 和 {{item.peerName}}</text>
         </view>
       </view>
-      <!-- 对方头像 / 虚位 -->
+      <!-- 对方头像 / 虚位。头像加载失败（不开云存储时常见）回退首字母色块 -->
       <view class="board-card__avatar">
-        <t-avatar wx:if="{{item.peerAvatar}}" image="{{item.peerAvatar}}" size="small" />
+        <image
+          wx:if="{{item.peerAvatar && !avatarErr[item.boardId]}}"
+          class="avatar-img"
+          src="{{item.peerAvatar}}"
+          mode="aspectFill"
+          data-board-id="{{item.boardId}}"
+          binderror="onPeerAvatarError"
+        />
         <view
           wx:elif="{{item.peerFallback}}"
           class="avatar-fallback"
@@ -50,23 +57,26 @@
   <!-- 建板 FAB（t-fab 抛 click 事件，不是 tap） -->
   <t-fab wx:if="{{boards.length > 0}}" icon="add" bind:click="onCreateTap" />
 
-  <!-- 建板弹层 -->
-  <t-popup visible="{{showCreate}}" placement="bottom" bind:visible-change="onCreateVisibleChange">
-    <view class="create-panel">
-      <view class="create-title">新建共享番单</view>
-      <t-input
-        placeholder="给这个板起个名（可留空）"
-        value="{{newBoardName}}"
-        maxlength="20"
-        bind:change="onBoardNameInput"
-      />
-      <t-button
-        theme="primary"
-        size="large"
-        block
-        loading="{{creating}}"
-        bindtap="onConfirmCreate"
-      >建板</t-button>
+  <!-- 建板弹层（统一外壳 .sheet，与 shared-board 各弹层同款）-->
+  <t-popup visible="{{showCreate}}" placement="bottom" close-on-overlay-click bind:visible-change="onCreateVisibleChange">
+    <view class="sheet">
+      <view class="sheet__handle"></view>
+      <view class="sheet__header"><text class="sheet__title">新建共享番单</text></view>
+      <view class="sheet__body">
+        <t-input
+          placeholder="给这个板起个名（可留空）"
+          value="{{newBoardName}}"
+          maxlength="20"
+          bind:change="onBoardNameInput"
+        />
+        <t-button
+          theme="primary"
+          size="large"
+          block
+          loading="{{creating}}"
+          bindtap="onConfirmCreate"
+        >建板</t-button>
+      </view>
     </view>
   </t-popup>
 </view>

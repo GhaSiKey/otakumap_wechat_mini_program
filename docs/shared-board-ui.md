@@ -232,20 +232,23 @@
 
 | 元素 | 组件 | CSS 变量 |
 |------|------|---------|
-| 弹层 | `t-popup placement="bottom"` | 圆角顶 `--td-radius-extra-large`；底 `--td-bg-color-container` |
-| 番名 | `text` | `--td-text-color-primary`；`--td-font-size-title-large` |
+| 弹层外壳 | `t-popup placement="bottom"` + 公共 `.sheet`（`sheet.wxss`） | 顶角圆角 32rpx；底 `--td-bg-color-container`；顶部拖动条 handle + 上投影分层 |
+| 番名 | `text`（可点，旁 `t-icon edit-1`）→ 点击原地切 `t-input` 内联编辑 | `--td-text-color-primary`；`--td-font-size-title-large` |
 | 副信息 | `text` | `--td-text-color-secondary` |
 | 我/TA 两栏 | 自绘 `view.duel-col` ×2 | 底 `--td-bg-color-secondarycontainer`；圆角 `--td-radius-default` |
-| 头像 | `t-avatar` medium | — |
+| 头像 | 自绘首字色块（`m-fallback big`，身份色 `--sb-color-me/peer`） | — |
 | +1 主按钮 | `t-button theme=primary size=large block` | `--td-brand-color` |
-| 集数选择 | `t-popup` + `t-picker`（滚轮） | — |
+| 集数选择（短番） | `t-picker` 滚轮，`totalEp ≤ EP_ROLL_MAX`(24) | 范围 `0..totalEp`（含 0 = 未开追，可回退纠错） |
+| 集数选择（长番/无分母） | 独立 `.sheet` + `input type="number"` 直接输入 | 凡人 183、柯南上千不再卡上限；上限交云函数 `clampEp` 兜底 |
 | 状态选择 | `t-action-sheet`（6 状态枚举） | — |
 | 短评占位 | `t-cell` disabled + `t-icon lock-on` | `--td-text-color-placeholder`（MVP 灰置不可点） |
 
 交互：
 - **主手势 +1**：点击 → 乐观 UI 本地 `ep+1` 立即反映（PRD §10 冷启动应对），我的游标回弹滑动，云函数 `updateProgress` 回来对账，失败 `t-toast` 报错并回滚。
-- 点集数数字 → `t-picker` 滚轮，范围 `1..(totalEp||99)`，处理补录跳集。
-- 点状态 → `t-action-sheet` 六选一；选「弃番」给一次轻确认 `t-dialog`（是社交信号）。
+- **番名改名**：点番名/编辑图标 → 详情弹层内**原地**切成输入框（不再叠第二层弹窗），编辑态隐藏 +1/改集数/改状态操作区避免噪声；保存/取消回展示态。
+- **改集数**：短番（有明确总集数且 ≤24）走滚轮可视化；长番/无分母走数字键盘直接输入。点「看到第几集」下钻前先收起详情，避免两层遮罩叠暗、两张白卡摞。
+- 点状态 → `t-action-sheet` 六选一；选「弃番」给一次轻确认 `wx.showModal`（去批判感文案「先下车？随时能回来接着追」）。
+- **下钻闭环**：集数/状态选择器关闭（confirm/cancel/点遮罩任一路径）后都弹回详情弹层。注意 `t-picker` 的 confirm/cancel **不发** `visible-change`（仅点遮罩发），需在 confirm/cancel 内自行恢复；`t-action-sheet` 三条路径均走 `_trigger` 发 `visible-change`，可统一交给它。两组件机制不同，不可套用同一假设。
 - **只能改自己那栏**，TA 栏纯展示不可编辑（对应 §6 `progress.<myOpenid>` 私有写）。
 
 ---

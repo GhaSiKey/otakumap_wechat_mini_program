@@ -3,17 +3,34 @@
   <!-- ============ 成员条 ============ -->
   <view class="member-bar">
     <view class="member member--tappable" bindtap="onEditProfileTap">
-      <view wx:if="{{vm.me.avatar}}" class="m-avatar"><t-avatar image="{{vm.me.avatar}}" size="small" /></view>
-      <view wx:else class="m-fallback identity--me {{vm.me.openid ? '' : 'identity--pending'}}">
-        {{vm.me.nickname ? vm.me.nickname[0] : '我'}}<view wx:if="{{!vm.me.avatar}}" class="m-set-badge">+</view>
+      <!-- 头像区：可点设置角标常驻（不随头像/首字母分支消失），保住「点这里改资料」的可发现性 -->
+      <view class="m-avatar-wrap">
+        <!-- 头像失败兜底：不开云存储时对方常读不到 cloud:// 头像，image binderror 回退首字母色块 -->
+        <image
+          wx:if="{{vm.me.avatar && !meAvatarError}}"
+          class="m-avatar-img"
+          src="{{vm.me.avatar}}"
+          mode="aspectFill"
+          binderror="onMeAvatarError"
+        />
+        <view wx:else class="m-fallback identity--me {{vm.me.openid ? '' : 'identity--pending'}}">
+          {{vm.me.nickname ? vm.me.nickname[0] : '我'}}
+        </view>
+        <view class="m-set-badge">+</view>
       </view>
       <text class="m-name">{{vm.me.nickname || '设置我' }}</text>
     </view>
     <!-- 配对后：对方；筹备态：虚位空椅（钩子，非灰置） -->
     <view class="member {{justJoined ? 'member-joined' : ''}}" wx:if="{{vm.peer}}">
       <text class="m-name">{{vm.peer.nickname || 'TA'}}</text>
-      <view wx:if="{{vm.peer.avatar}}" class="m-avatar"><t-avatar image="{{vm.peer.avatar}}" size="small" /></view>
-      <view wx:else class="m-fallback identity--peer">TA</view>
+      <image
+        wx:if="{{vm.peer.avatar && !peerAvatarError}}"
+        class="m-avatar-img"
+        src="{{vm.peer.avatar}}"
+        mode="aspectFill"
+        binderror="onPeerAvatarError"
+      />
+      <view wx:else class="m-fallback identity--peer">{{vm.peer.nickname ? vm.peer.nickname[0] : 'TA'}}</view>
     </view>
     <view class="member" wx:else>
       <text class="m-name hint">等 TA 加入</text>
@@ -117,110 +134,144 @@
 </view>
 
 <!-- ============ 加番弹层 ============ -->
-<t-popup visible="{{showAdd}}" placement="bottom" bind:visible-change="onAddVisibleChange">
-  <view class="add-panel">
-    <view class="panel-title">添加番剧</view>
-    <t-input placeholder="输入番剧名称" value="{{newItemName}}" maxlength="60" bind:change="onItemNameInput" />
-    <t-button theme="primary" size="large" block loading="{{adding}}" bindtap="onConfirmAdd">添加</t-button>
+<t-popup visible="{{showAdd}}" placement="bottom" close-on-overlay-click bind:visible-change="onAddVisibleChange">
+  <view class="sheet">
+    <view class="sheet__handle"></view>
+    <view class="sheet__header"><text class="sheet__title">添加番剧</text></view>
+    <view class="sheet__body">
+      <t-input placeholder="输入番剧名称" value="{{newItemName}}" maxlength="60" bind:change="onItemNameInput" />
+      <t-button theme="primary" size="large" block loading="{{adding}}" bindtap="onConfirmAdd">添加</t-button>
+    </view>
   </view>
 </t-popup>
 
 <!-- ============ P3 进度详情弹层 ============ -->
-<t-popup visible="{{showDetail}}" placement="bottom" bind:visible-change="onDetailVisibleChange">
-  <view class="detail-panel" wx:if="{{detailItem}}">
-    <view class="detail-name" bindtap="onEditItemTap">
-      {{detailItem.name}}<t-icon name="edit-1" size="32rpx" class="detail-name__edit" />
-    </view>
-    <view class="detail-sub" wx:if="{{detailItem.totalEp}}">共 {{detailItem.totalEp}} 集</view>
+<t-popup visible="{{showDetail}}" placement="bottom" close-on-overlay-click bind:visible-change="onDetailVisibleChange">
+  <view class="sheet detail-panel" wx:if="{{detailItem}}">
+    <view class="sheet__handle"></view>
 
-    <!-- 左右对峙（仅详情页允许） -->
-    <view class="duel">
-      <view class="duel-col">
-        <view class="m-fallback big identity--me">我</view>
-        <view class="duel-ep">E{{detailItem.pair.mine.ep}}</view>
-        <view class="duel-status">{{statusLabels[detailItem.pair.mine.status] || '未设'}}</view>
-      </view>
-      <view class="duel-col" wx:if="{{detailItem.pair.hasPeer}}">
-        <view class="m-fallback big identity--peer">TA</view>
-        <view class="duel-ep">E{{detailItem.pair.peer.ep}}</view>
-        <view class="duel-status">{{statusLabels[detailItem.pair.peer.status] || '未设'}}</view>
-      </view>
-      <view class="duel-col" wx:else>
-        <view class="ghost-breathing">?</view>
-        <view class="duel-ep hint">{{vm.peer ? '还没翻牌' : '等 TA 加入'}}</view>
+    <!-- 番名：默认展示可点改名；进入编辑态原地切成输入框（不再叠第二层弹窗） -->
+    <view class="sheet__header">
+      <block wx:if="{{!editingName}}">
+        <text class="sheet__title detail-name" bindtap="onEditItemTap">{{detailItem.name}}</text>
+        <t-icon name="edit-1" size="36rpx" class="detail-name__edit" bindtap="onEditItemTap" />
+      </block>
+      <view wx:else class="detail-name-edit">
+        <t-input class="detail-name-input" value="{{editName}}" maxlength="60" bind:change="onEditNameInput" />
+        <text class="name-edit-btn name-edit-btn--cancel" bindtap="onCancelEditName">取消</text>
+        <text class="name-edit-btn name-edit-btn--save {{savingEdit ? 'is-loading' : ''}}" bindtap="onConfirmEdit">保存</text>
       </view>
     </view>
+    <view class="detail-sub" wx:if="{{detailItem.totalEp && !editingName}}">共 {{detailItem.totalEp}} 集</view>
+    <view class="detail-sub" wx:if="{{editingName}}">番名两人共享，改了 TA 也会看到</view>
 
-    <!-- 主手势：+1（最高频，乐观 UI 无确认） -->
-    <t-button theme="primary" size="large" block bindtap="onEpInc">我看完这集 +1</t-button>
-
-    <!-- 低频入口：改集数（跳集/补集/纠错）、改状态 -->
-    <view class="detail-actions">
-      <view class="detail-action" bindtap="onEpTap">
-        <text class="detail-action__label">看到第几集</text>
-        <text class="detail-action__value">E{{detailItem.pair.mine.ep}} ›</text>
+    <!-- 编辑番名时收起操作区，只留改名，避免视觉噪声 -->
+    <view class="sheet__body" wx:if="{{!editingName}}">
+      <!-- 左右对峙（仅详情页允许） -->
+      <view class="duel">
+        <view class="duel-col">
+          <view class="m-fallback big identity--me">我</view>
+          <view class="duel-ep">E{{detailItem.pair.mine.ep}}</view>
+          <view class="duel-status">{{statusLabels[detailItem.pair.mine.status] || '未设'}}</view>
+        </view>
+        <view class="duel-col" wx:if="{{detailItem.pair.hasPeer}}">
+          <view class="m-fallback big identity--peer">TA</view>
+          <view class="duel-ep">E{{detailItem.pair.peer.ep}}</view>
+          <view class="duel-status">{{statusLabels[detailItem.pair.peer.status] || '未设'}}</view>
+        </view>
+        <view class="duel-col" wx:else>
+          <view class="ghost-breathing">?</view>
+          <view class="duel-ep hint">{{vm.peer ? '还没翻牌' : '等 TA 加入'}}</view>
+        </view>
       </view>
-      <view class="detail-action" bindtap="onStatusTap">
-        <text class="detail-action__label">状态</text>
-        <text class="detail-action__value">{{statusLabels[detailItem.pair.mine.status] || '未设'}} ›</text>
+
+      <!-- 主手势：+1（最高频，乐观 UI 无确认） -->
+      <t-button theme="primary" size="large" block bindtap="onEpInc">我看完这集 +1</t-button>
+
+      <!-- 低频入口：改集数（跳集/补集/纠错）、改状态 -->
+      <view class="detail-actions">
+        <view class="detail-action" bindtap="onEpTap">
+          <text class="detail-action__label">看到第几集</text>
+          <text class="detail-action__value">E{{detailItem.pair.mine.ep}} ›</text>
+        </view>
+        <view class="detail-action" bindtap="onStatusTap">
+          <text class="detail-action__label">状态</text>
+          <text class="detail-action__value">{{statusLabels[detailItem.pair.mine.status] || '未设'}} ›</text>
+        </view>
       </view>
     </view>
-  </view>
-</t-popup>
-
-<!-- ============ 编辑番剧弹层（共享字段，MVP 只做改名）============ -->
-<t-popup visible="{{showEdit}}" placement="bottom" bind:visible-change="onEditVisibleChange">
-  <view class="edit-panel" wx:if="{{detailItem}}">
-    <view class="panel-title">编辑番剧</view>
-    <view class="edit-note">番名两人共享，改了 TA 也会看到</view>
-    <t-input placeholder="番剧名称" value="{{editName}}" maxlength="60" bind:change="onEditNameInput" />
-    <t-button theme="primary" size="large" block loading="{{savingEdit}}" bindtap="onConfirmEdit">保存</t-button>
   </view>
 </t-popup>
 
 <!-- ============ 设置我的头像昵称弹层（微信不能自动读取，用户主动设）============ -->
-<t-popup visible="{{showProfile}}" placement="bottom" bind:visible-change="onProfileVisibleChange">
-  <view class="profile-panel">
-    <view class="panel-title">设置我的头像昵称</view>
-    <view class="profile-avatar-row">
-      <button
-        class="avatar-choose-btn"
-        open-type="chooseAvatar"
-        bind:chooseavatar="onChooseAvatar"
-      >
-        <t-avatar wx:if="{{profileAvatar}}" image="{{profileAvatar}}" size="large" />
-        <view wx:else class="avatar-choose-placeholder">＋<text class="avatar-choose-hint">选头像</text></view>
-      </button>
+<t-popup visible="{{showProfile}}" placement="bottom" close-on-overlay-click bind:visible-change="onProfileVisibleChange">
+  <view class="sheet">
+    <view class="sheet__handle"></view>
+    <view class="sheet__header"><text class="sheet__title">设置我的头像昵称</text></view>
+    <view class="sheet__body profile-body">
+      <view class="profile-avatar-row">
+        <button
+          class="avatar-choose-btn"
+          open-type="chooseAvatar"
+          bind:chooseavatar="onChooseAvatar"
+        >
+          <t-avatar wx:if="{{profileAvatar}}" image="{{profileAvatar}}" size="large" />
+          <view wx:else class="avatar-choose-placeholder">＋<text class="avatar-choose-hint">选头像</text></view>
+        </button>
+      </view>
+      <input
+        class="nickname-input"
+        type="nickname"
+        placeholder="输入昵称（或用微信昵称）"
+        value="{{profileNickname}}"
+        bind:input="onNicknameInput"
+        bind:blur="onNicknameInput"
+      />
+      <t-button theme="primary" size="large" block loading="{{savingProfile}}" bindtap="onSaveProfile">保存</t-button>
+      <view class="sheet__note">头像仅上传后你自己可见，TA 看到的是你昵称首字；昵称双方都能看到</view>
     </view>
-    <input
-      class="nickname-input"
-      type="nickname"
-      placeholder="输入昵称（或用微信昵称）"
-      value="{{profileNickname}}"
-      bind:input="onNicknameInput"
-      bind:blur="onNicknameInput"
-    />
-    <t-button theme="primary" size="large" block loading="{{savingProfile}}" bindtap="onSaveProfile">保存</t-button>
-    <view class="profile-note">设置后 TA 也能看到你的头像</view>
   </view>
 </t-popup>
 
-<!-- 集数选择器（跳集/补集/纠错，范围从 0 开始能回退到未开追）-->
+<!-- ============ 集数数字输入弹层（长番/无分母：滚轮反人类，改数字键盘直接输入）============ -->
+<t-popup visible="{{showEpInput}}" placement="bottom" close-on-overlay-click bind:visible-change="onEpInputVisibleChange">
+  <view class="sheet">
+    <view class="sheet__handle"></view>
+    <view class="sheet__header"><text class="sheet__title">看到第几集</text></view>
+    <view class="sheet__body">
+      <!-- 不用 focus 自动聚焦：popup 上滑动画期间 focus 易失效/键盘顶起弹层错位，让用户点一下更稳 -->
+      <input
+        class="ep-number-input"
+        type="number"
+        placeholder="输入集数，如 183"
+        value="{{epInputValue}}"
+        bind:input="onEpInputChange"
+      />
+      <view class="sheet__note" wx:if="{{detailItem && detailItem.totalEp}}">共 {{detailItem.totalEp}} 集，超出会自动截到最后一集</view>
+      <t-button theme="primary" size="large" block bindtap="onEpInputConfirm">确定</t-button>
+    </view>
+  </view>
+</t-popup>
+
+<!-- 集数选择器（短番：从 0 开始能回退到未开追）。必须绑 visible-change：
+     点遮罩关闭时组件自降内部 visible，需同步父级 showEpPicker 并弹回详情，否则下钻死路+失步打不开 -->
 <t-picker
   visible="{{showEpPicker}}"
   value="{{epPickerValue}}"
   bind:confirm="onEpPickerConfirm"
   bind:cancel="onEpPickerCancel"
+  bind:visible-change="onEpPickerVisibleChange"
 >
   <t-picker-item options="{{epOptions}}"></t-picker-item>
 </t-picker>
 
-<!-- 状态选择器（六选一）-->
+<!-- 状态选择器（六选一）。同样绑 visible-change 兑现「点遮罩关闭」并弹回详情 -->
 <t-action-sheet
   id="statusSheet"
   visible="{{showStatusSheet}}"
   items="{{statusSheetItems}}"
   bind:selected="onStatusSelected"
   bind:cancel="onStatusSheetCancel"
+  bind:visible-change="onStatusSheetVisibleChange"
 />
 

@@ -1,0 +1,52 @@
+/**
+ * sheet.wxss — 底部弹层统一外壳（board-list / shared-board 两页 @import 共用）
+ *
+ * 解决「弹窗风格不统一 + 叠加时白底难区分」：所有 bottom popup 内容套同一套 .sheet 外壳
+ * ——顶部拖动条 handle、居中标题栏、顶角大圆角、上投影分层。配色走 --td-* 变量，亮暗自适配。
+ * 交互统一（点遮罩关闭）在各 t-popup 上显式声明，不在此文件。
+ */
+
+.sheet {
+  position: relative;
+  background: var(--td-bg-color-container, #ffffff);
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 0 var(--td-spacer-2, 32rpx)
+    calc(var(--td-spacer-3, 48rpx) + env(safe-area-inset-bottom));
+  /* 上投影：让弹层与身后遮罩/另一层拉开层次，叠加时不再糊成一片 */
+  box-shadow: 0 -8rpx 32rpx rgba(0, 0, 0, 0.12);
+}
+
+/* 顶部拖动条：纯视觉暗示「可下滑关闭」，统一所有弹层的顶部锚点 */
+.sheet__handle {
+  width: 64rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: var(--td-bg-color-component, #e7e7e7);
+  margin: 16rpx auto 0;
+}
+
+.sheet__header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88rpx;
+}
+
+.sheet__title {
+  font-size: var(--td-font-size-title-large, 36rpx);
+  font-weight: 600;
+  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
+}
+
+.sheet__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--td-spacer-2, 32rpx);
+}
+
+.sheet__note {
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
+  text-align: center;
+}

@@ -13,6 +13,7 @@ Page({
     showCreate: false, // 建板弹层
     newBoardName: '',
     creating: false,
+    avatarErr: {},    // {boardId: true} 对方头像加载失败 → 回退首字母（不开云存储时常见）
   },
 
   onLoad() {
@@ -51,7 +52,16 @@ Page({
     }
     const myOpenid = this.data.myOpenid;
     const boards = (r.data.boards || []).map((b) => this._toVM(b, myOpenid));
+    // 不重置 avatarErr：不开云存储时对方头像恒失败，每次 onShow 重置会导致列表头像反复闪烁。
+    // 首字母兜底后保持稳定；按 boardId 索引，脏标记无害（首字母本就是兜底）
     this.setData({ boards, loading: false });
+  },
+
+  // 对方头像加载失败 → 标记该板回退首字母色块
+  onPeerAvatarError(e) {
+    const { boardId } = e.currentTarget.dataset;
+    if (!boardId) return;
+    this.setData({ [`avatarErr.${boardId}`]: true });
   },
 
   // 单个板卡片视图模型
