@@ -102,10 +102,19 @@ function buildProgressPair(item, myOpenid, peerOpenid) {
   const peerEp = peerRaw ? clampEp(peerRaw.ep, totalEp) || 0 : 0;
   const hasPeer = !!peerRaw;
 
-  const mine = mineRaw ? { ep: mineEp, status: mineRaw.status } : { ep: 0, status: null };
-  const peer = hasPeer ? { ep: peerEp, status: peerRaw.status } : null;
+  const mineStatus = mineRaw ? mineRaw.status : null;
+  const peerStatus = hasPeer ? peerRaw.status : null;
+  const mine = mineRaw ? { ep: mineEp, status: mineStatus } : { ep: 0, status: null };
+  const peer = hasPeer ? { ep: peerEp, status: peerStatus } : null;
 
-  // 游标百分比
+  // 终止态标记：done=看完（轴填满到 100%），dropped=弃番（游标灰化、不参与追赶叙事）
+  const mineDone = mineStatus === 'done';
+  const peerDone = peerStatus === 'done';
+  const mineDropped = mineStatus === 'dropped';
+  const peerDropped = peerStatus === 'dropped';
+
+  // 游标百分比。看完(done)语义上是走到终点 → 强制 100%，不受有无总集数影响
+  // （无分母时若按 ep 锚定会停在 75%，违反「看完＝满进度」直觉）。
   let minePercent;
   let peerPercent;
   if (hasTotalEp) {
@@ -123,6 +132,9 @@ function buildProgressPair(item, myOpenid, peerOpenid) {
       peerPercent = hasPeer ? (peerEp / maxEp) * anchor : 0;
     }
   }
+  // done 覆盖：看完就是满进度到底
+  if (mineDone) minePercent = 100;
+  if (peerDone) peerPercent = 100;
 
   // 领先关系（中性，不含褒贬；对方未翻牌 = none）
   let lead;
@@ -132,14 +144,18 @@ function buildProgressPair(item, myOpenid, peerOpenid) {
   else lead = 'even';
 
   const diff = hasPeer ? Math.abs(mineEp - peerEp) : null;
+  // 任一方弃番 → 追赶叙事失效（人家不追了，「还差 X 话追上」是虚假期待），文案层改走「下车」分支
+  const eitherDropped = mineDropped || peerDropped;
 
   // 差距档位：仅保留 break（超大 gap 的轴断裂纯视觉降级，不等比拉伸）。
   // 原 blurred 模糊档随防剧透一并砍掉（2026-07-23）——进度信息全透明，措辞统一精确。
   let gapMode = 'exact';
   if (hasPeer && diff > VIEW.BREAK_GAP) gapMode = 'break';
 
-  // 追平重叠（两游标够近，头像合并为 ◉）
-  const isOverlap = hasPeer && Math.abs(minePercent - peerPercent) < VIEW.OVERLAP_PCT;
+  // 追平重叠（两游标够近，头像合并为 ◉）。弃番方不参与合并：
+  // 弃番停在某话，若与在追方 ep 恰好接近会误判「追平庆祝」，而弃番不该触发追平。
+  const isOverlap =
+    hasPeer && !eitherDropped && Math.abs(minePercent - peerPercent) < VIEW.OVERLAP_PCT;
 
   // 轴分段（UI §3.1）：共同走过 = 到较落后者；前沿 = 落后者→领先者
   const commonPercent = hasPeer ? Math.min(minePercent, peerPercent) : minePercent;
@@ -158,6 +174,9 @@ function buildProgressPair(item, myOpenid, peerOpenid) {
     diff,
     gapMode,
     isOverlap,
+    mineDropped,
+    peerDropped,
+    eitherDropped,
     safeTalkEp: safeTalkEp(mineEp, hasPeer ? peerEp : 0),
   };
 }

@@ -155,6 +155,53 @@ const p8 = T.buildProgressPair(
 eq('差 22 集 gapMode=break', p8.gapMode, 'break');
 
 // ============================================================
+// 终止态：done 轴填满 100% / dropped 灰化不参与追赶
+// ============================================================
+// 看完(done)无总集数：游标强制 100%（不再停在 75% 锚点）
+const pDone = T.buildProgressPair(
+  item({ totalEp: null, progress: { me: { ep: 8, status: 'done' }, pe: { ep: 8, status: 'done' } } }),
+  'me',
+  'pe'
+);
+eq('done 无分母 minePercent=100', pDone.minePercent, 100);
+eq('done 无分母 peerPercent=100', pDone.peerPercent, 100);
+eq('双方 done 仍算追平 isOverlap', pDone.isOverlap, true);
+
+// 单方 done（有总集数）也到 100
+const pDone2 = T.buildProgressPair(
+  item({ totalEp: 12, progress: { me: { ep: 12, status: 'done' }, pe: { ep: 6, status: 'watching' } } }),
+  'me',
+  'pe'
+);
+eq('done 有分母 minePercent=100', pDone2.minePercent, 100);
+
+// 一方弃番(dropped)一方在追：dropped 标记 + 不触发追平合并
+const pDrop = T.buildProgressPair(
+  item({ totalEp: null, progress: { me: { ep: 4, status: 'watching' }, pe: { ep: 1, status: 'dropped' } } }),
+  'me',
+  'pe'
+);
+eq('TA 弃番 peerDropped=true', pDrop.peerDropped, true);
+eq('TA 弃番 mineDropped=false', pDrop.mineDropped, false);
+eq('有弃番 eitherDropped=true', pDrop.eitherDropped, true);
+
+// 弃番方 ep 与在追方接近也不误判追平（eitherDropped 否决 overlap）
+const pDropClose = T.buildProgressPair(
+  item({ totalEp: 12, progress: { me: { ep: 6, status: 'watching' }, pe: { ep: 6, status: 'dropped' } } }),
+  'me',
+  'pe'
+);
+eq('弃番方 ep 接近不误判追平 isOverlap=false', pDropClose.isOverlap, false);
+
+// 本人弃番也标记
+const pMineDrop = T.buildProgressPair(
+  item({ totalEp: null, progress: { me: { ep: 2, status: 'dropped' }, pe: { ep: 5, status: 'watching' } } }),
+  'me',
+  'pe'
+);
+eq('我弃番 mineDropped=true', pMineDrop.mineDropped, true);
+
+// ============================================================
 // sanitizeAvatar：cloud:// 净化为空，其余原样
 // ============================================================
 eq('cloud:// → 空（无法在 image 加载，避免 500）', T.sanitizeAvatar('cloud://env-x/avatars/a.png'), '');

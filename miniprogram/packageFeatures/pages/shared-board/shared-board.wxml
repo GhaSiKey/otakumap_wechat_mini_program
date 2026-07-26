@@ -106,13 +106,13 @@
             <view class="cursor-dot cursor-dot--merged">◉</view>
           </view>
           <block wx:else>
-            <!-- 我的游标 -->
+            <!-- 我的游标（弃番则灰化：下车了，不再前进） -->
             <view class="axis-cursor cursor--mine" style="left:{{it.pair.minePercent}}%">
-              <view class="cursor-dot identity--me">我</view>
+              <view class="cursor-dot {{it.pair.mineDropped ? 'cursor-dot--dropped' : 'identity--me'}}">我</view>
             </view>
             <!-- 对方游标 -->
             <view wx:if="{{it.pair.hasPeer}}" class="axis-cursor cursor--peer" style="left:{{it.pair.peerPercent}}%">
-              <view class="cursor-dot identity--peer">TA</view>
+              <view class="cursor-dot {{it.pair.peerDropped ? 'cursor-dot--dropped' : 'identity--peer'}}">TA</view>
             </view>
           </block>
           <!-- 无分母右端渐隐 -->
@@ -120,13 +120,19 @@
         </view>
 
         <!-- 进度摘要：配对态显示双人对比（措辞精确，配色走蓝不走红）；筹备态只显示自己 -->
+        <!-- 弃番者不说「还差/领先」（追赶叙事失效），改说「已下车」；本人弃番则「我 已下车」 -->
         <view class="item-diff">
-          <text>我 第{{it.pair.mine.ep}}话</text>
+          <text wx:if="{{it.pair.mineDropped}}" class="dropped-txt">我 已下车（第{{it.pair.mine.ep}}话）</text>
+          <text wx:else>我 第{{it.pair.mine.ep}}话</text>
           <block wx:if="{{vm.peer}}">
-            <text wx:if="{{it.pair.hasPeer}}"> · TA 第{{it.pair.peer.ep}}话</text>
+            <text wx:if="{{it.pair.hasPeer && it.pair.peerDropped}}" class="dropped-txt"> · TA 已下车（第{{it.pair.peer.ep}}话）</text>
+            <text wx:elif="{{it.pair.hasPeer}}"> · TA 第{{it.pair.peer.ep}}话</text>
             <text wx:else class="hint"> · TA 还没翻牌</text>
-            <text wx:if="{{it.pair.lead === 'even' && it.pair.hasPeer}}" class="sync"> · 同步 🎉</text>
-            <text wx:elif="{{it.pair.lead !== 'none'}}" class="lead-txt"> · {{it.pair.lead === 'mine' ? 'TA 还差 ' + it.pair.diff + ' 话追上' : 'TA 领先 ' + it.pair.diff + ' 话'}}</text>
+            <!-- 追赶/同步文案仅在双方都没弃番时才有意义 -->
+            <block wx:if="{{it.pair.hasPeer && !it.pair.eitherDropped}}">
+              <text wx:if="{{it.pair.lead === 'even'}}" class="sync"> · 同步 🎉</text>
+              <text wx:elif="{{it.pair.lead !== 'none'}}" class="lead-txt"> · {{it.pair.lead === 'mine' ? 'TA 还差 ' + it.pair.diff + ' 话追上' : 'TA 领先 ' + it.pair.diff + ' 话'}}</text>
+            </block>
           </block>
         </view>
 
@@ -172,20 +178,34 @@
   <view class="sheet detail-panel" wx:if="{{detailItem}}">
     <view class="sheet__handle"></view>
 
-    <!-- 番名：默认展示可点改名；进入编辑态原地切成输入框（不再叠第二层弹窗） -->
-    <view class="sheet__header">
-      <block wx:if="{{!editingName}}">
+    <!-- 番名：默认展示可点改名；进入编辑态原地切成独立编辑区（不再叠第二层弹窗） -->
+    <block wx:if="{{!editingName}}">
+      <view class="sheet__header">
         <text class="sheet__title detail-name" bindtap="onEditItemTap">{{detailItem.name}}</text>
         <t-icon name="edit-1" size="36rpx" class="detail-name__edit" bindtap="onEditItemTap" />
-      </block>
-      <view wx:else class="detail-name-edit">
-        <t-input class="detail-name-input" value="{{editName}}" maxlength="60" bind:change="onEditNameInput" />
-        <text class="name-edit-btn name-edit-btn--cancel" bindtap="onCancelEditName">取消</text>
-        <text class="name-edit-btn name-edit-btn--save {{savingEdit ? 'is-loading' : ''}}" bindtap="onConfirmEdit">保存</text>
+      </view>
+      <view class="detail-sub" wx:if="{{detailItem.totalEp}}">共 {{detailItem.totalEp}} 集</view>
+    </block>
+
+    <!-- 改名编辑区：标题 + 带边框输入框 + 说明 + 底部按钮行，垂直堆叠 -->
+    <view wx:else class="name-edit-panel">
+      <view class="name-edit-panel__title">改番名</view>
+      <input
+        class="name-edit-input"
+        value="{{editName}}"
+        maxlength="60"
+        focus="{{editingName}}"
+        placeholder="输入番剧名"
+        confirm-type="done"
+        bind:input="onEditNameInput"
+        bind:confirm="onConfirmEdit"
+      />
+      <view class="name-edit-panel__note">番名两人共享，改了 TA 也会看到</view>
+      <view class="name-edit-panel__actions">
+        <view class="name-edit-action name-edit-action--cancel" bindtap="onCancelEditName">取消</view>
+        <view class="name-edit-action name-edit-action--save {{savingEdit ? 'is-loading' : ''}}" bindtap="onConfirmEdit">保存</view>
       </view>
     </view>
-    <view class="detail-sub" wx:if="{{detailItem.totalEp && !editingName}}">共 {{detailItem.totalEp}} 集</view>
-    <view class="detail-sub" wx:if="{{editingName}}">番名两人共享，改了 TA 也会看到</view>
 
     <!-- 编辑番名时收起操作区，只留改名，避免视觉噪声 -->
     <view class="sheet__body" wx:if="{{!editingName}}">

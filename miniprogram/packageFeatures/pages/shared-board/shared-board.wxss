@@ -381,6 +381,12 @@ page {
   box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.12);
 }
 
+/* 弃番游标：灰化 + 半透明，位置保留但不再是「前进中」的鲜活色，表达「下车了」 */
+.cursor-dot--dropped {
+  background: var(--td-text-color-placeholder, #bbbbbb);
+  opacity: 0.7;
+}
+
 /* 追平合并态 ◉：success 色 + 光晕脉冲，兑现追平仪式感（情绪峰值） */
 .cursor-dot--merged {
   width: 52rpx;
@@ -431,6 +437,11 @@ page {
   color: var(--td-brand-color, #0052d9);
 }
 
+/* 弃番文案：灰化，去追赶感，与游标灰化呼应 */
+.item-diff .dropped-txt {
+  color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
+}
+
 /* 「能一起聊到 E几」核心卖点：浅绿底 pill，抬成卡片里仅次于轴的第二焦点 */
 .safe-talk-pill {
   display: inline-flex;
@@ -464,34 +475,67 @@ page {
   vertical-align: middle;
 }
 
-/* 番名内联编辑态：输入框 + 取消/保存，占满标题栏（替代原独立编辑弹层） */
-.detail-name-edit {
+/* 番名编辑区：独立垂直堆叠面板（替代原挤在标题栏的内联编辑） */
+.name-edit-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 8rpx var(--td-spacer-2, 32rpx) 0;
+}
+
+.name-edit-panel__title {
+  font-size: var(--td-font-size-title-medium, 32rpx);
+  font-weight: 600;
+  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
+  text-align: center;
+  margin-bottom: var(--td-spacer-2, 32rpx);
+}
+
+/* 带边框底色的输入框，一眼可见是可编辑输入态（对齐 ep-number-input 观感） */
+.name-edit-input {
+  width: 100%;
+  height: 88rpx;
+  padding: 0 var(--td-spacer-2, 32rpx);
+  background: var(--td-bg-color-secondarycontainer, #f3f3f3);
+  border-radius: var(--td-radius-default, 12rpx);
+  font-size: var(--td-font-size-body-large, 32rpx);
+  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
+  box-sizing: border-box;
+}
+
+.name-edit-panel__note {
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
+  margin: var(--td-spacer, 16rpx) 4rpx var(--td-spacer-3, 48rpx);
+}
+
+/* 底部按钮行：取消（次要）+ 保存（主要），等宽并排 */
+.name-edit-panel__actions {
+  display: flex;
+  gap: var(--td-spacer, 16rpx);
+}
+
+.name-edit-action {
+  flex: 1;
+  height: 88rpx;
   display: flex;
   align-items: center;
-  gap: var(--td-spacer, 16rpx);
-  width: 100%;
+  justify-content: center;
+  border-radius: var(--td-radius-default, 12rpx);
+  font-size: var(--td-font-size-body-large, 32rpx);
 }
 
-.detail-name-input {
-  flex: 1;
-  min-width: 0;
-}
-
-.name-edit-btn {
-  flex-shrink: 0;
-  font-size: var(--td-font-size-body-medium, 28rpx);
-}
-
-.name-edit-btn--cancel {
+.name-edit-action--cancel {
+  background: var(--td-bg-color-secondarycontainer, #f3f3f3);
   color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
 }
 
-.name-edit-btn--save {
-  color: var(--td-brand-color, #0052d9);
+.name-edit-action--save {
+  background: var(--td-brand-color, #0052d9);
+  color: #ffffff;
   font-weight: 600;
 }
 
-.name-edit-btn.is-loading {
+.name-edit-action.is-loading {
   opacity: 0.5;
 }
 
