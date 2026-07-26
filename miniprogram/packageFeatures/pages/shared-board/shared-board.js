@@ -64,6 +64,10 @@ Page({
     showProfile: false,
     profileNickname: '',
     savingProfile: false,
+    // +1 动画开关：详情弹层集数大字上跳 + 绿色 +1 浮起（点「看完一集」触发）
+    epBump: false,
+    // 「N 部能一起聊」提示条：不再常驻，仅 commonCount 变大时短暂弹出
+    showCommonTalk: false,
   },
 
   async onLoad(query) {
@@ -105,6 +109,12 @@ Page({
     this._load().then(() => wx.stopPullDownRefresh());
   },
 
+  onUnload() {
+    // 防页面销毁后 setData
+    if (this._epBumpTimer) clearTimeout(this._epBumpTimer);
+    if (this._commonTalkTimer) clearTimeout(this._commonTalkTimer);
+  },
+
   // 拉板 + 番单，构建视图模型
   async _load() {
     const { boardId, myOpenid } = this.data;
@@ -130,8 +140,24 @@ Page({
     this.setData(patch);
     wx.setNavigationBarTitle({ title: board.name });
     if (wasWaiting && nowPaired) this._celebrateJoin(vm.peer);
+    // 顶部「N 部能一起聊」不再常驻：仅当本次比上次「多了能一起聊的番」才短暂弹出提醒。
+    // 首次进入（_lastCommonCount 未定义）不弹，避免每次打开都刷屏 = 变相常驻。
+    this._maybeFlashCommonTalk(vm.commonCount);
     // 记录本人查看时间，清未读红点（不阻塞渲染，失败无妨）
     api.markViewed(this.data.boardId);
+  },
+
+  // 「N 部能一起聊」按需提醒：commonCount 变大才弹横条，3.5s 后自动收起。
+  // 首次进入不弹（_lastCommonCount 为 undefined）；变小/不变不弹。
+  _maybeFlashCommonTalk(count) {
+    const prev = this._lastCommonCount;
+    this._lastCommonCount = count;
+    if (prev == null) return; // 首次加载，只记不弹
+    if (count > prev && count > 0) {
+      if (this._commonTalkTimer) clearTimeout(this._commonTalkTimer);
+      this.setData({ showCommonTalk: true });
+      this._commonTalkTimer = setTimeout(() => this.setData({ showCommonTalk: false }), 3500);
+    }
   },
 
   // 对方加入庆祝：成员条虚位实体化动画 + toast + 震动
@@ -340,6 +366,17 @@ Page({
     if (!d) return;
     const target = d.pair.mine.ep + 1;
     this._commitProgress(d.itemId, target, this._deriveStatus(d.pair.mine.status, target));
+    this._playEpBump();
+  },
+
+  // +1 动画：集数大字上跳回落 + 绿色 +1 浮起淡出。CSS animation 驱动，700ms 后复位。
+  // 复位用 setData(false) 让下次点击能重新触发（同名 class 需先移除再加）。
+  _playEpBump() {
+    if (this._epBumpTimer) clearTimeout(this._epBumpTimer);
+    // 先关再开：连点时若已是 true，setData 同值不会重放动画，故强制先 false
+    this.setData({ epBump: false });
+    wx.nextTick(() => this.setData({ epBump: true }));
+    this._epBumpTimer = setTimeout(() => this.setData({ epBump: false }), 700);
   },
 
   // 唯一的状态自动联动：ep 从 0 变 ≥1 且当前是「想看」→ 自动转「在追」（其余状态不动）
@@ -357,7 +394,7 @@ Page({
     const useRoll = d.totalEp && d.totalEp > 0 && d.totalEp <= EP_ROLL_MAX;
     if (useRoll) {
       const epOptions = [];
-      for (let i = 0; i <= d.totalEp; i++) epOptions.push({ label: `E${i}`, value: i });
+      for (let i = 0; i <= d.totalEp; i++) epOptions.push({ label: `第${i}话`, value: i });
       // 收起详情遮罩再叠滚轮，避免两层遮罩叠暗 + 两张白卡摞
       this.setData({
         showDetail: false,

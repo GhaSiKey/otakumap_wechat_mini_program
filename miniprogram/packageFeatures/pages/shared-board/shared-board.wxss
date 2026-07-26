@@ -113,6 +113,16 @@ page {
   border-radius: 999rpx;
 }
 
+/* 按需提醒：从顶部滑入淡出（不再常驻，commonCount 变大时才出现） */
+.common-talk--flash {
+  animation: commonTalkFlashKf 0.35s ease-out;
+}
+
+@keyframes commonTalkFlashKf {
+  0% { transform: translateY(-16rpx); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
 .common-talk__icon {
   font-size: 28rpx;
 }
@@ -508,6 +518,13 @@ page {
   min-width: 180rpx;
 }
 
+/* 集数大字容器：相对定位，给 +1 浮起动画做锚点 */
+.duel-ep-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
 .duel-ep {
   font-size: var(--td-font-size-title-large, 36rpx);
   font-weight: 600;
@@ -518,6 +535,35 @@ page {
   font-size: var(--td-font-size-body-small, 24rpx);
   font-weight: normal;
   color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
+}
+
+/* +1 触发：集数大字上跳回落，配合成功绿闪一下 */
+.duel-ep.ep-bump {
+  animation: epBumpKf 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes epBumpKf {
+  0% { transform: translateY(0) scale(1); }
+  35% { transform: translateY(-14rpx) scale(1.28); color: var(--td-success-color, #2ba471); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* +1 浮起：从集数位置起，向上升 + 放大 + 淡出 */
+.ep-plus-fly {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: var(--td-success-color, #2ba471);
+  pointer-events: none;
+  animation: epPlusFlyKf 0.7s ease-out forwards;
+}
+
+@keyframes epPlusFlyKf {
+  0% { transform: translate(-50%, 0) scale(0.6); opacity: 0; }
+  25% { transform: translate(-50%, -20rpx) scale(1.1); opacity: 1; }
+  100% { transform: translate(-50%, -72rpx) scale(1); opacity: 0; }
 }
 
 .duel-status {

@@ -39,14 +39,14 @@
   </view>
 
   <!-- ============ 共同话题带（门面核心卖点：N 部能一起聊）============ -->
-  <!-- 配对态且有共同在追/看完的番才显示；点击滚到「一起追」分区 -->
+  <!-- 不再常驻：仅当 commonCount 变大时（又多一部能聊）短暂弹出提醒，3.5s 自动收起。点击滚到分区。 -->
   <view
-    wx:if="{{vm.peer && vm.commonCount > 0}}"
-    class="common-talk"
+    wx:if="{{vm.peer && vm.commonCount > 0 && showCommonTalk}}"
+    class="common-talk common-talk--flash"
     bindtap="onTapCommonTalk"
   >
     <text class="common-talk__icon">{{commonTalk.ICON}}</text>
-    <text class="common-talk__text">{{commonTalk.PREFIX}}{{vm.commonCount}}{{commonTalk.SUFFIX}}</text>
+    <text class="common-talk__text">又多一部能一起聊，共 {{vm.commonCount}} 部</text>
     <text class="common-talk__arrow">›</text>
   </view>
 
@@ -121,19 +121,19 @@
 
         <!-- 进度摘要：配对态显示双人对比（措辞精确，配色走蓝不走红）；筹备态只显示自己 -->
         <view class="item-diff">
-          <text>我 E{{it.pair.mine.ep}}</text>
+          <text>我 第{{it.pair.mine.ep}}话</text>
           <block wx:if="{{vm.peer}}">
-            <text wx:if="{{it.pair.hasPeer}}"> · TA E{{it.pair.peer.ep}}</text>
+            <text wx:if="{{it.pair.hasPeer}}"> · TA 第{{it.pair.peer.ep}}话</text>
             <text wx:else class="hint"> · TA 还没翻牌</text>
             <text wx:if="{{it.pair.lead === 'even' && it.pair.hasPeer}}" class="sync"> · 同步 🎉</text>
-            <text wx:elif="{{it.pair.lead !== 'none'}}" class="lead-txt"> · {{it.pair.lead === 'mine' ? 'TA 还差 ' + it.pair.diff + ' 集追上' : 'TA 领先 ' + it.pair.diff + ' 集'}}</text>
+            <text wx:elif="{{it.pair.lead !== 'none'}}" class="lead-txt"> · {{it.pair.lead === 'mine' ? 'TA 还差 ' + it.pair.diff + ' 话追上' : 'TA 领先 ' + it.pair.diff + ' 话'}}</text>
           </block>
         </view>
 
         <!-- 核心卖点：能一起聊到第几集（双方都追了才有意义）——单拎一行做浅底 pill 抬权重 -->
         <view wx:if="{{it.pair.hasPeer && it.pair.safeTalkEp > 0}}" class="safe-talk-pill">
           <text class="safe-talk-pill__icon">💬</text>
-          <text>能一起聊到 E{{it.pair.safeTalkEp}}</text>
+          <text>能一起聊到 第{{it.pair.safeTalkEp}}话</text>
         </view>
       </view>
     </view>
@@ -193,12 +193,16 @@
       <view class="duel">
         <view class="duel-col">
           <view class="m-fallback big identity--me">我</view>
-          <view class="duel-ep">E{{detailItem.pair.mine.ep}}</view>
+          <view class="duel-ep-wrap">
+            <view class="duel-ep {{epBump ? 'ep-bump' : ''}}">第{{detailItem.pair.mine.ep}}话</view>
+            <!-- +1 浮起动画：点「看完这集」时从集数位置浮起上升淡出 -->
+            <text wx:if="{{epBump}}" class="ep-plus-fly">+1</text>
+          </view>
           <view class="duel-status">{{statusLabels[detailItem.pair.mine.status] || '未设'}}</view>
         </view>
         <view class="duel-col" wx:if="{{detailItem.pair.hasPeer}}">
           <view class="m-fallback big identity--peer">TA</view>
-          <view class="duel-ep">E{{detailItem.pair.peer.ep}}</view>
+          <view class="duel-ep">第{{detailItem.pair.peer.ep}}话</view>
           <view class="duel-status">{{statusLabels[detailItem.pair.peer.status] || '未设'}}</view>
         </view>
         <view class="duel-col" wx:else>
@@ -208,13 +212,13 @@
       </view>
 
       <!-- 主手势：+1（最高频，乐观 UI 无确认） -->
-      <t-button theme="primary" size="large" block bindtap="onEpInc">我看完这集 +1</t-button>
+      <t-button theme="primary" size="large" block bindtap="onEpInc">看完一集 +1</t-button>
 
       <!-- 低频入口：改集数（跳集/补集/纠错）、改状态 -->
       <view class="detail-actions">
         <view class="detail-action" bindtap="onEpTap">
-          <text class="detail-action__label">看到第几集</text>
-          <text class="detail-action__value">E{{detailItem.pair.mine.ep}} ›</text>
+          <text class="detail-action__label">看到第几话</text>
+          <text class="detail-action__value">第{{detailItem.pair.mine.ep}}话 ›</text>
         </view>
         <view class="detail-action" bindtap="onStatusTap">
           <text class="detail-action__label">状态</text>
@@ -253,13 +257,13 @@
 <t-popup visible="{{showEpInput}}" placement="bottom" close-on-overlay-click bind:visible-change="onEpInputVisibleChange">
   <view class="sheet">
     <view class="sheet__handle"></view>
-    <view class="sheet__header"><text class="sheet__title">看到第几集</text></view>
+    <view class="sheet__header"><text class="sheet__title">看到第几话</text></view>
     <view class="sheet__body">
       <!-- 不用 focus 自动聚焦：popup 上滑动画期间 focus 易失效/键盘顶起弹层错位，让用户点一下更稳 -->
       <input
         class="ep-number-input"
         type="number"
-        placeholder="输入集数，如 183"
+        placeholder="输入话数，如 183"
         value="{{epInputValue}}"
         bind:input="onEpInputChange"
       />
