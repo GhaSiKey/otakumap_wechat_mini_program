@@ -44,6 +44,8 @@ const updateMemberProfile = (boardId, nickname, avatar) =>
 const markViewed = (boardId) => invoke('markViewed', { boardId });
 
 // 头像临时文件上传云存储，resolve fileID（失败 resolve null，调用方兜底）
+// ⚠️ 已弃用（2026-07-23）：cloud:// 头像连自己都读不到（云存储公开读要付费套餐），
+// 头像上传功能已砍，双方统一昵称首字色块。此函数暂留，若日后开通云存储公开读可复用。
 function uploadAvatar(tempFilePath, myOpenid) {
   return new Promise((resolve) => {
     const cloudPath = `avatars/${myOpenid}_${Date.now()}.png`;

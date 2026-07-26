@@ -9,9 +9,12 @@ const api = require('../../utils/shared-board/cloud-api');
 const T = require('../../utils/shared-board/transform');
 const {
   STATUS_LABELS,
+  STATUS_TAG_THEME,
   PROGRESS_STATUS,
   EP_ROLL_MAX,
   JOIN_ERR_MESSAGES,
+  COMMON_TALK,
+  SECTION,
 } = require('../../utils/shared-board/config');
 
 // 状态 action-sheet 的选项（按 PROGRESS_STATUS 顺序生成，文案走 STATUS_LABELS，不硬编码）
@@ -20,6 +23,8 @@ const STATUS_SHEET_ITEMS = PROGRESS_STATUS.map((s) => ({ label: STATUS_LABELS[s]
 Page({
   data: {
     statusLabels: STATUS_LABELS, // 分区标题已在 transform 内算好（sec.title），此处只留状态标签
+    statusTagTheme: STATUS_TAG_THEME, // 状态标签按语义配色（t-tag theme），不再全蓝
+    commonTalk: COMMON_TALK,     // 「N 部能一起聊」文案配置（图标/前后缀），数字在 wxml 用 vm.commonCount 插
     boardId: '',
     token: '',            // 分享卡片带的配对 token
     myOpenid: '',
@@ -55,9 +60,8 @@ Page({
     // 头像加载失败标记（不开云存储时对方常读不到，回退首字母；换头像后 _load 重置重试）
     meAvatarError: false,
     peerAvatarError: false,
-    // 设置头像昵称弹层
+    // 设置昵称弹层（头像上传已砍，统一首字色块）
     showProfile: false,
-    profileAvatar: '',    // chooseAvatar 拿到的临时路径
     profileNickname: '',
     savingProfile: false,
   },
@@ -138,6 +142,16 @@ Page({
     setTimeout(() => this.setData({ justJoined: false }), 500);
   },
 
+  // 点「N 部能一起聊」→ 滚到相关分区。commonCount 含「双方都看完(done)」，
+  // 而 done 归 DONE 分区不归 TOGETHER，故 together 不存在时兜底滚到 done，避免点了没反应。
+  onTapCommonTalk() {
+    const sections = (this.data.vm && this.data.vm.sections) || [];
+    const has = (key) => sections.some((s) => s.sectionKey === key);
+    const targetKey = has(SECTION.TOGETHER) ? SECTION.TOGETHER : (has(SECTION.DONE) ? SECTION.DONE : null);
+    if (!targetKey) return;
+    wx.pageScrollTo({ selector: `#section-${targetKey}`, duration: 300 });
+  },
+
   // ==================== 头像加载失败兜底 ====================
   // 不开云存储时对方读不到 cloud:// 头像，image binderror 触发 → 回退首字母色块
   onMeAvatarError() {
@@ -148,22 +162,17 @@ Page({
     this.setData({ peerAvatarError: true });
   },
 
-  // ==================== 设置头像昵称（微信不能自动读，用户主动设）====================
+  // ==================== 设置昵称（微信不能自动读，用户主动设）====================
+  // 头像上传已砍：cloud:// 头像连自己都读不到，双方统一昵称首字色块。只设昵称。
   onEditProfileTap() {
     this.setData({
       showProfile: true,
-      profileAvatar: (this.data.vm && this.data.vm.me && this.data.vm.me.avatar) || '',
       profileNickname: (this.data.vm && this.data.vm.me && this.data.vm.me.nickname) || '',
     });
   },
 
   onProfileVisibleChange(e) {
     this.setData({ showProfile: e.detail.visible });
-  },
-
-  // chooseAvatar 回调：拿到临时头像路径先本地预览，保存时才上传
-  onChooseAvatar(e) {
-    this.setData({ profileAvatar: e.detail.avatarUrl });
   },
 
   onNicknameInput(e) {
@@ -173,25 +182,19 @@ Page({
   async onSaveProfile() {
     if (this.data.savingProfile) return;
     const nickname = (this.data.profileNickname || '').trim();
-    const localAvatar = this.data.profileAvatar || '';
-    if (!nickname && !localAvatar) {
-      wx.showToast({ title: '设个头像或昵称吧', icon: 'none' });
+    if (!nickname) {
+      wx.showToast({ title: '设个昵称吧', icon: 'none' });
       return;
     }
     this.setData({ savingProfile: true });
-    // 头像是本地临时路径才需上传；已是云 fileID（http/cloud）则沿用
-    let avatarFileId = localAvatar;
-    if (localAvatar && !/^cloud:\/\/|^https?:\/\//.test(localAvatar)) {
-      avatarFileId = (await api.uploadAvatar(localAvatar, this.data.myOpenid)) || '';
-    }
-    const r = await api.updateMemberProfile(this.data.boardId, nickname, avatarFileId);
+    // 只更新昵称，avatar 传空（历史 cloud:// 头像也无展示价值，sanitizeAvatar 已净化）
+    const r = await api.updateMemberProfile(this.data.boardId, nickname, '');
     this.setData({ savingProfile: false });
     if (!r.ok) {
       wx.showToast({ title: '保存失败', icon: 'none' });
       return;
     }
-    // 我换了头像 → 清失败标记给新 URL 一次加载机会（自己的头像自己一般能读到）
-    this.setData({ showProfile: false, meAvatarError: false });
+    this.setData({ showProfile: false });
     wx.showToast({ title: '已更新', icon: 'success' });
     this._load();
   },
@@ -235,6 +238,31 @@ Page({
     // 退出编辑态 + 同步详情标题 + 重拉列表
     this.setData({ editingName: false, 'detailItem.name': name });
     this._load();
+  },
+
+  // ==================== 移出番单（软删，可恢复）====================
+  onRemoveItemTap() {
+    const d = this.data.detailItem;
+    if (!d) return;
+    // 轻确认防误触；措辞软（软删可恢复，不叫删除）
+    // 不染红 confirm：软删可恢复，不制造删除恐慌，与「移出而非删除」的措辞一致
+    wx.showModal({
+      title: '移出番单？',
+      content: '会从你俩的番单里拿掉，需要的话之后还能加回来',
+      confirmText: '移出',
+      cancelText: '再想想',
+      success: async (res) => {
+        if (!res.confirm) return;
+        const r = await api.deleteItem(d.itemId, true);
+        if (!r.ok) {
+          wx.showToast({ title: '移出失败', icon: 'none' });
+          return;
+        }
+        this.setData({ showDetail: false });
+        wx.showToast({ title: '已移出', icon: 'none' });
+        this._load();
+      },
+    });
   },
 
   // ==================== 配对邀请（P4）====================
@@ -306,12 +334,12 @@ Page({
     this.setData({ showDetail: e.detail.visible, editingName: false });
   },
 
-  // +1：乐观 UI 本地先加，云函数回来对账（被 clamp 则 snap 到权威值）
-  async onEpInc() {
+  // +1：本地即时累加（连点基于最新本地态，五连点=+5），_commitProgress 内部乐观更新 + 异步对账
+  onEpInc() {
     const d = this.data.detailItem;
     if (!d) return;
     const target = d.pair.mine.ep + 1;
-    await this._commitProgress(d.itemId, target, this._deriveStatus(d.pair.mine.status, target));
+    this._commitProgress(d.itemId, target, this._deriveStatus(d.pair.mine.status, target));
   },
 
   // 唯一的状态自动联动：ep 从 0 变 ≥1 且当前是「想看」→ 自动转「在追」（其余状态不动）
@@ -426,26 +454,48 @@ Page({
     if (!e.detail.visible) this.setData({ showStatusSheet: false, showDetail: true });
   },
 
-  async _commitProgress(itemId, ep, status) {
-    const r = await api.updateProgress(itemId, ep, status);
-    if (!r.ok) {
-      wx.showToast({ title: '更新失败', icon: 'none' });
-      return;
-    }
-    // 用服务端权威值刷新弹层 + 重拉列表
+  // 乐观 UI：本地先更新（UI 秒变，支持连点累加），云函数回来对账；失败回滚 + toast。
+  // PRD §10 冷启动应对——云函数首次 1~3s，不能让最高频的 +1 手势卡在网络后面。
+  _commitProgress(itemId, ep, status) {
+    const myOpenid = this.data.myOpenid;
     const raw = this.data.rawItems.find((it) => it._id === itemId);
-    if (raw) {
-      raw.progress = raw.progress || {};
-      raw.progress[this.data.myOpenid] = { ep: r.data.mine.ep, status: r.data.mine.status };
-    }
+    if (!raw) return;
     const peerOpenid = this.data.vm && this.data.vm.peer ? this.data.vm.peer.openid : null;
-    const newPair = T.buildProgressPair(raw, this.data.myOpenid, peerOpenid);
-    this.setData({ 'detailItem.pair': newPair });
-    // 追平里程碑：双方都在追且刚好持平，本地未庆祝过 → 播 sync 动画 + 震动（防重放）
-    if (newPair.hasPeer && newPair.lead === 'even') {
+
+    // ① 本地乐观写入 rawItems + 重算 pair 立即上屏（clamp 与云函数同规则，本地也先夹一下）
+    // 失败不靠本地快照回滚，直接 _load 拉服务端权威值对账，故这里不存快照。
+    const optimisticEp = T.clampEp(ep, raw.totalEp);
+    raw.progress = raw.progress || {};
+    raw.progress[myOpenid] = { ep: optimisticEp != null ? optimisticEp : ep, status };
+    const optimisticPair = T.buildProgressPair(raw, myOpenid, peerOpenid);
+    this.setData({ 'detailItem.pair': optimisticPair });
+    // 追平里程碑在乐观态即时庆祝（本地防重放），手感更跟手
+    if (optimisticPair.hasPeer && optimisticPair.lead === 'even') {
       this._celebrateSync(itemId);
     }
-    this._load();
+
+    // ③ 请求序号：只让「最新一次」提交的回包写权威对账，旧回包丢弃（防连点乱序覆盖）
+    this._commitSeq = (this._commitSeq || 0) + 1;
+    const seq = this._commitSeq;
+    this._commitLatest = this._commitLatest || {};
+    this._commitLatest[itemId] = seq;
+
+    api.updateProgress(itemId, ep, status).then((r) => {
+      const isStale = this._commitLatest[itemId] !== seq; // 期间又点了，丢弃本次回包
+      if (isStale) return; // 旧回包，最新态已更靠前，交给最新那次收尾，不回写
+      if (!r.ok) {
+        // 失败：不用本地快照回滚（连点场景快照是中间乐观态，回滚会漂移）。
+        // 直接 _load 从服务端拉权威值对账，是唯一诚实且能自愈的还原。
+        wx.showToast({ title: '更新失败，已还原', icon: 'none' });
+        this._load();
+        return;
+      }
+      // 用服务端权威值对账（clamp 修正等），再重拉列表同步分区/commonCount
+      raw.progress[myOpenid] = { ep: r.data.mine.ep, status: r.data.mine.status };
+      const authoritativePair = T.buildProgressPair(raw, myOpenid, peerOpenid);
+      this.setData({ 'detailItem.pair': authoritativePair });
+      this._load();
+    });
   },
 
   // 追平庆祝（本地 storage 防重放，同一 item 同一人只放一次）

@@ -2,7 +2,7 @@
 //
 // 允许一人加入多个板（PRD §5.4）。onShow 拉列表（打开即最新，MVP 不做 watch）。
 const api = require('../../utils/shared-board/cloud-api');
-const { pickCoverColor } = require('../../utils/shared-board/transform');
+const { pickCoverColor, sanitizeAvatar } = require('../../utils/shared-board/transform');
 const { BOARD_STATUS } = require('../../utils/shared-board/config');
 
 Page({
@@ -77,7 +77,7 @@ Page({
       archived,
       paired,
       peerName: peer ? peer.nickname || '对方' : '',
-      peerAvatar: peer ? peer.avatar || '' : '',
+      peerAvatar: peer ? sanitizeAvatar(peer.avatar) : '', // cloud:// 净化为空→走首字母，不发失败请求刷 500
       peerFallback: peer ? pickCoverColor(peer.nickname || '对方') : null,
       waitingHint: paired ? '' : '等 TA 点开链接',
       hasUnread: !!board.hasUnread,

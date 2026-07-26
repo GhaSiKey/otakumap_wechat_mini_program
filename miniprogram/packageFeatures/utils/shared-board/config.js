@@ -84,8 +84,8 @@ const JOIN_ERR_MESSAGES = {
 const VIEW = {
   AXIS_LEAD_ANCHOR: 75, // 无分母时领先者游标锚定在轴的百分比位置
   OVERLAP_PCT: 3, // 两游标间距 < 此值 → 判定追平重叠 ◉
-  BREAK_GAP: 12, // 集数差 > 此值 → 轴断裂波浪，不等比拉伸
-  BLUR_GAP: 5, // 集数差 > 此值 → 领先幅度显模糊档（防剧透）
+  BREAK_GAP: 12, // 集数差 > 此值 → 轴断裂波浪，不等比拉伸（纯视觉降级，与剧透无关）
+  // BLUR_GAP 已删（2026-07-23 砍防剧透）：原用于「领先幅度模糊档」，进度信息现全透明
 };
 
 // ── 分区（UI 规格 §P2，顺序即展示顺序，不硬编码）──
@@ -96,6 +96,14 @@ const SECTION = {
   DONE: 'done', // 一起追完了
 };
 const SECTION_ORDER = [SECTION.TOGETHER, SECTION.NOT_STARTED, SECTION.PAUSED, SECTION.DONE];
+
+// 「N 部能一起聊」共同话题带文案（门面核心卖点，配对态 commonCount>0 才显示）。
+// 数字由前端插，前后缀集中配置不硬编码进 wxml。
+const COMMON_TALK = {
+  ICON: '💬',
+  PREFIX: '', // 数字前缀（如需「有」等前置词放这）
+  SUFFIX: ' 部能一起聊', // 数字后缀
+};
 
 // 分区标题文案（配对态：含关系词，UI 层展示，集中配置不硬编码进 wxml）
 const SECTION_TITLES = {
@@ -123,10 +131,23 @@ const STATUS_LABELS = {
   dropped: '弃番',
 };
 
+// 状态标签色（TDesign t-tag theme）：按语义区分冷暖，不再全蓝一个色。
+// primary 蓝=进行中主态；success 绿=完成；warning=暂停；default 灰=淡化（想看/弃番不强调）
+const STATUS_TAG_THEME = {
+  want: 'default', // 想看：还没开始，弱化
+  watching: 'primary', // 在追：进行中主态
+  caught_up: 'primary', // 追平待更：也是进行中
+  paused: 'warning', // 暂缓：黄，提示中断
+  done: 'success', // 看完：绿，完成感
+  dropped: 'default', // 弃番：灰，不强调（去批判感，和「下车」调性一致）
+};
+
 // ── 首字色块调色板（封面为空时占位）──
 // JS 侧取不到 WXSS 的 --td-* 变量，故从 TDesign 品牌色阶人工派生并集中于此，
 // 属「配置层集中管理」而非「散落硬编码」。真按变量取色需 wx.getComputedStyle，MVP 不做。
-const COVER_PALETTE = ['#0052D9', '#0594FA', '#00A870', '#ED7B2A', '#E34D59', '#834EC2', '#EBB105'];
+// 全部收敛为「能扛白字」的深色档（2026-07-23 视觉评审）：原浅蓝/黄/橙/绿白字对比度低于 4.5:1
+// （黄 #EBB105 白字仅 1.9:1 基本不可读），已分别压深到 ≥4.5:1，配 ≥36rpx 首字稳达大字阈值。
+const COVER_PALETTE = ['#0052D9', '#0A6DD1', '#0A8C5E', '#D9600F', '#E34D59', '#834EC2', '#B67C00'];
 
 // ── 成员身份色（固定 2 人）──
 // 我=品牌蓝，TA=紫。TA 刻意不用成功绿(#00A870)：绿是「追平/看完」的奖章色，
@@ -159,7 +180,9 @@ module.exports = {
   SECTION_ORDER,
   SECTION_TITLES,
   SECTION_TITLES_SOLO,
+  COMMON_TALK,
   STATUS_LABELS,
+  STATUS_TAG_THEME,
   COVER_PALETTE,
   MEMBER_COLORS,
   AIR_STATUS_LABELS,

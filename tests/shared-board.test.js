@@ -138,21 +138,30 @@ eq('未翻牌 hasPeer=false', p6.hasPeer, false);
 eq('未翻牌 lead=none', p6.lead, 'none');
 eq('未翻牌 diff=null', p6.diff, null);
 
-// 模糊档（差 > BLUR_GAP）
+// 砍防剧透后：中等差距不再有 blurred 模糊档，统一 exact（差 8 集，>5 但 ≤BREAK_GAP）
 const p7 = T.buildProgressPair(
   item({ totalEp: 28, progress: { me: { ep: 2, status: 'watching' }, pe: { ep: 10, status: 'watching' } } }),
   'me',
   'pe'
 );
-eq('差 8 集 gapMode=blurred', p7.gapMode, 'blurred');
+eq('差 8 集 gapMode=exact（不再模糊）', p7.gapMode, 'exact');
 
-// 断裂档（差 > BREAK_GAP）
+// 断裂档（差 > BREAK_GAP）：纯视觉轴断裂，与剧透无关，保留
 const p8 = T.buildProgressPair(
   item({ totalEp: 28, progress: { me: { ep: 2, status: 'watching' }, pe: { ep: 24, status: 'watching' } } }),
   'me',
   'pe'
 );
 eq('差 22 集 gapMode=break', p8.gapMode, 'break');
+
+// ============================================================
+// sanitizeAvatar：cloud:// 净化为空，其余原样
+// ============================================================
+eq('cloud:// → 空（无法在 image 加载，避免 500）', T.sanitizeAvatar('cloud://env-x/avatars/a.png'), '');
+eq('https 原样返回', T.sanitizeAvatar('https://x.com/a.png'), 'https://x.com/a.png');
+eq('wxfile 临时路径原样（chooseAvatar 预览）', T.sanitizeAvatar('wxfile://tmp_123.png'), 'wxfile://tmp_123.png');
+eq('空值 → 空', T.sanitizeAvatar(''), '');
+eq('null → 空', T.sanitizeAvatar(null), '');
 
 // ============================================================
 // sectionOf：分区判定

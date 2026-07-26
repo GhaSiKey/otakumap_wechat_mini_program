@@ -44,6 +44,18 @@ function resolvePeer(members, myOpenid) {
 }
 
 /**
+ * 头像 URL 净化：cloud:// 文件 ID 无法在普通 <image src> 里加载
+ * （会被拼成页面相对路径→500 报错刷屏），且不开云存储权限时对方本就读不到。
+ * 故 cloud:// 一律视作「无有效头像」返回 ''，让 wxml 直接走首字母兜底，不发失败请求。
+ * https/wxfile（chooseAvatar 临时路径）等可正常加载的 URL 原样返回。
+ */
+function sanitizeAvatar(url) {
+  if (!url || typeof url !== 'string') return '';
+  if (url.indexOf('cloud://') === 0) return '';
+  return url;
+}
+
+/**
  * 首字色块：番名首字符 + 按番名稳定 hash 选出的主题色。
  * 同名恒定同色（hash 逐字符累加，可测），供封面为空时占位。
  */
@@ -121,12 +133,10 @@ function buildProgressPair(item, myOpenid, peerOpenid) {
 
   const diff = hasPeer ? Math.abs(mineEp - peerEp) : null;
 
-  // 差距档位（防剧透：差得多时只给模糊感）
+  // 差距档位：仅保留 break（超大 gap 的轴断裂纯视觉降级，不等比拉伸）。
+  // 原 blurred 模糊档随防剧透一并砍掉（2026-07-23）——进度信息全透明，措辞统一精确。
   let gapMode = 'exact';
-  if (hasPeer) {
-    if (diff > VIEW.BREAK_GAP) gapMode = 'break';
-    else if (diff > VIEW.BLUR_GAP) gapMode = 'blurred';
-  }
+  if (hasPeer && diff > VIEW.BREAK_GAP) gapMode = 'break';
 
   // 追平重叠（两游标够近，头像合并为 ◉）
   const isOverlap = hasPeer && Math.abs(minePercent - peerPercent) < VIEW.OVERLAP_PCT;
@@ -267,8 +277,8 @@ function buildBoardViewModel(board, items, myOpenid) {
     name: board.name,
     status: board.status,
     phase,
-    me: meM ? { openid: meM.openid, nickname: meM.nickname, avatar: meM.avatar } : null,
-    peer: peerM ? { openid: peerM.openid, nickname: peerM.nickname, avatar: peerM.avatar } : null,
+    me: meM ? { openid: meM.openid, nickname: meM.nickname, avatar: sanitizeAvatar(meM.avatar) } : null,
+    peer: peerM ? { openid: peerM.openid, nickname: peerM.nickname, avatar: sanitizeAvatar(peerM.avatar) } : null,
     sections,
     commonCount,
   };
@@ -277,6 +287,7 @@ function buildBoardViewModel(board, items, myOpenid) {
 module.exports = {
   clampEp,
   resolvePeer,
+  sanitizeAvatar,
   pickCoverColor,
   safeTalkEp,
   buildProgressPair,

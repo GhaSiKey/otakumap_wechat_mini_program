@@ -38,6 +38,18 @@
     </view>
   </view>
 
+  <!-- ============ 共同话题带（门面核心卖点：N 部能一起聊）============ -->
+  <!-- 配对态且有共同在追/看完的番才显示；点击滚到「一起追」分区 -->
+  <view
+    wx:if="{{vm.peer && vm.commonCount > 0}}"
+    class="common-talk"
+    bindtap="onTapCommonTalk"
+  >
+    <text class="common-talk__icon">{{commonTalk.ICON}}</text>
+    <text class="common-talk__text">{{commonTalk.PREFIX}}{{vm.commonCount}}{{commonTalk.SUFFIX}}</text>
+    <text class="common-talk__arrow">›</text>
+  </view>
+
   <!-- ============ 筹备态邀请横幅（单人，紧凑不挡番单）============ -->
   <view wx:if="{{vm.phase === 'waiting'}}" class="invite-banner">
     <view class="invite-banner__text">
@@ -58,7 +70,7 @@
       <view class="list-empty__text">{{vm.peer ? '还没加番，点右下角加一部吧' : '先把想追的番加进来'}}</view>
     </view>
 
-    <view class="section" wx:for="{{vm.sections}}" wx:key="sectionKey" wx:for-item="sec">
+    <view class="section" id="section-{{sec.sectionKey}}" wx:for="{{vm.sections}}" wx:key="sectionKey" wx:for-item="sec">
       <view class="section-title">{{sec.title}}</view>
 
       <view
@@ -76,42 +88,52 @@
             <text class="item-name">{{it.name}}</text>
             <text wx:if="{{it.subtitle}}" class="item-sub">{{it.subtitle}}</text>
           </view>
-          <t-tag wx:if="{{statusLabels[it.pair.mine.status]}}" size="small" variant="light" theme="primary">{{statusLabels[it.pair.mine.status]}}</t-tag>
+          <t-tag wx:if="{{statusLabels[it.pair.mine.status]}}" size="small" variant="light" theme="{{statusTagTheme[it.pair.mine.status] || 'default'}}">{{statusLabels[it.pair.mine.status]}}</t-tag>
         </view>
 
         <!-- 同轴集数轴 -->
         <view class="axis">
           <view class="axis-track"></view>
-          <view class="axis-common" style="width:{{it.pair.commonPercent}}%"></view>
+          <!-- 已走过段：追平时染 success 绿，与合并态 ◉ 呼应，让「一起走到这里」是绿色整体 -->
+          <view class="axis-common {{it.pair.isOverlap ? 'axis-common--sync' : ''}}" style="width:{{it.pair.commonPercent}}%"></view>
           <view
             wx:if="{{it.pair.hasPeer}}"
             class="axis-lead"
             style="left:{{it.pair.minePercent < it.pair.peerPercent ? it.pair.minePercent : it.pair.peerPercent}}%;width:{{it.pair.leadWidth}}%"
           ></view>
-          <!-- 我的游标 -->
-          <view class="axis-cursor cursor--mine" style="left:{{it.pair.minePercent}}%">
-            <view class="cursor-dot identity--me">我</view>
+          <!-- 追平重叠：两游标收拢成一个 ◉ 合并态 + success 光晕（情绪峰值，isOverlap 由 transform 算） -->
+          <view wx:if="{{it.pair.isOverlap}}" class="axis-cursor cursor--merged" style="left:{{it.pair.minePercent}}%">
+            <view class="cursor-dot cursor-dot--merged">◉</view>
           </view>
-          <!-- 对方游标 -->
-          <view wx:if="{{it.pair.hasPeer}}" class="axis-cursor cursor--peer" style="left:{{it.pair.peerPercent}}%">
-            <view class="cursor-dot identity--peer">TA</view>
-          </view>
+          <block wx:else>
+            <!-- 我的游标 -->
+            <view class="axis-cursor cursor--mine" style="left:{{it.pair.minePercent}}%">
+              <view class="cursor-dot identity--me">我</view>
+            </view>
+            <!-- 对方游标 -->
+            <view wx:if="{{it.pair.hasPeer}}" class="axis-cursor cursor--peer" style="left:{{it.pair.peerPercent}}%">
+              <view class="cursor-dot identity--peer">TA</view>
+            </view>
+          </block>
           <!-- 无分母右端渐隐 -->
           <view wx:if="{{!it.pair.hasTotalEp}}" class="axis-fade"></view>
         </view>
 
-        <!-- 进度摘要：配对态显示双人对比（正向措辞+防剧透模糊档）；筹备态只显示自己 -->
+        <!-- 进度摘要：配对态显示双人对比（措辞精确，配色走蓝不走红）；筹备态只显示自己 -->
         <view class="item-diff">
           <text>我 E{{it.pair.mine.ep}}</text>
           <block wx:if="{{vm.peer}}">
             <text wx:if="{{it.pair.hasPeer}}"> · TA E{{it.pair.peer.ep}}</text>
             <text wx:else class="hint"> · TA 还没翻牌</text>
             <text wx:if="{{it.pair.lead === 'even' && it.pair.hasPeer}}" class="sync"> · 同步 🎉</text>
-            <text wx:elif="{{it.pair.gapMode === 'exact' && it.pair.lead !== 'none'}}" class="lead-txt"> · {{it.pair.lead === 'mine' ? 'TA 还差 ' + it.pair.diff + ' 集追上' : 'TA 领先 ' + it.pair.diff + ' 集'}}</text>
-            <text wx:elif="{{it.pair.gapMode !== 'exact' && it.pair.lead !== 'none'}}" class="lead-txt"> · {{it.pair.lead === 'mine' ? 'TA 落后不少' : 'TA 领先不少'}}</text>
+            <text wx:elif="{{it.pair.lead !== 'none'}}" class="lead-txt"> · {{it.pair.lead === 'mine' ? 'TA 还差 ' + it.pair.diff + ' 集追上' : 'TA 领先 ' + it.pair.diff + ' 集'}}</text>
           </block>
-          <!-- 核心价值：能安全聊到第几集（双方都追了才有意义）-->
-          <text wx:if="{{it.pair.hasPeer && it.pair.safeTalkEp > 0}}" class="safe-talk"> · 能一起聊到 E{{it.pair.safeTalkEp}}</text>
+        </view>
+
+        <!-- 核心卖点：能一起聊到第几集（双方都追了才有意义）——单拎一行做浅底 pill 抬权重 -->
+        <view wx:if="{{it.pair.hasPeer && it.pair.safeTalkEp > 0}}" class="safe-talk-pill">
+          <text class="safe-talk-pill__icon">💬</text>
+          <text>能一起聊到 E{{it.pair.safeTalkEp}}</text>
         </view>
       </view>
     </view>
@@ -199,26 +221,20 @@
           <text class="detail-action__value">{{statusLabels[detailItem.pair.mine.status] || '未设'}} ›</text>
         </view>
       </view>
+
+      <!-- 移出番单（软删，措辞软、不叫删除；低调置底，轻确认防误触） -->
+      <view class="detail-remove" bindtap="onRemoveItemTap">移出番单</view>
     </view>
   </view>
 </t-popup>
 
-<!-- ============ 设置我的头像昵称弹层（微信不能自动读取，用户主动设）============ -->
+<!-- ============ 设置我的昵称弹层（微信不能自动读取，用户主动设）============ -->
+<!-- 头像上传已砍：cloud:// 头像连自己都读不到（云存储要付费开公开读），双方统一昵称首字色块 -->
 <t-popup visible="{{showProfile}}" placement="bottom" close-on-overlay-click bind:visible-change="onProfileVisibleChange">
   <view class="sheet">
     <view class="sheet__handle"></view>
-    <view class="sheet__header"><text class="sheet__title">设置我的头像昵称</text></view>
+    <view class="sheet__header"><text class="sheet__title">设置我的昵称</text></view>
     <view class="sheet__body profile-body">
-      <view class="profile-avatar-row">
-        <button
-          class="avatar-choose-btn"
-          open-type="chooseAvatar"
-          bind:chooseavatar="onChooseAvatar"
-        >
-          <t-avatar wx:if="{{profileAvatar}}" image="{{profileAvatar}}" size="large" />
-          <view wx:else class="avatar-choose-placeholder">＋<text class="avatar-choose-hint">选头像</text></view>
-        </button>
-      </view>
       <input
         class="nickname-input"
         type="nickname"
@@ -228,7 +244,7 @@
         bind:blur="onNicknameInput"
       />
       <t-button theme="primary" size="large" block loading="{{savingProfile}}" bindtap="onSaveProfile">保存</t-button>
-      <view class="sheet__note">头像仅上传后你自己可见，TA 看到的是你昵称首字；昵称双方都能看到</view>
+      <view class="sheet__note">头像统一用昵称首字色块（双方一致）；昵称双方都能看到</view>
     </view>
   </view>
 </t-popup>

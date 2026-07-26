@@ -339,7 +339,7 @@ const ERR = { OK:'OK', UNAUTHENTICATED:'ERR_UNAUTHENTICATED', INTERNAL:'ERR_INTE
   TOKEN_USED:'ERR_TOKEN_USED', ITEM_NOT_FOUND:'ERR_ITEM_NOT_FOUND', DUPLICATE_ITEM:'ERR_DUPLICATE_ITEM',
   INVALID_EP:'ERR_INVALID_EP', INVALID_STATUS:'ERR_INVALID_STATUS' };
 // 视图层阈值（transform 用，UI §8）
-const VIEW = { AXIS_LEAD_ANCHOR: 75, OVERLAP_PCT: 3, BREAK_GAP: 12, BLUR_GAP: 5 };
+const VIEW = { AXIS_LEAD_ANCHOR: 75, OVERLAP_PCT: 3, BREAK_GAP: 12 }; // BLUR_GAP 已删（2026-07-23 砍防剧透）
 // 分区（UI §P2，不硬编码顺序）
 const SECTION = { TOGETHER:'together', NOT_STARTED:'not_started', PAUSED:'paused', DONE:'done' };
 const SECTION_ORDER = [SECTION.TOGETHER, SECTION.NOT_STARTED, SECTION.PAUSED, SECTION.DONE];
@@ -387,7 +387,7 @@ buildProgressPair(item, myOpenid, peerOpenid) -> {
   commonPercent, leadWidth,              // 轴分段，对应 UI §3.1 DOM
   lead:'mine'|'peer'|'even'|'none',      // none=对方未翻牌
   diff,                                  // |mineEp-peerEp|，无 peer 时 null
-  gapMode:'exact'|'blurred'|'break',     // ≤BLUR_GAP 精确 / >BLUR_GAP 模糊 / >BREAK_GAP 断裂
+  gapMode:'exact'|'break',               // 精确 / >BREAK_GAP 轴断裂（原 'blurred' 模糊档随防剧透已砍 2026-07-23）
   isOverlap,                             // |Δpercent|<OVERLAP_PCT → 头像重叠 ◉
 }
 // 分支：我领先/对方领先/持平/无 totalEp/进度回退(被clamp)/对方未翻牌。只出中性结构，正向文案在页面层。
@@ -428,7 +428,7 @@ buildProgressPair({ totalEp:28, progress:{me:{ep:3}} },'me','pe')
 
 对齐现有 `worldcup.test.js` 的断言风格（`eq(name, actual, expected)` + 深比较 + 计数 + `process.exit`），零依赖，`node tests/shared-board.test.js` 直接跑。覆盖分支：
 
-- **buildProgressPair**：我领先(lead='mine',diff=4)/对方领先/持平(even,isOverlap=true)/无总集数(hasTotalEp=false,peerPercent=AXIS_LEAD_ANCHOR)/进度回退(ep>totalEp 被 clamp,不超100)/对方未翻牌(peer=null,lead='none')/模糊档(diff>BLUR_GAP)/断裂档(diff>BREAK_GAP)
+- **buildProgressPair**：我领先(lead='mine',diff=4)/对方领先/持平(even,isOverlap=true)/无总集数(hasTotalEp=false,peerPercent=AXIS_LEAD_ANCHOR)/进度回退(ep>totalEp 被 clamp,不超100)/对方未翻牌(peer=null,lead='none')/断裂档(diff>BREAK_GAP)（原模糊档 diff>BLUR_GAP 随防剧透已砍 2026-07-23）
 - **clampEp**：`clampEp(30,28)===28`、`clampEp(-1,null)===null`、`clampEp(5,null)===5`、`clampEp(3.5,null)===null`
 - **pickCoverColor**：同名两次 color 相同；char===首字符
 - **sectionOf/groupItems**：两人 watching→TOGETHER；一人 want 一人无进度→NOT_STARTED；一方 dropped→PAUSED；都 done→DONE；软删除过滤；组内按 sortOrder[my] 升序；分区顺序===SECTION_ORDER 过滤空组
