@@ -164,6 +164,24 @@ const TOTAL_EP_COPY = {
   EXCEED_HINT: '已超出预设 ›', // 个人进度 > 总集数时的轴末提示（点击可改总集数）
 };
 
+// ── 选集器按钮文案 ──
+// 本版本 TDesign t-picker 的 cancelBtn/confirmBtn 默认值是布尔 true，模板直接
+// 渲染 {{cancelBtn}} → 屏幕上显示 "true"。必须显式传字符串文案覆盖。
+const PICKER_COPY = {
+  CANCEL: '取消',
+  CONFIRM: '确认',
+};
+
+// ── P2 顶部「TA 更新了」信息条文案 ──
+// 进板结算：对方在我上次查看后更新过的番。单部报具体番名+集数，多部报数量。
+// {peer}/{name}/{ep}/{count} 由页面插值（peer 用对方昵称，缺省「TA」），不硬编码进 wxml。
+const PEER_UPDATE_COPY = {
+  ICON: '🔔',
+  SINGLE: '{peer} 追到了《{name}》第 {ep} 话',
+  MULTI: '{peer} 更新了 {count} 部番的进度',
+  PEER_DEFAULT: 'TA', // 对方没设昵称时的兜底称呼
+};
+
 // ── 首字色块调色板（封面为空时占位）──
 // JS 侧取不到 WXSS 的 --td-* 变量，故从 TDesign 品牌色阶人工派生并集中于此，
 // 属「配置层集中管理」而非「散落硬编码」。真按变量取色需 wx.getComputedStyle，MVP 不做。
@@ -212,4 +230,6 @@ module.exports = {
   AIR_STATUS_LABELS,
   AIR_STATUS_OPTIONS,
   TOTAL_EP_COPY,
+  PICKER_COPY,
+  PEER_UPDATE_COPY,
 };

@@ -60,10 +60,14 @@ exports.main = async (event) => {
       if (!Object.values(C.AIR_STATUS).includes(allow.airStatus)) return fail(C.ERR.INVALID_STATUS);
     }
 
+    const now = db.serverDate();
     await db
       .collection(C.COLLECTION.ITEM)
       .doc(itemId)
-      .update({ data: Object.assign({}, allow, { updateTime: db.serverDate() }) });
+      .update({ data: Object.assign({}, allow, { updateTime: now }) });
+
+    // bump 所属板 updateTime，让 P1 板列表红点能感知对方的番剧信息编辑（改名/总集数等）
+    await db.collection(C.COLLECTION.BOARD).doc(item.boardId).update({ data: { updateTime: now } });
 
     return ok({ itemId });
   } catch (e) {

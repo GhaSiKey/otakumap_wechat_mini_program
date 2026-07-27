@@ -19,7 +19,27 @@ const {
   TOTAL_EP_MAX,
   TOTAL_EP_MIN,
   AIR_STATUS_OPTIONS,
+  PICKER_COPY,
+  PEER_UPDATE_COPY,
 } = require('../../utils/shared-board/config');
+
+// 占位符插值：{key} → vars[key]。用回调式 replace，避免番名等值含 $&/$1 等
+// 被 String.replace 第二参当特殊模式解析（番名用户可自由输入，属必防的注入面）。
+function fillTemplate(tpl, vars) {
+  return tpl.replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? String(vars[k]) : m));
+}
+
+// 「TA 更新了」信息条文案插值：把 {peer}/{name}/{ep}/{count} 替换成实值。
+// 单部报具体番名+集数，多部报数量。措辞全在 PEER_UPDATE_COPY，此处只做填充。
+function formatPeerUpdate(updates, peerName) {
+  const peer = peerName || PEER_UPDATE_COPY.PEER_DEFAULT;
+  if (!updates || updates.count <= 0) return '';
+  if (updates.count === 1) {
+    const u = updates.items[0];
+    return fillTemplate(PEER_UPDATE_COPY.SINGLE, { peer, name: u.name, ep: u.ep });
+  }
+  return fillTemplate(PEER_UPDATE_COPY.MULTI, { peer, count: updates.count });
+}
 
 // 状态 action-sheet 的选项（按 PROGRESS_STATUS 顺序生成，文案走 STATUS_LABELS，不硬编码）
 const STATUS_SHEET_ITEMS = PROGRESS_STATUS.map((s) => ({ label: STATUS_LABELS[s], value: s }));
@@ -31,6 +51,8 @@ Page({
     commonTalk: COMMON_TALK,     // 「N 部能一起聊」文案配置（图标/前后缀），数字在 wxml 用 vm.commonCount 插
     totalEpCopy: TOTAL_EP_COPY,  // 总集数录入相关文案（占位/提示/字段名），集中配置不硬编码进 wxml
     airStatusOptions: AIR_STATUS_OPTIONS, // 番剧信息弹层放送状态可选项（放送中/已完结/未定）
+    pickerCopy: PICKER_COPY, // 选集器取消/确认按钮文案（覆盖 t-picker 布尔默认值渲染成 "true" 的问题）
+    peerUpdateCopy: PEER_UPDATE_COPY, // 「TA 更新了」信息条图标等视觉文案（正文已在 _load 插值成 peerUpdateText）
     boardId: '',
     token: '',            // 分享卡片带的配对 token
     myOpenid: '',
@@ -80,6 +102,9 @@ Page({
     epBump: false,
     // 「N 部能一起聊」提示条：不再常驻，仅 commonCount 变大时短暂弹出
     showCommonTalk: false,
+    // 「TA 更新了」信息条：进板结算一次（对方在我上次查看后的新动向），展示固定不重算，点击收起
+    peerUpdateText: '',
+    showPeerUpdate: false,
   },
 
   async onLoad(query) {
@@ -158,13 +183,26 @@ Page({
         patch.detailItem = T.buildItemViewModel(curRaw, myOpenid, pOpenid);
       }
     }
+    // 「TA 更新了」信息条：仅进板首次结算一次（用本次返回 board 里的旧 lastViewedAt 做基准，
+    // 必须在 markViewed 写新值之前算——markViewed 改的是数据库不是这份内存 board，故顺序安全）。
+    // 后续 _load（onShow 复访 / +1 对账 / 下拉刷新）不重算，避免信息条闪烁或误报我自己的操作。
+    if (!this._settledPeerUpdates) {
+      this._settledPeerUpdates = true;
+      const updates = T.buildPeerUpdates(board, items, myOpenid);
+      if (updates.count > 0) {
+        patch.peerUpdateText = formatPeerUpdate(updates, vm.peer ? vm.peer.nickname : '');
+        patch.showPeerUpdate = true;
+      }
+    }
+
     this.setData(patch);
     wx.setNavigationBarTitle({ title: board.name });
     if (wasWaiting && nowPaired) this._celebrateJoin(vm.peer);
     // 顶部「N 部能一起聊」不再常驻：仅当本次比上次「多了能一起聊的番」才短暂弹出提醒。
     // 首次进入（_lastCommonCount 未定义）不弹，避免每次打开都刷屏 = 变相常驻。
     this._maybeFlashCommonTalk(vm.commonCount);
-    // 记录本人查看时间，清未读红点（不阻塞渲染，失败无妨）
+    // 记录本人查看时间，清未读红点（不阻塞渲染，失败无妨）。
+    // 放在 buildPeerUpdates 之后：本次信息条已用旧 viewed 算完，此处写新值只影响下次进板。
     api.markViewed(this.data.boardId);
   },
 
@@ -179,6 +217,11 @@ Page({
       this.setData({ showCommonTalk: true });
       this._commonTalkTimer = setTimeout(() => this.setData({ showCommonTalk: false }), 3500);
     }
+  },
+
+  // 点「TA 更新了」信息条 → 收起（用户已看见即达成告知目的，不跳转，交互最轻）
+  onDismissPeerUpdate() {
+    this.setData({ showPeerUpdate: false });
   },
 
   // 对方加入庆祝：成员条虚位实体化动画 + toast + 震动

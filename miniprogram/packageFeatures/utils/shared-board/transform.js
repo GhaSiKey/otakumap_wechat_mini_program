@@ -326,6 +326,59 @@ function buildBoardViewModel(board, items, myOpenid) {
   };
 }
 
+// ── 时间归一：serverDate 经云函数 → callFunction 序列化后到前端是 ISO 字符串，
+//    数据库直读时可能是 Date 对象，脏数据可能是数字。统一转毫秒时间戳，非法返回 NaN。──
+function toMillis(t) {
+  if (t == null) return NaN;
+  if (typeof t === 'number') return t;
+  if (t instanceof Date) return t.getTime();
+  const ms = new Date(t).getTime();
+  return ms; // 非法字符串 → NaN
+}
+
+/**
+ * 「TA 更新了什么」：逐番比对对方进度更新时间 > 我上次查看该板的时间。
+ *
+ * 数据来源全部现成、不需新模型：
+ *   - progress[peer].updateTime：对方每次改进度由 updateProgress/addItem 写入
+ *   - board.lastViewedAt[me]：我上次进板由 markViewed 写入
+ * 首次进板（myViewed 为空）返回 []：没有「上次」无从 diff，不该炸出一堆「新动向」。
+ *
+ * 返回结构化数据（不拼文案，措辞留页面/config）：
+ *   { count, items: [{ itemId, name, ep, status }] }，按对方更新时间倒序（最新在前）。
+ */
+function buildPeerUpdates(board, items, myOpenid) {
+  const members = (board && board.members) || [];
+  const peerOpenid = resolvePeer(members, myOpenid);
+  const myViewed = board && board.lastViewedAt ? toMillis(board.lastViewedAt[myOpenid]) : NaN;
+  // 未配对 / 我从没查看过 → 无可 diff 的基准
+  if (!peerOpenid || Number.isNaN(myViewed)) return { count: 0, items: [] };
+
+  const updated = [];
+  (items || [])
+    .filter((it) => it && !it.deleted)
+    .forEach((it) => {
+      const peerP = (it.progress || {})[peerOpenid];
+      if (!peerP) return;
+      const peerAt = toMillis(peerP.updateTime);
+      if (Number.isNaN(peerAt) || peerAt <= myViewed) return;
+      // 只报「真看了至少第 1 话」的进度。对方新加番（ep=0/want）也会写 updateTime，
+      // 若不滤会报成「TA 追到了《X》第 0 话」措辞失真——加番不是「追进度」这件事。
+      const peerEp = typeof peerP.ep === 'number' ? peerP.ep : 0;
+      if (peerEp < 1) return;
+      updated.push({
+        itemId: it._id,
+        name: it.name,
+        ep: peerEp,
+        status: peerP.status || null,
+        _at: peerAt,
+      });
+    });
+
+  updated.sort((a, b) => b._at - a._at); // 最新更新在前
+  return { count: updated.length, items: updated.map(({ _at, ...rest }) => rest) };
+}
+
 module.exports = {
   clampEp,
   normalizeTotalEp,
@@ -338,5 +391,6 @@ module.exports = {
   buildItemViewModel,
   groupItems,
   buildBoardViewModel,
+  buildPeerUpdates,
 };
 

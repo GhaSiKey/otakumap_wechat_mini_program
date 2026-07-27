@@ -54,6 +54,10 @@ exports.main = async (event) => {
         },
       });
 
+    // bump 所属板的 updateTime：P1 板列表红点判定 hasUnread = board.updateTime > 我的 lastViewedAt。
+    // 改进度是最高频事件，不 bump 则对方追番时我在板列表看不到未读红点（红点形同虚设）。
+    await db.collection(C.COLLECTION.BOARD).doc(item.boardId).update({ data: { updateTime: now } });
+
     // 回传服务端裁决后的权威值，供前端对账（被 clamp 时前端 snap 到此值）
     return ok({ itemId, mine: { ep: epFinal, status } });
   } catch (e) {

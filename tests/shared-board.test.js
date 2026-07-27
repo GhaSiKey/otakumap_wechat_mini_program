@@ -329,6 +329,68 @@ const boardArc = { _id: 'b3', name: '归档', status: 'archived', members: board
 eq('归档 phase=archived', T.buildBoardViewModel(boardArc, [], 'me').phase, 'archived');
 
 // ============================================================
+// buildPeerUpdates：进板结算「TA 在我上次查看后更新了什么」
+// updateTime 用毫秒数（真实是 ISO 字符串，toMillis 兼容字符串/Date/数字）
+// ============================================================
+const puBoard = (myViewed) => ({
+  _id: 'b1',
+  name: '板',
+  status: 'full',
+  members: [
+    { openid: 'me', nickname: '小高' },
+    { openid: 'pe', nickname: '小王' },
+  ],
+  lastViewedAt: myViewed == null ? {} : { me: myViewed },
+});
+// 对方在 t=200 更新，我上次看是 t=100 → 应报为新动向
+const puItems = [
+  item({ _id: 'x', name: '进击的巨人', progress: { me: { ep: 3, status: 'watching', updateTime: 150 }, pe: { ep: 8, status: 'watching', updateTime: 200 } } }),
+];
+const pu1 = T.buildPeerUpdates(puBoard(100), puItems, 'me');
+eq('TA 更新晚于我查看 → count=1', pu1.count, 1);
+eq('TA 更新条目带番名', pu1.items[0].name, '进击的巨人');
+eq('TA 更新条目带集数', pu1.items[0].ep, 8);
+
+// 对方更新早于我查看 → 不算新
+const pu2 = T.buildPeerUpdates(puBoard(300), puItems, 'me');
+eq('TA 更新早于我查看 → count=0', pu2.count, 0);
+
+// 我从没查看过（lastViewedAt 无我这格）→ 无基准，返回空
+const pu3 = T.buildPeerUpdates(puBoard(null), puItems, 'me');
+eq('我从没查看过 → count=0（无 diff 基准）', pu3.count, 0);
+
+// 未配对（无对方）→ 空
+const puSolo = { _id: 'b2', name: '单人', status: 'active', members: [{ openid: 'me' }], lastViewedAt: { me: 100 } };
+eq('未配对 → count=0', T.buildPeerUpdates(puSolo, puItems, 'me').count, 0);
+
+// 只统计对方进度，我自己的更新不算（即便晚于我查看）
+const puMineOnly = [
+  item({ _id: 'y', name: '我改的番', progress: { me: { ep: 5, status: 'watching', updateTime: 999 } } }),
+];
+eq('只有我更新 → count=0（不误报自己操作）', T.buildPeerUpdates(puBoard(100), puMineOnly, 'me').count, 0);
+
+// 软删除的番不计入
+const puDeleted = [
+  item({ _id: 'z', name: '已删', deleted: true, progress: { pe: { ep: 9, status: 'watching', updateTime: 500 } } }),
+];
+eq('软删番不计入 TA 更新', T.buildPeerUpdates(puBoard(100), puDeleted, 'me').count, 0);
+
+// 对方新加番（ep=0/want）虽写了 updateTime，但不算「追进度」，不报（避免「第 0 话」失真）
+const puAdded = [
+  item({ _id: 'w', name: '刚加的番', progress: { pe: { ep: 0, status: 'want', updateTime: 500 } } }),
+];
+eq('对方加番 ep=0 不计入（避免第0话）', T.buildPeerUpdates(puBoard(100), puAdded, 'me').count, 0);
+
+// 多部按更新时间倒序（最新在前）
+const puMulti = [
+  item({ _id: 'a', name: '早更新', progress: { pe: { ep: 2, status: 'watching', updateTime: 200 } } }),
+  item({ _id: 'b', name: '晚更新', progress: { pe: { ep: 4, status: 'watching', updateTime: 400 } } }),
+];
+const puM = T.buildPeerUpdates(puBoard(100), puMulti, 'me');
+eq('多部 TA 更新 count=2', puM.count, 2);
+eq('多部按更新时间倒序（最新在前）', puM.items[0].name, '晚更新');
+
+// ============================================================
 // config 前后端漂移守卫（docs/shared-board-data.md §5.2）
 // 云函数侧 constants.js 是前端 config.js 服务端子集的拷贝，键值必须一致。
 // ============================================================

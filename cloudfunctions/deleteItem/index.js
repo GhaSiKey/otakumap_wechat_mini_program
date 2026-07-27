@@ -42,6 +42,9 @@ exports.main = async (event) => {
         },
       });
 
+    // bump 所属板 updateTime，让 P1 板列表红点能感知对方移出/恢复番剧
+    await db.collection(C.COLLECTION.BOARD).doc(item.boardId).update({ data: { updateTime: now } });
+
     return ok({ itemId, deleted });
   } catch (e) {
     return fail(C.ERR.INTERNAL, String((e && e.message) || e));

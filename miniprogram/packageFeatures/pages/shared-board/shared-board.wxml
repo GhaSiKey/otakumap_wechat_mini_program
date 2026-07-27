@@ -38,6 +38,14 @@
     </view>
   </view>
 
+  <!-- ============ 「TA 更新了」信息条（进板结算一次，展示对方在我上次查看后的新动向）============ -->
+  <!-- 点击收起。用 TA 身份色 --sb-color-peer 呼应，与「N 部能一起聊」（绿）区分开 -->
+  <view wx:if="{{showPeerUpdate}}" class="peer-update" bindtap="onDismissPeerUpdate">
+    <text class="peer-update__icon">{{peerUpdateCopy.ICON}}</text>
+    <text class="peer-update__text">{{peerUpdateText}}</text>
+    <text class="peer-update__close">✕</text>
+  </view>
+
   <!-- ============ 共同话题带（门面核心卖点：N 部能一起聊）============ -->
   <!-- 不再常驻：仅当 commonCount 变大时（又多一部能聊）短暂弹出提醒，3.5s 自动收起。点击滚到分区。 -->
   <view
@@ -371,6 +379,8 @@
 <t-picker
   visible="{{showEpPicker}}"
   value="{{epPickerValue}}"
+  cancel-btn="{{pickerCopy.CANCEL}}"
+  confirm-btn="{{pickerCopy.CONFIRM}}"
   bind:confirm="onEpPickerConfirm"
   bind:cancel="onEpPickerCancel"
   bind:visible-change="onEpPickerVisibleChange"

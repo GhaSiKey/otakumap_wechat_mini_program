@@ -14,6 +14,7 @@ page {
   --sb-axis-common-sync: var(--td-success-color, #2ba471); /* 追平时已走过段染成 success 绿，与 ◉ 合并态呼应 */
   --sb-color-me: #0052d9; /* 我=品牌蓝 */
   --sb-color-peer: #834ec2; /* TA=紫（非成功绿，绿留给追平/看完奖章） */
+  --sb-peer-tint: rgba(131, 78, 194, 0.1); /* 「TA 更新了」信息条底色：紫身份色淡化，与绿色共同话题带区分 */
 }
 
 .page {
@@ -30,6 +31,7 @@ page {
     --sb-axis-common-sync: var(--td-success-color, #46bd87);
     --sb-color-me: #4582e6;
     --sb-color-peer: #9560d0; /* 压深（原 #a97be0 白字仅 3.1:1）：游标 22rpx 白字达标 */
+    --sb-peer-tint: rgba(149, 96, 208, 0.22); /* 暗模式加深透明度，深底上仍可辨 */
   }
 }
 
@@ -137,6 +139,46 @@ page {
   font-size: 32rpx;
   color: var(--td-brand-color, #0052d9);
   opacity: 0.6;
+}
+
+/* 「TA 更新了」信息条：进板结算展示对方新动向，点击收起。紫底呼应 TA 身份色 */
+.peer-update {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin: var(--td-spacer, 16rpx) var(--td-spacer-2, 32rpx) 0;
+  padding: 16rpx var(--td-spacer-2, 32rpx);
+  background: var(--sb-peer-tint, rgba(131, 78, 194, 0.1));
+  border-radius: 16rpx;
+  animation: peerUpdateInKf 0.35s ease-out;
+}
+
+@keyframes peerUpdateInKf {
+  0% { transform: translateY(-16rpx); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.peer-update__icon {
+  font-size: 30rpx;
+  flex-shrink: 0;
+}
+
+.peer-update__text {
+  flex: 1;
+  font-size: var(--td-font-size-body-medium, 28rpx);
+  font-weight: 600;
+  color: var(--sb-color-peer, #834ec2);
+  /* 单部番名可能长，超出省略，不撑破一行 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peer-update__close {
+  font-size: 24rpx;
+  color: var(--td-text-color-placeholder, #bbb);
+  flex-shrink: 0;
+  padding-left: 8rpx;
 }
 
 .member {
