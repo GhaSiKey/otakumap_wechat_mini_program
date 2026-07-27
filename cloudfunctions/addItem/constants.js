@@ -27,6 +27,8 @@ const PROGRESS_STATUS_DEFAULT = 'want';
 
 const EP_MIN = 0;
 const EP_MAX_WHEN_UNKNOWN = 9999;
+const TOTAL_EP_MAX = 9999; // 总集数录入上限（与前端 config 同源）
+const TOTAL_EP_MIN = 1; // 总集数下限（0/负数走「未设」= null）
 
 const PAIR_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -63,6 +65,8 @@ module.exports = {
   PROGRESS_STATUS_DEFAULT,
   EP_MIN,
   EP_MAX_WHEN_UNKNOWN,
+  TOTAL_EP_MAX,
+  TOTAL_EP_MIN,
   PAIR_TOKEN_TTL_MS,
   DEFAULT_BOARD_NAME,
   BOARD_NAME_MAX,

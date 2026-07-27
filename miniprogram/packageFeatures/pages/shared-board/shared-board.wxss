@@ -419,6 +419,27 @@ page {
   mask-image: linear-gradient(90deg, transparent 0%, #000 100%);
 }
 
+/* 终点桩：有总集数时轴末端的竖向标记，表达「这是终点，进度有底」。
+   放在 track 右端，比 track 略高、圆角小竖条，与游标圆点区分（那是人，这是终点）。 */
+.axis-goal {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 8rpx;
+  height: 24rpx;
+  transform: translateY(-50%);
+  background: var(--td-text-color-placeholder, #bbbbbb);
+  border-radius: 4rpx;
+}
+
+/* 超出预设提示：轻量橙字，点击改总集数。不做重色块，避免像报错吓人（多半是特别篇/漏设） */
+.exceed-hint {
+  display: inline-block;
+  margin-top: 8rpx;
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-warning-color, #e37318);
+}
+
 /* ==================== 进度摘要 ==================== */
 .item-diff {
   font-size: var(--td-font-size-body-small, 24rpx);
@@ -545,6 +566,46 @@ page {
   text-align: center;
 }
 
+/* 可点的番剧信息行：居中胶囊 + 箭头，点开番剧信息编辑弹层。
+   居中而非贴左，与标题拉开垂直间距，不再挤在标题正下方 */
+.detail-sub--tappable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+  width: fit-content;
+  margin: 8rpx auto var(--td-spacer-2, 32rpx);
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  background: var(--td-bg-color-secondarycontainer, #f3f3f3);
+}
+
+.detail-sub__arrow {
+  color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
+}
+
+/* 放送状态三选一 tag（番剧信息弹层） */
+.air-status-group {
+  display: flex;
+  gap: var(--td-spacer-1, 16rpx);
+}
+
+.air-status-tag {
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
+  background: var(--td-bg-color-secondarycontainer, #f3f3f3);
+  border: 2rpx solid transparent;
+}
+
+/* 选中态：品牌色描边 + 品牌浅底 + 品牌字色 */
+.air-status-tag.is-active {
+  color: var(--td-brand-color, #0052d9);
+  background: var(--td-brand-color-light, #f2f3ff);
+  border-color: var(--td-brand-color, #0052d9);
+}
+
 .duel {
   display: flex;
   justify-content: center;
@@ -611,32 +672,33 @@ page {
 }
 
 .duel-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
   font-size: var(--td-font-size-body-small, 24rpx);
   color: var(--td-brand-color, #0052d9);
 }
 
-/* 低频操作入口：改集数 / 改状态 */
-.detail-actions {
-  display: flex;
-  flex-direction: column;
+/* 「我」列可点编辑区（集数/状态）：加内边距扩大点击热区 + 铅笔 icon 暗示可改。
+   点下轻微反馈，与 TA 列纯展示区分开。 */
+.duel-editable {
+  padding: 6rpx 12rpx;
+  border-radius: var(--td-radius-default, 12rpx);
 }
 
-.detail-action {
-  display: flex;
+.duel-editable:active {
+  background: var(--td-bg-color-container, #ffffff);
+}
+
+/* 集数容器本是浮起动画锚点（relative），可点态下让 icon 贴在集数右侧 */
+.duel-ep-wrap.duel-editable {
   align-items: center;
-  justify-content: space-between;
-  padding: var(--td-spacer-2, 32rpx) 0;
-  border-top: 1rpx solid var(--td-border-level-1-color, #e7e7e7);
+  gap: 4rpx;
 }
 
-.detail-action__label {
-  font-size: var(--td-font-size-body-medium, 28rpx);
-  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
-}
-
-.detail-action__value {
-  font-size: var(--td-font-size-body-medium, 28rpx);
-  color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
+.duel-edit-icon {
+  color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
 }
 
 /* 移出番单：低调置底文字按钮，弱化处理不抢主操作（不用大红按钮制造删除恐慌） */
@@ -712,6 +774,58 @@ page {
   font-size: var(--td-font-size-body-medium, 28rpx);
   color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
   box-sizing: border-box;
+}
+
+/* ==================== 总集数步进器（加番弹层 / 番剧信息弹层共用）==================== */
+/* 一行：左标签 + 右步进器（−[input]+），自建不引 t-stepper（免构建 npm） */
+.ep-stepper-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: var(--td-spacer-1, 16rpx);
+}
+
+.ep-stepper-row__label {
+  font-size: var(--td-font-size-body-medium, 28rpx);
+  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
+}
+
+.ep-stepper {
+  display: flex;
+  align-items: center;
+  border-radius: var(--td-radius-default, 12rpx);
+  overflow: hidden;
+  background: var(--td-bg-color-secondarycontainer, #f3f3f3);
+}
+
+.ep-stepper__btn {
+  width: 72rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  font-size: 40rpx;
+  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
+  user-select: none;
+}
+
+.ep-stepper__btn.is-disabled {
+  color: var(--td-text-color-disabled, rgba(0, 0, 0, 0.26));
+}
+
+.ep-stepper__input {
+  width: 120rpx;
+  height: 72rpx;
+  text-align: center;
+  font-size: var(--td-font-size-body-medium, 28rpx);
+  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
+  background: var(--td-bg-color-container, #fff);
+}
+
+/* 步进器下方副提示：紧贴步进器，不用 note 的默认大间距 */
+.ep-stepper-hint {
+  margin-top: var(--td-spacer, 8rpx);
+  align-self: flex-start;
 }
 
 /* ==================== 成员条头像图（失败回退首字母，见 wxml binderror）==================== */

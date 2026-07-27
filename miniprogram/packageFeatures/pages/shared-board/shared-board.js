@@ -15,6 +15,10 @@ const {
   JOIN_ERR_MESSAGES,
   COMMON_TALK,
   SECTION,
+  TOTAL_EP_COPY,
+  TOTAL_EP_MAX,
+  TOTAL_EP_MIN,
+  AIR_STATUS_OPTIONS,
 } = require('../../utils/shared-board/config');
 
 // 状态 action-sheet 的选项（按 PROGRESS_STATUS 顺序生成，文案走 STATUS_LABELS，不硬编码）
@@ -25,6 +29,8 @@ Page({
     statusLabels: STATUS_LABELS, // 分区标题已在 transform 内算好（sec.title），此处只留状态标签
     statusTagTheme: STATUS_TAG_THEME, // 状态标签按语义配色（t-tag theme），不再全蓝
     commonTalk: COMMON_TALK,     // 「N 部能一起聊」文案配置（图标/前后缀），数字在 wxml 用 vm.commonCount 插
+    totalEpCopy: TOTAL_EP_COPY,  // 总集数录入相关文案（占位/提示/字段名），集中配置不硬编码进 wxml
+    airStatusOptions: AIR_STATUS_OPTIONS, // 番剧信息弹层放送状态可选项（放送中/已完结/未定）
     boardId: '',
     token: '',            // 分享卡片带的配对 token
     myOpenid: '',
@@ -35,10 +41,16 @@ Page({
     // 加番弹层
     showAdd: false,
     newItemName: '',
+    newItemTotalEp: '', // 选填总集数（字符串，空=不填），提交时归一
     adding: false,
     // 进度编辑弹层（P3）
     showDetail: false,
     detailItem: null,
+    // 番剧信息编辑弹层（共享字段：总集数 + 放送状态），独立于进度编辑，绝不复用 showEpInput
+    showItemInfo: false,
+    itemInfoTotalEp: '',      // 总集数（字符串，空=未设），提交时归一
+    itemInfoAirStatus: '',    // 放送状态（AIR_STATUS 枚举值）
+    savingItemInfo: false,
     // 集数滚轮（短番，totalEp ≤ EP_ROLL_MAX）
     showEpPicker: false,
     epOptions: [],        // [{label:'E0',value:0}, ...]
@@ -137,6 +149,15 @@ Page({
     this._lastPeerAvatarUrl = curPeerUrl;
     const patch = { vm, rawBoard: board, rawItems: items, loading: false };
     if (peerUrlChanged) patch.peerAvatarError = false; // 对方头像换了新 URL，给一次加载机会
+    // 详情弹层打开时用最新数据重建 detailItem，否则改了总集数/放送状态/进度后弹层仍显示旧值。
+    // pair 也从同一份权威 raw 重算，与 _commitProgress 的乐观对账一致，不冲突。
+    if (this.data.detailItem) {
+      const curRaw = items.find((it) => it._id === this.data.detailItem.itemId);
+      if (curRaw) {
+        const pOpenid = vm.peer ? vm.peer.openid : null;
+        patch.detailItem = T.buildItemViewModel(curRaw, myOpenid, pOpenid);
+      }
+    }
     this.setData(patch);
     wx.setNavigationBarTitle({ title: board.name });
     if (wasWaiting && nowPaired) this._celebrateJoin(vm.peer);
@@ -266,6 +287,89 @@ Page({
     this._load();
   },
 
+  // ==================== 番剧信息编辑（总集数 + 放送状态，共享字段）====================
+  // 独立于「看到第几话」（个人进度）：那个写 progress.ep，这个写 item.totalEp/airStatus。
+  // 点详情弹层「共X集 / 放送状态」行进入，收起详情遮罩再叠，关闭时弹回详情。
+  onItemInfoTap() {
+    const d = this.data.detailItem;
+    if (!d) return;
+    this.setData({
+      showDetail: false,
+      showItemInfo: true,
+      itemInfoTotalEp: d.totalEp != null ? String(d.totalEp) : '',
+      itemInfoAirStatus: d.airStatus || '',
+    });
+  },
+
+  onItemInfoVisibleChange(e) {
+    // 点遮罩关闭 → 回详情（与 ep 输入弹层同款出口）
+    if (!e.detail.visible) this.setData({ showItemInfo: false, showDetail: true });
+  },
+
+  // 卡片上「已超出预设 ›」提示点击：直接打开番剧信息弹层改总集数（catchtap 已阻止冒泡到卡片）。
+  // 不经详情弹层，故先备好 detailItem 再复用 onItemInfoTap 的开层逻辑。
+  onExceedHintTap(e) {
+    const { itemId } = e.currentTarget.dataset;
+    const raw = this.data.rawItems.find((it) => it._id === itemId);
+    if (!raw) return;
+    const peerOpenid = this.data.vm && this.data.vm.peer ? this.data.vm.peer.openid : null;
+    const detailItem = T.buildItemViewModel(raw, this.data.myOpenid, peerOpenid);
+    this.setData({
+      detailItem,
+      showDetail: false,
+      showItemInfo: true,
+      itemInfoTotalEp: detailItem.totalEp != null ? String(detailItem.totalEp) : '',
+      itemInfoAirStatus: detailItem.airStatus || '',
+    });
+  },
+
+  onItemInfoTotalEpInput(e) {
+    this.setData({ itemInfoTotalEp: this._sanitizeTotalEpInput(e.detail.value) });
+  },
+
+  onItemInfoTotalEpInc() {
+    this.setData({ itemInfoTotalEp: String(this._stepTotalEp(this.data.itemInfoTotalEp, +1)) });
+  },
+
+  onItemInfoTotalEpDec() {
+    const cur = this.data.itemInfoTotalEp;
+    if (!cur) return;
+    this.setData({ itemInfoTotalEp: String(this._stepTotalEp(cur, -1)) });
+  },
+
+  onItemInfoAirStatusChange(e) {
+    this.setData({ itemInfoAirStatus: e.currentTarget.dataset.value });
+  },
+
+  async onItemInfoConfirm() {
+    if (this.data.savingItemInfo) return;
+    const d = this.data.detailItem;
+    if (!d) return;
+    const totalEp = T.normalizeTotalEp(this.data.itemInfoTotalEp); // 合法整数或 null
+    const airStatus = this.data.itemInfoAirStatus || '';
+    // 首次从「无总集数」变「有总集数」→ 进度轴从无分母切到有分母，播校准提示
+    const wasUnset = d.totalEp == null;
+    const nowSet = totalEp != null;
+
+    const patch = { totalEp };
+    if (airStatus) patch.airStatus = airStatus;
+
+    this.setData({ savingItemInfo: true });
+    const r = await api.updateItem(d.itemId, patch);
+    this.setData({ savingItemInfo: false });
+    if (!r.ok) {
+      wx.showToast({ title: '保存失败', icon: 'none' });
+      return;
+    }
+    this.setData({ showItemInfo: false, showDetail: true });
+    if (wasUnset && nowSet) {
+      wx.showToast({ title: this.data.totalEpCopy.CALIBRATED, icon: 'none' });
+    } else {
+      wx.showToast({ title: '已更新', icon: 'success' });
+    }
+    this._load();
+  },
+
   // ==================== 移出番单（软删，可恢复）====================
   onRemoveItemTap() {
     const d = this.data.detailItem;
@@ -305,7 +409,7 @@ Page({
 
   // ==================== 加番 ====================
   onAddTap() {
-    this.setData({ showAdd: true, newItemName: '' });
+    this.setData({ showAdd: true, newItemName: '', newItemTotalEp: '' });
   },
 
   onAddVisibleChange(e) {
@@ -316,6 +420,35 @@ Page({
     this.setData({ newItemName: e.detail.value });
   },
 
+  // 总集数步进器：input 直接改（保留字符串，空=不填），±按钮在当前值基础上增减。
+  // 边界钳制统一走 _stepTotalEp，不散落魔法数字。
+  onAddTotalEpInput(e) {
+    this.setData({ newItemTotalEp: this._sanitizeTotalEpInput(e.detail.value) });
+  },
+
+  onAddTotalEpInc() {
+    this.setData({ newItemTotalEp: String(this._stepTotalEp(this.data.newItemTotalEp, +1)) });
+  },
+
+  onAddTotalEpDec() {
+    const cur = this.data.newItemTotalEp;
+    if (!cur) return; // 空态减无意义（下限即 1，不从空跳到 0）
+    this.setData({ newItemTotalEp: String(this._stepTotalEp(cur, -1)) });
+  },
+
+  // 输入净化：只留数字，去前导空；不在输入期强制钳上限（让人能连打），提交时再归一
+  _sanitizeTotalEpInput(v) {
+    const digits = String(v == null ? '' : v).replace(/[^\d]/g, '');
+    return digits;
+  },
+
+  // 步进：在当前值（空按 0 起）基础上 ±1，钳到 [TOTAL_EP_MIN, TOTAL_EP_MAX]
+  _stepTotalEp(cur, delta) {
+    const base = parseInt(cur, 10);
+    const n = (Number.isNaN(base) ? 0 : base) + delta;
+    return Math.max(TOTAL_EP_MIN, Math.min(TOTAL_EP_MAX, n));
+  },
+
   async onConfirmAdd() {
     if (this.data.adding) return;
     const name = (this.data.newItemName || '').trim();
@@ -323,8 +456,10 @@ Page({
       wx.showToast({ title: '输入番剧名称', icon: 'none' });
       return;
     }
+    // 总集数选填：归一为合法整数或 null（空/非法/越界都落 null，与云函数同规则）
+    const totalEp = T.normalizeTotalEp(this.data.newItemTotalEp);
     this.setData({ adding: true });
-    const r = await api.addItem(this.data.boardId, name);
+    const r = await api.addItem(this.data.boardId, name, totalEp != null ? { totalEp } : {});
     this.setData({ adding: false });
     if (!r.ok) {
       const msg = r.code === 'ERR_DUPLICATE_ITEM' ? '这部番已经在单里啦' : '添加失败';
@@ -341,17 +476,12 @@ Page({
     const raw = this.data.rawItems.find((it) => it._id === itemId);
     if (!raw) return;
     const peerOpenid = this.data.vm && this.data.vm.peer ? this.data.vm.peer.openid : null;
-    const pair = T.buildProgressPair(raw, this.data.myOpenid, peerOpenid);
+    // 用 buildItemViewModel 构建：一并拿到 subtitle/airLabel（番剧信息行展示用），避免页面重复拼串
+    const detailItem = T.buildItemViewModel(raw, this.data.myOpenid, peerOpenid);
     this.setData({
       showDetail: true,
       editingName: false, // 每次打开回到展示态
-      detailItem: {
-        itemId,
-        name: raw.name,
-        totalEp: raw.totalEp,
-        airStatus: raw.airStatus,
-        pair,
-      },
+      detailItem,
     });
   },
 

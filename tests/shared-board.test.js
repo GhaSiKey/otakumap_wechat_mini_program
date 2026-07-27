@@ -51,6 +51,20 @@ eq('clampEp 无分母超兜底上限', T.clampEp(99999, null), C.EP_MAX_WHEN_UNK
 eq('clampEp 0 合法', T.clampEp(0, 28), 0);
 
 // ============================================================
+// normalizeTotalEp：总集数录入归一（与云函数整数守卫同规则）
+// ============================================================
+eq('normalizeTotalEp 空串 → null', T.normalizeTotalEp(''), null);
+eq('normalizeTotalEp null → null', T.normalizeTotalEp(null), null);
+eq('normalizeTotalEp 合法数字字符串', T.normalizeTotalEp('12'), 12);
+eq('normalizeTotalEp 合法整数', T.normalizeTotalEp(24), 24);
+eq('normalizeTotalEp 0 越下限 → null', T.normalizeTotalEp('0'), null);
+eq('normalizeTotalEp 负数 → null', T.normalizeTotalEp('-3'), null);
+eq('normalizeTotalEp 小数 → null', T.normalizeTotalEp('3.5'), null);
+eq('normalizeTotalEp 超上限 → null', T.normalizeTotalEp(String(C.TOTAL_EP_MAX + 1)), null);
+eq('normalizeTotalEp 上限边界合法', T.normalizeTotalEp(C.TOTAL_EP_MAX), C.TOTAL_EP_MAX);
+eq('normalizeTotalEp 非数字文本 → null', T.normalizeTotalEp('abc'), null);
+
+// ============================================================
 // resolvePeer
 // ============================================================
 const twoMembers = [{ openid: 'me' }, { openid: 'pe' }];
@@ -153,6 +167,38 @@ const p8 = T.buildProgressPair(
   'pe'
 );
 eq('差 22 集 gapMode=break', p8.gapMode, 'break');
+
+// ============================================================
+// epExceedsTotal：某方原始集数 > 已设总集数（特别篇/漏设）
+// 用 raw ep 判定（clamp 后看不出溢出），仅有分母时有意义
+// ============================================================
+const pEx1 = T.buildProgressPair(
+  item({ totalEp: 12, progress: { me: { ep: 13, status: 'watching' } } }),
+  'me',
+  'pe'
+);
+eq('我超出总集数 epExceedsTotal=true', pEx1.epExceedsTotal, true);
+
+const pEx2 = T.buildProgressPair(
+  item({ totalEp: 12, progress: { me: { ep: 12, status: 'watching' }, pe: { ep: 14, status: 'watching' } } }),
+  'me',
+  'pe'
+);
+eq('对方超出也算 epExceedsTotal=true', pEx2.epExceedsTotal, true);
+
+const pEx3 = T.buildProgressPair(
+  item({ totalEp: 12, progress: { me: { ep: 12, status: 'watching' } } }),
+  'me',
+  'pe'
+);
+eq('正好等于总集数不算超出', pEx3.epExceedsTotal, false);
+
+const pEx4 = T.buildProgressPair(
+  item({ totalEp: null, progress: { me: { ep: 99, status: 'watching' } } }),
+  'me',
+  'pe'
+);
+eq('无分母无「超出」概念 epExceedsTotal=false', pEx4.epExceedsTotal, false);
 
 // ============================================================
 // 终止态：done 轴填满 100% / dropped 灰化不参与追赶
@@ -294,6 +340,8 @@ eq('漂移守卫 MEMBER_ROLE 一致', S.MEMBER_ROLE, C.MEMBER_ROLE);
 eq('漂移守卫 AIR_STATUS 一致', S.AIR_STATUS, C.AIR_STATUS);
 eq('漂移守卫 PROGRESS_STATUS 一致', S.PROGRESS_STATUS, C.PROGRESS_STATUS);
 eq('漂移守卫 EP_MAX_WHEN_UNKNOWN 一致', S.EP_MAX_WHEN_UNKNOWN, C.EP_MAX_WHEN_UNKNOWN);
+eq('漂移守卫 TOTAL_EP_MAX 一致', S.TOTAL_EP_MAX, C.TOTAL_EP_MAX);
+eq('漂移守卫 TOTAL_EP_MIN 一致', S.TOTAL_EP_MIN, C.TOTAL_EP_MIN);
 eq('漂移守卫 ITEM_SHARED_FIELDS 一致', S.ITEM_SHARED_FIELDS, C.ITEM_SHARED_FIELDS);
 eq('漂移守卫 ERR 一致', S.ERR, C.ERR);
 

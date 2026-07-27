@@ -115,8 +115,10 @@
               <view class="cursor-dot {{it.pair.peerDropped ? 'cursor-dot--dropped' : 'identity--peer'}}">TA</view>
             </view>
           </block>
-          <!-- 无分母右端渐隐 -->
-          <view wx:if="{{!it.pair.hasTotalEp}}" class="axis-fade"></view>
+          <!-- 有分母：末端「终点桩」标出闭区间终点（有底），与无分母的右端渐隐互斥 -->
+          <view wx:if="{{it.pair.hasTotalEp}}" class="axis-goal"></view>
+          <!-- 无分母右端渐隐（不知道还有多长） -->
+          <view wx:else class="axis-fade"></view>
         </view>
 
         <!-- 进度摘要：配对态显示双人对比（措辞精确，配色走蓝不走红）；筹备态只显示自己 -->
@@ -141,6 +143,14 @@
           <text class="safe-talk-pill__icon">💬</text>
           <text>能一起聊到 第{{it.pair.safeTalkEp}}话</text>
         </view>
+
+        <!-- 超出预设提示：某方集数已超过设定的总集数（漏设/特别篇），点击改总集数纠正 -->
+        <view
+          wx:if="{{it.pair.epExceedsTotal}}"
+          class="exceed-hint"
+          catchtap="onExceedHintTap"
+          data-item-id="{{it.itemId}}"
+        >{{totalEpCopy.EXCEED_HINT}}</view>
       </view>
     </view>
 
@@ -168,6 +178,24 @@
     <view class="sheet__header"><text class="sheet__title">添加番剧</text></view>
     <view class="sheet__body">
       <t-input placeholder="输入番剧名称" value="{{newItemName}}" maxlength="60" bind:change="onItemNameInput" />
+
+      <!-- 总集数（选填）：自建步进器 −/输入/+，不引 t-stepper（免构建 npm） -->
+      <view class="ep-stepper-row">
+        <text class="ep-stepper-row__label">{{totalEpCopy.TOTAL_EP_LABEL}}</text>
+        <view class="ep-stepper">
+          <view class="ep-stepper__btn {{!newItemTotalEp ? 'is-disabled' : ''}}" bindtap="onAddTotalEpDec">−</view>
+          <input
+            class="ep-stepper__input"
+            type="number"
+            placeholder="选填"
+            value="{{newItemTotalEp}}"
+            bind:input="onAddTotalEpInput"
+          />
+          <view class="ep-stepper__btn" bindtap="onAddTotalEpInc">+</view>
+        </view>
+      </view>
+      <view class="sheet__note ep-stepper-hint">{{totalEpCopy.ADD_HINT}}</view>
+
       <t-button theme="primary" size="large" block loading="{{adding}}" bindtap="onConfirmAdd">添加</t-button>
     </view>
   </view>
@@ -184,7 +212,13 @@
         <text class="sheet__title detail-name" bindtap="onEditItemTap">{{detailItem.name}}</text>
         <t-icon name="edit-1" size="36rpx" class="detail-name__edit" bindtap="onEditItemTap" />
       </view>
-      <view class="detail-sub" wx:if="{{detailItem.totalEp}}">共 {{detailItem.totalEp}} 集</view>
+      <!-- 番剧信息行（放送状态 · 共X集）：常显可点，点开番剧信息编辑弹层。
+           未设总集数时显示「未设置」引导补录，而非藏起来（藏了就没有录入入口） -->
+      <view class="detail-sub detail-sub--tappable" bindtap="onItemInfoTap">
+        <text wx:if="{{detailItem.subtitle}}">{{detailItem.subtitle}}</text>
+        <text wx:else class="hint">{{totalEpCopy.TOTAL_EP_LABEL}}{{totalEpCopy.TOTAL_EP_UNSET}}</text>
+        <text class="detail-sub__arrow">›</text>
+      </view>
     </block>
 
     <!-- 改名编辑区：标题 + 带边框输入框 + 说明 + 底部按钮行，垂直堆叠 -->
@@ -209,16 +243,23 @@
 
     <!-- 编辑番名时收起操作区，只留改名，避免视觉噪声 -->
     <view class="sheet__body" wx:if="{{!editingName}}">
-      <!-- 左右对峙（仅详情页允许） -->
+      <!-- 左右对峙。编辑入口内嵌到「我」列：点集数改话数、点状态改状态（各带铅笔 icon）。
+           TA 列是对方进度、我无权改，纯展示不可点。 -->
       <view class="duel">
         <view class="duel-col">
           <view class="m-fallback big identity--me">我</view>
-          <view class="duel-ep-wrap">
+          <!-- 我的集数：可点改话数 -->
+          <view class="duel-ep-wrap duel-editable" bindtap="onEpTap">
             <view class="duel-ep {{epBump ? 'ep-bump' : ''}}">第{{detailItem.pair.mine.ep}}话</view>
+            <t-icon name="edit-1" size="24rpx" class="duel-edit-icon" />
             <!-- +1 浮起动画：点「看完这集」时从集数位置浮起上升淡出 -->
             <text wx:if="{{epBump}}" class="ep-plus-fly">+1</text>
           </view>
-          <view class="duel-status">{{statusLabels[detailItem.pair.mine.status] || '未设'}}</view>
+          <!-- 我的状态：可点改状态 -->
+          <view class="duel-status duel-editable" bindtap="onStatusTap">
+            <text>{{statusLabels[detailItem.pair.mine.status] || '未设'}}</text>
+            <t-icon name="edit-1" size="22rpx" class="duel-edit-icon" />
+          </view>
         </view>
         <view class="duel-col" wx:if="{{detailItem.pair.hasPeer}}">
           <view class="m-fallback big identity--peer">TA</view>
@@ -233,18 +274,6 @@
 
       <!-- 主手势：+1（最高频，乐观 UI 无确认） -->
       <t-button theme="primary" size="large" block bindtap="onEpInc">看完一集 +1</t-button>
-
-      <!-- 低频入口：改集数（跳集/补集/纠错）、改状态 -->
-      <view class="detail-actions">
-        <view class="detail-action" bindtap="onEpTap">
-          <text class="detail-action__label">看到第几话</text>
-          <text class="detail-action__value">第{{detailItem.pair.mine.ep}}话 ›</text>
-        </view>
-        <view class="detail-action" bindtap="onStatusTap">
-          <text class="detail-action__label">状态</text>
-          <text class="detail-action__value">{{statusLabels[detailItem.pair.mine.status] || '未设'}} ›</text>
-        </view>
-      </view>
 
       <!-- 移出番单（软删，措辞软、不叫删除；低调置底，轻确认防误触） -->
       <view class="detail-remove" bindtap="onRemoveItemTap">移出番单</view>
@@ -289,6 +318,50 @@
       />
       <view class="sheet__note" wx:if="{{detailItem && detailItem.totalEp}}">共 {{detailItem.totalEp}} 集，超出会自动截到最后一集</view>
       <t-button theme="primary" size="large" block bindtap="onEpInputConfirm">确定</t-button>
+    </view>
+  </view>
+</t-popup>
+
+<!-- ============ 番剧信息编辑弹层（共享字段：总集数 + 放送状态）============ -->
+<!-- 独立 state（showItemInfo/itemInfoTotalEp/itemInfoAirStatus），绝不复用 showEpInput——
+     那个写的是「我看到第几话」（个人进度），这里写的是番剧共享元信息，写串会污染进度 -->
+<t-popup visible="{{showItemInfo}}" placement="bottom" close-on-overlay-click bind:visible-change="onItemInfoVisibleChange">
+  <view class="sheet">
+    <view class="sheet__handle"></view>
+    <view class="sheet__header"><text class="sheet__title">{{totalEpCopy.INFO_TITLE}}</text></view>
+    <view class="sheet__body">
+      <!-- 总集数：同款步进器 -->
+      <view class="ep-stepper-row">
+        <text class="ep-stepper-row__label">{{totalEpCopy.TOTAL_EP_LABEL}}</text>
+        <view class="ep-stepper">
+          <view class="ep-stepper__btn {{!itemInfoTotalEp ? 'is-disabled' : ''}}" bindtap="onItemInfoTotalEpDec">−</view>
+          <input
+            class="ep-stepper__input"
+            type="number"
+            placeholder="选填"
+            value="{{itemInfoTotalEp}}"
+            bind:input="onItemInfoTotalEpInput"
+          />
+          <view class="ep-stepper__btn" bindtap="onItemInfoTotalEpInc">+</view>
+        </view>
+      </view>
+
+      <!-- 放送状态：三选一 tag（放送中/已完结/未定），点选即切 -->
+      <view class="ep-stepper-row">
+        <text class="ep-stepper-row__label">{{totalEpCopy.AIR_STATUS_LABEL}}</text>
+        <view class="air-status-group">
+          <view
+            wx:for="{{airStatusOptions}}"
+            wx:key="value"
+            class="air-status-tag {{itemInfoAirStatus === item.value ? 'is-active' : ''}}"
+            data-value="{{item.value}}"
+            bindtap="onItemInfoAirStatusChange"
+          >{{item.label}}</view>
+        </view>
+      </view>
+
+      <view class="sheet__note">番剧信息两人共享，改了 TA 也会看到</view>
+      <t-button theme="primary" size="large" block loading="{{savingItemInfo}}" bindtap="onItemInfoConfirm">保存</t-button>
     </view>
   </view>
 </t-popup>

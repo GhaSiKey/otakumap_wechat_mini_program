@@ -23,6 +23,14 @@ exports.main = async (event) => {
     const trimmed = (typeof name === 'string' ? name.trim() : '').slice(0, C.ITEM_NAME_MAX);
     if (!trimmed) return fail(C.ERR.INVALID_PARAM);
 
+    // 总集数归一：只接受 [TOTAL_EP_MIN, TOTAL_EP_MAX] 内的整数，否则一律 null（视作未设）。
+    // 前端选填空/非法（空串、NaN、小数、超上限）都落到 null，不写脏数据。
+    const normTotalEp =
+      Number.isInteger(totalEp) && totalEp >= C.TOTAL_EP_MIN && totalEp <= C.TOTAL_EP_MAX ? totalEp : null;
+    // 放送状态归一：非枚举值一律回落 UNKNOWN
+    const airValues = Object.values(C.AIR_STATUS);
+    const normAirStatus = airValues.includes(airStatus) ? airStatus : C.AIR_STATUS.UNKNOWN;
+
     // 成员校验
     const board = (await db.collection(C.COLLECTION.BOARD).doc(boardId).get().catch(() => null)) || null;
     const bd = board && board.data;
@@ -42,8 +50,8 @@ exports.main = async (event) => {
         boardId,
         memberOpenids: bd.memberOpenids, // 冗余，供 item 读规则（免 get()）
         name: trimmed,
-        totalEp: totalEp != null ? totalEp : null,
-        airStatus: airStatus || C.AIR_STATUS.UNKNOWN,
+        totalEp: normTotalEp,
+        airStatus: normAirStatus,
         cover: cover || '',
         alias: [],
         addBy: OPENID,

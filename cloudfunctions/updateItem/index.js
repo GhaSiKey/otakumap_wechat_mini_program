@@ -48,6 +48,18 @@ exports.main = async (event) => {
       allow.name = t;
     }
 
+    // 总集数：允许 null（显式清空「未设」），否则须为 [TOTAL_EP_MIN, TOTAL_EP_MAX] 内整数。
+    // 用户主动编辑，非法值直接拒绝而非静默落 null（静默篡改会让人以为存成功了）。
+    if (allow.totalEp !== undefined && allow.totalEp !== null) {
+      const n = allow.totalEp;
+      if (!Number.isInteger(n) || n < C.TOTAL_EP_MIN || n > C.TOTAL_EP_MAX) return fail(C.ERR.INVALID_PARAM);
+    }
+
+    // 放送状态：须为 AIR_STATUS 枚举内的值
+    if (allow.airStatus !== undefined) {
+      if (!Object.values(C.AIR_STATUS).includes(allow.airStatus)) return fail(C.ERR.INVALID_STATUS);
+    }
+
     await db
       .collection(C.COLLECTION.ITEM)
       .doc(itemId)

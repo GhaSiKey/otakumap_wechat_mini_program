@@ -20,6 +20,8 @@ const {
   SECTION_TITLES_SOLO,
   COVER_PALETTE,
   AIR_STATUS_LABELS,
+  TOTAL_EP_MAX,
+  TOTAL_EP_MIN,
   VIEW,
 } = require('./config');
 
@@ -34,6 +36,19 @@ function clampEp(ep, totalEp) {
   if (typeof ep !== 'number' || !Number.isInteger(ep) || ep < 0) return null;
   const ceiling = totalEp != null && totalEp > 0 ? totalEp : EP_MAX_WHEN_UNKNOWN;
   return Math.min(ep, ceiling);
+}
+
+/**
+ * 归一化总集数录入：把任意用户输入（字符串/数字/空）归一为
+ *   - 合法值：[TOTAL_EP_MIN, TOTAL_EP_MAX] 内整数
+ *   - null：空 / 非法 / 越界（视作「未设」）
+ * 与云函数 addItem/updateItem 的整数守卫同规则，前端据此即时反馈，不写脏数据。
+ */
+function normalizeTotalEp(input) {
+  if (input === '' || input == null) return null;
+  const n = typeof input === 'string' ? Number(input.trim()) : input;
+  if (!Number.isInteger(n) || n < TOTAL_EP_MIN || n > TOTAL_EP_MAX) return null;
+  return n;
 }
 
 /** 从成员列表找出「不是我」的那个 openid；只有我一人（未配对）时返回 null。 */
@@ -147,6 +162,13 @@ function buildProgressPair(item, myOpenid, peerOpenid) {
   // 任一方弃番 → 追赶叙事失效（人家不追了，「还差 X 话追上」是虚假期待），文案层改走「下车」分支
   const eitherDropped = mineDropped || peerDropped;
 
+  // 超出预设标记：某方记录的原始集数 > 已设总集数（如设 12 集却看到第 13 话，可能有特别篇/漏设）。
+  // 仅有分母时有意义（无分母无「超出」概念）。用 raw 值判定——clamp 后的 mineEp 已被压到 totalEp，
+  // 看不出溢出。轴末据此提示「已超出预设 ›」，点击引导更新总集数。
+  const rawMineEp = mineRaw && typeof mineRaw.ep === 'number' ? mineRaw.ep : 0;
+  const rawPeerEp = peerRaw && typeof peerRaw.ep === 'number' ? peerRaw.ep : 0;
+  const epExceedsTotal = hasTotalEp && Math.max(rawMineEp, rawPeerEp) > totalEp;
+
   // 差距档位：仅保留 break（超大 gap 的轴断裂纯视觉降级，不等比拉伸）。
   // 原 blurred 模糊档随防剧透一并砍掉（2026-07-23）——进度信息全透明，措辞统一精确。
   let gapMode = 'exact';
@@ -177,6 +199,7 @@ function buildProgressPair(item, myOpenid, peerOpenid) {
     mineDropped,
     peerDropped,
     eitherDropped,
+    epExceedsTotal,
     safeTalkEp: safeTalkEp(mineEp, hasPeer ? peerEp : 0),
   };
 }
@@ -305,6 +328,7 @@ function buildBoardViewModel(board, items, myOpenid) {
 
 module.exports = {
   clampEp,
+  normalizeTotalEp,
   resolvePeer,
   sanitizeAvatar,
   pickCoverColor,

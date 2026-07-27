@@ -25,6 +25,13 @@ const MEMBER_ROLE = { OWNER: 'owner', GUEST: 'guest' };
 const AIR_STATUS = { AIRING: 'airing', FINISHED: 'finished', UNKNOWN: 'unknown' };
 // 放送状态中文标签（卡片信息密度用；unknown 不显示，不硬造文案）
 const AIR_STATUS_LABELS = { airing: '放送中', finished: '已完结', unknown: '' };
+// 番剧信息编辑弹层的放送状态可选项（顺序即展示顺序）。
+// 编辑态 unknown 用「未定」而非空——展示态可以留白，但让人「选」时必须给可点的实义标签。
+const AIR_STATUS_OPTIONS = [
+  { value: AIR_STATUS.AIRING, label: '放送中' },
+  { value: AIR_STATUS.FINISHED, label: '已完结' },
+  { value: AIR_STATUS.UNKNOWN, label: '未定' },
+];
 
 // 进度状态机（PRD §5.2）：想看 / 在追 / 追平待更 / 暂缓 / 看完 / 弃番
 const PROGRESS_STATUS = ['want', 'watching', 'caught_up', 'paused', 'done', 'dropped'];
@@ -33,6 +40,9 @@ const PROGRESS_STATUS_DEFAULT = 'want';
 // ── 集数边界 ──
 const EP_MIN = 0; // 0 = 未开追
 const EP_MAX_WHEN_UNKNOWN = 9999; // 无 totalEp 时的上限兜底（后端 clamp 用）
+// 总集数录入上限：与无分母兜底同量级（柯南上千、海贼上千均在内），防手滑输天文数字
+const TOTAL_EP_MAX = 9999;
+const TOTAL_EP_MIN = 1; // 总集数至少 1 集（0/负数无意义，走「未设」而非填 0）
 const EP_PICKER_MAX_UNKNOWN = 99; // 无 totalEp 时选集器展示上限（滚轮别太长，够用即可）
 // 滚轮/数字输入分界：总集数 ≤ 此值用滚轮（一季标准番 12/24 集），> 此值或无分母（长番/连续放送，
 // 如凡人 183、柯南上千）改数字键盘直接输入——让人滚一两百格选集数是反人类的（纯前端展示阈值）
@@ -142,6 +152,18 @@ const STATUS_TAG_THEME = {
   dropped: 'default', // 弃番：灰，不强调（去批判感，和「下车」调性一致）
 };
 
+// 总集数录入相关文案（加番弹层 / 番剧信息编辑弹层 / 轴提示共用，集中不散落进 wxml）
+const TOTAL_EP_COPY = {
+  ADD_PLACEHOLDER: '总集数（选填）', // 加番弹层输入框占位
+  ADD_HINT: '放送中的番可以先不填，看完再补', // 加番弹层副提示
+  INFO_TITLE: '番剧信息', // 番剧信息编辑弹层标题
+  TOTAL_EP_LABEL: '总集数', // 编辑弹层字段名
+  AIR_STATUS_LABEL: '放送状态', // 编辑弹层字段名
+  TOTAL_EP_UNSET: '未设置', // 详情弹层「共X集」行未设总集数时的展示
+  CALIBRATED: '进度轴已按总集数校准', // 首次填完总集数后的校准 toast
+  EXCEED_HINT: '已超出预设 ›', // 个人进度 > 总集数时的轴末提示（点击可改总集数）
+};
+
 // ── 首字色块调色板（封面为空时占位）──
 // JS 侧取不到 WXSS 的 --td-* 变量，故从 TDesign 品牌色阶人工派生并集中于此，
 // 属「配置层集中管理」而非「散落硬编码」。真按变量取色需 wx.getComputedStyle，MVP 不做。
@@ -167,6 +189,8 @@ module.exports = {
   EP_MAX_WHEN_UNKNOWN,
   EP_PICKER_MAX_UNKNOWN,
   EP_ROLL_MAX,
+  TOTAL_EP_MAX,
+  TOTAL_EP_MIN,
   PAIR_TOKEN_TTL_MS,
   DEFAULT_BOARD_NAME,
   BOARD_NAME_MAX,
@@ -186,4 +210,6 @@ module.exports = {
   COVER_PALETTE,
   MEMBER_COLORS,
   AIR_STATUS_LABELS,
+  AIR_STATUS_OPTIONS,
+  TOTAL_EP_COPY,
 };
