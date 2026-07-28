@@ -1,0 +1,109 @@
+<view class="page">
+  <!-- 头部：大封面 + 标题 + 关键信息 -->
+  <view class="hero">
+    <!-- 封面可点击全屏预览（双指缩放）；右下角放大图标提示可点 -->
+    <view class="cover-wrap" bind:tap="onTapCover">
+      <image class="cover" src="{{cover}}" mode="aspectFill" />
+      <view wx:if="{{cover}}" class="cover-zoom">⛶</view>
+    </view>
+    <view class="hero-info">
+      <view class="title">{{name}}</view>
+      <!-- 类型 · 年份（列表带入，秒开即有） -->
+      <view class="type-line" wx:if="{{typeDesc || year}}">
+        <text wx:if="{{typeDesc}}">{{typeDesc}}</text>
+        <text wx:if="{{typeDesc && year}}"> · </text>
+        <text wx:if="{{year}}">{{year}}</text>
+      </view>
+      <view class="ep">{{totalEp ? totalEp + ' 集' : epUnknownLabel}}</view>
+      <view wx:if="{{airDateText}}" class="air-date-line">{{airDateText}}</view>
+      <view wx:if="{{rating}}" class="rating">★ {{rating}}</view>
+      <!-- 放送状态 + 每周几更新（详情拉取后填充） -->
+      <view class="air-row" wx:if="{{airStatusText}}">
+        <t-tag size="small" variant="light" theme="{{airDayText ? 'success' : 'default'}}">{{airStatusText}}</t-tag>
+        <text wx:if="{{airDayText}}" class="air-day">{{airDayText}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 详情加载态 -->
+  <view wx:if="{{loading}}" class="loading-box">
+    <t-loading theme="circular" size="40rpx" text="加载详情…" />
+  </view>
+
+  <!-- 详情加载失败（头部已用列表数据渲染，这里只提示增量拉取失败） -->
+  <view wx:elif="{{error}}" class="error-box">{{error}}</view>
+
+  <!-- 详情内容区 -->
+  <view wx:else class="section">
+    <!-- 制作信息 -->
+    <view wx:if="{{intro}}" class="section-block">
+      <view class="section-title">{{sectionTitles.INTRO}}</view>
+      <view class="summary">{{intro}}</view>
+    </view>
+
+    <!-- 标签 -->
+    <view wx:if="{{tags.length}}" class="section-block">
+      <view class="section-title">{{sectionTitles.TAGS}}</view>
+      <view class="tag-wrap">
+        <t-tag wx:for="{{tags}}" wx:key="*this" size="small" variant="light" theme="primary" class="tag-chip">{{item}}</t-tag>
+      </view>
+    </view>
+
+    <!-- 简介 -->
+    <view wx:if="{{summary}}" class="section-block">
+      <view class="section-title">{{sectionTitles.SUMMARY}}</view>
+      <view class="summary">{{summary}}</view>
+    </view>
+
+    <!-- 分集标题（预览截断，长番显示折叠提示） -->
+    <view wx:if="{{episodeTitles.length}}" class="section-block">
+      <view class="section-title">{{sectionTitles.EPISODES}}</view>
+      <view wx:for="{{episodeTitles}}" wx:key="index" class="ep-title">{{item}}</view>
+      <view wx:if="{{episodeMore}}" class="meta-line">{{episodeMore}}</view>
+    </view>
+
+    <!-- 相关作品（横滑卡，点击跳该番详情） -->
+    <block wx:if="{{relateds.length}}">
+      <view class="section-block">
+        <view class="section-title">{{sectionTitles.RELATEDS}}</view>
+        <scroll-view scroll-x class="ref-scroll" enhanced show-scrollbar="{{false}}">
+          <view
+            wx:for="{{relateds}}"
+            wx:key="sourceId"
+            class="ref-card"
+            data-id="{{item.sourceId}}"
+            data-name="{{item.name}}"
+            data-cover="{{item.cover}}"
+            bind:tap="onTapRef"
+          >
+            <image class="ref-cover" src="{{item.cover}}" mode="aspectFill" lazy-load />
+            <view class="ref-name">{{item.name}}</view>
+            <view wx:if="{{item.rating}}" class="ref-rating">★ {{item.rating}}</view>
+          </view>
+        </scroll-view>
+      </view>
+    </block>
+
+    <!-- 相似推荐（横滑卡，同上，放最底部不干扰主任务） -->
+    <block wx:if="{{similars.length}}">
+      <view class="section-block">
+        <view class="section-title">{{sectionTitles.SIMILARS}}</view>
+        <scroll-view scroll-x class="ref-scroll" enhanced show-scrollbar="{{false}}">
+          <view
+            wx:for="{{similars}}"
+            wx:key="sourceId"
+            class="ref-card"
+            data-id="{{item.sourceId}}"
+            data-name="{{item.name}}"
+            data-cover="{{item.cover}}"
+            bind:tap="onTapRef"
+          >
+            <image class="ref-cover" src="{{item.cover}}" mode="aspectFill" lazy-load />
+            <view class="ref-name">{{item.name}}</view>
+            <view wx:if="{{item.rating}}" class="ref-rating">★ {{item.rating}}</view>
+          </view>
+        </scroll-view>
+      </view>
+    </block>
+  </view>
+</view>

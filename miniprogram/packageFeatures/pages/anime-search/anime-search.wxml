@@ -1,0 +1,54 @@
+<view class="page">
+  <!-- 搜索框：输入即存 keyword，回车/点搜索按钮发起查询 -->
+  <view class="search-bar">
+    <t-search
+      value="{{keyword}}"
+      placeholder="输入番名，如 葬送的芙莉莲"
+      bind:change="onSearchChange"
+      bind:submit="onSearch"
+    />
+    <t-button theme="primary" size="small" bind:tap="onSearch" class="search-btn">搜索</t-button>
+  </view>
+
+  <!-- 命中缓存提示（验收期观察缓存用，接入正式流程后可撤） -->
+  <view wx:if="{{fromCache && animes.length}}" class="cache-flag">已命中缓存（6h 内不重复请求上游）</view>
+
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="state-box">
+    <t-loading theme="circular" size="40rpx" text="{{hint}}" />
+  </view>
+
+  <!-- 空态 / 错误提示 -->
+  <view wx:elif="{{!animes.length}}" class="state-box">
+    <t-empty description="{{hint}}" />
+  </view>
+
+  <!-- 结果列表 -->
+  <view wx:else class="result-list">
+    <view
+      wx:for="{{animes}}"
+      wx:key="sourceId"
+      class="result-item"
+      data-id="{{item.sourceId}}"
+      data-name="{{item.name}}"
+      data-cover="{{item.cover}}"
+      data-totalep="{{item.totalEp}}"
+      data-typedesc="{{item.typeDesc}}"
+      data-year="{{item.year}}"
+      data-startdate="{{item.startDate}}"
+      bind:tap="onTapItem"
+    >
+      <image class="cover" src="{{item.cover}}" mode="aspectFill" lazy-load />
+      <view class="info">
+        <view class="title">{{item.name}}</view>
+        <view class="tags">
+          <t-tag wx:if="{{item.typeDesc}}" size="small" variant="light" theme="primary">{{item.typeDesc}}</t-tag>
+          <text wx:if="{{item.year}}" class="meta">{{item.year}}</text>
+          <text class="meta">{{item.totalEp ? item.totalEp + ' 集' : epUnknownLabel}}</text>
+        </view>
+        <view class="rating" wx:if="{{item.rating}}">★ {{item.rating}}</view>
+      </view>
+      <text class="arrow">›</text>
+    </view>
+  </view>
+</view>

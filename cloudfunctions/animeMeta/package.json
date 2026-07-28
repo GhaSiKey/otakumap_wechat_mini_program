@@ -1,0 +1,9 @@
+{
+  "name": "animeMeta",
+  "version": "1.0.0",
+  "description": "代理弹弹play 开放平台，提供番剧元数据搜索与详情（密钥走环境变量）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

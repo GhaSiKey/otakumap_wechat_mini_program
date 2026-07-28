@@ -1,0 +1,93 @@
+.page {
+  min-height: 100vh;
+  background: var(--td-bg-color-page, #f3f3f3);
+  padding: 16rpx 24rpx;
+  box-sizing: border-box;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.search-bar t-search {
+  flex: 1;
+}
+
+.search-btn {
+  flex-shrink: 0;
+}
+
+.cache-flag {
+  font-size: 22rpx;
+  color: var(--td-text-color-placeholder, #bbb);
+  padding: 12rpx 8rpx 0;
+}
+
+.state-box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: 160rpx;
+}
+
+.result-list {
+  margin-top: 16rpx;
+}
+
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx;
+  margin-bottom: 16rpx;
+  background: var(--td-bg-color-container, #fff);
+  border-radius: 16rpx;
+}
+
+.cover {
+  width: 96rpx;
+  height: 136rpx;
+  border-radius: 12rpx;
+  flex-shrink: 0;
+  background: var(--td-bg-color-component, #e7e7e7); /* 图未加载时的占位底 */
+}
+
+.info {
+  flex: 1;
+  min-width: 0; /* 让 title 能正常省略 */
+}
+
+.title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--td-text-color-primary, #000);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tags {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.meta {
+  font-size: 24rpx;
+  color: var(--td-text-color-secondary, #888);
+}
+
+.rating {
+  font-size: 24rpx;
+  color: var(--td-warning-color, #e37318);
+  margin-top: 10rpx;
+}
+
+.arrow {
+  font-size: 40rpx;
+  color: var(--td-text-color-placeholder, #ccc);
+  flex-shrink: 0;
+}

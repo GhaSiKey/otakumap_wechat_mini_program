@@ -37,6 +37,14 @@ Page({
         emoji: '👫',
         path: '/packageFeatures/pages/shared-board/board-list',
       },
+      {
+        // 临时入口：弹弹play 番剧元数据搜索验收页，验收通过后接入加番流程再撤除
+        id: 'anime-search',
+        title: '番剧搜索（验收）',
+        desc: '搜索番名，查看封面/集数/放送状态（弹弹play 数据）',
+        emoji: '🔍',
+        path: '/packageFeatures/pages/anime-search/anime-search',
+      },
     ],
   },
 
