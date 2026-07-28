@@ -343,7 +343,8 @@ page {
 }
 
 .item-name {
-  font-size: 30rpx;
+  font-size: 32rpx;
+  font-weight: 600;
   color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
   overflow: hidden;
   text-overflow: ellipsis;
@@ -423,10 +424,10 @@ page {
   box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.12);
 }
 
-/* 弃番游标：灰化 + 半透明，位置保留但不再是「前进中」的鲜活色，表达「下车了」 */
+/* 弃番游标：灰色实心填充，位置保留但不再是「前进中」的鲜活色，表达「下车了」。
+   不用透明度（半透明会透出底下轨道显脏），直接实心灰，白字清晰 */
 .cursor-dot--dropped {
   background: var(--td-text-color-placeholder, #bbbbbb);
-  opacity: 0.7;
 }
 
 /* 追平合并态 ◉：success 色 + 光晕脉冲，兑现追平仪式感（情绪峰值） */
@@ -789,15 +790,19 @@ page {
   position: absolute;
   right: -4rpx;
   bottom: -4rpx;
-  width: 28rpx;
-  height: 28rpx;
+  width: 32rpx;
+  height: 32rpx;
   border-radius: 50%;
   background: var(--td-brand-color, #0052d9);
   color: #fff;
-  font-size: 22rpx;
-  line-height: 28rpx;
-  text-align: center;
+  font-size: 24rpx;
   border: 2rpx solid var(--td-bg-color-container, #fff);
+  /* flex 居中而非 line-height 对齐：本页 view 全局 border-box，2rpx 边框会吃进内容区，
+     line-height 按整盒高算会比内容区高，导致「+」上下错位溢出。flex 居中不受边框影响。 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 /* ==================== 设置头像昵称弹层（外壳由 .sheet 提供，仅内容居中）==================== */
