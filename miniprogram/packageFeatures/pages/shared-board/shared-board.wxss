@@ -323,6 +323,11 @@ page {
   gap: 20rpx;
 }
 
+/* 状态 tag 不被长番名压扁：flex 行里 t-tag 需固定宽度，否则 __main 撑满后 tag 被挤没 */
+.item-head t-tag {
+  flex-shrink: 0;
+}
+
 .item-cover {
   width: 64rpx;
   height: 64rpx;
@@ -343,6 +348,9 @@ page {
 }
 
 .item-name {
+  /* display:block 必需：<text> 默认 inline，inline 元素上 text-overflow/nowrap 不生效，
+     长番名不会截断而是一路撑破，盖到右侧状态 tag。block 后才在 __main(flex:1,min-width:0) 内省略 */
+  display: block;
   font-size: 32rpx;
   font-weight: 600;
   color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
