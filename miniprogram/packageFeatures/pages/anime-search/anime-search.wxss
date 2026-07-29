@@ -5,18 +5,9 @@
   box-sizing: border-box;
 }
 
-.search-bar {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
+/* t-search 独占整行，「搜索」用组件原生 action 内置在框右端（见 wxml），不再外挂按钮 */
 .search-bar t-search {
-  flex: 1;
-}
-
-.search-btn {
-  flex-shrink: 0;
+  display: block;
 }
 
 .cache-flag {
@@ -48,10 +39,10 @@
 
 .cover {
   width: 96rpx;
-  height: 136rpx;
+  height: 128rpx; /* 3:4 海报比例，与两行内容高度协调 */
   border-radius: 12rpx;
   flex-shrink: 0;
-  background: var(--td-bg-color-component, #e7e7e7); /* 图未加载时的占位底 */
+  background: var(--td-bg-color-component, #e7e7e7); /* 图未加载/失败时的灰块占位底 */
 }
 
 .info {
@@ -63,15 +54,18 @@
   font-size: 30rpx;
   font-weight: 600;
   color: var(--td-text-color-primary, #000);
+  /* 放两行再省略：JOJO 等系列靠「星尘斗士/埃及篇」后缀区分季度，单行截断会切掉选季关键信息 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .tags {
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  flex-wrap: wrap;
+  gap: 8rpx 12rpx;
   margin-top: 12rpx;
 }
 
@@ -80,10 +74,10 @@
   color: var(--td-text-color-secondary, #888);
 }
 
+/* 评分行内化：与类型/年份/集数同一行，不再单独占行 */
 .rating {
   font-size: 24rpx;
   color: var(--td-warning-color, #e37318);
-  margin-top: 10rpx;
 }
 
 .arrow {

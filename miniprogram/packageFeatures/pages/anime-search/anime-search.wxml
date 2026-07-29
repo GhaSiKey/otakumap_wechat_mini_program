@@ -1,13 +1,15 @@
 <view class="page">
-  <!-- 搜索框：输入即存 keyword，回车/点搜索按钮发起查询 -->
+  <!-- 搜索框：用组件原生 action 把「搜索」放进框右端，只占文案宽度不与输入框平分屏幕。
+       回车/键盘搜索键走 submit，点右端「搜索」走 action-click，两条路径都发起查询 -->
   <view class="search-bar">
     <t-search
       value="{{keyword}}"
       placeholder="输入番名，如 葬送的芙莉莲"
+      action="搜索"
       bind:change="onSearchChange"
       bind:submit="onSearch"
+      bind:action-click="onSearch"
     />
-    <t-button theme="primary" size="small" bind:tap="onSearch" class="search-btn">搜索</t-button>
   </view>
 
   <!-- 命中缓存提示（验收期观察缓存用，接入正式流程后可撤） -->
@@ -41,12 +43,13 @@
       <image class="cover" src="{{item.cover}}" mode="aspectFill" lazy-load />
       <view class="info">
         <view class="title">{{item.name}}</view>
+        <!-- 类型/年份/集数/评分并作一行：卡片从三行压到两行更紧凑，评分不再单独占行 -->
         <view class="tags">
           <t-tag wx:if="{{item.typeDesc}}" size="small" variant="light" theme="primary">{{item.typeDesc}}</t-tag>
           <text wx:if="{{item.year}}" class="meta">{{item.year}}</text>
           <text class="meta">{{item.totalEp ? item.totalEp + ' 集' : epUnknownLabel}}</text>
+          <text wx:if="{{item.rating}}" class="rating">★ {{item.rating}}</text>
         </view>
-        <view class="rating" wx:if="{{item.rating}}">★ {{item.rating}}</view>
       </view>
       <text class="arrow">›</text>
     </view>
