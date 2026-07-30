@@ -62,6 +62,22 @@ const EMPTY = {
 // 集数展示：totalEp 为 0（上游无正片集数，如连载新番/剧场版占位）时的兜底文案
 const EP_UNKNOWN_LABEL = '集数待定';
 
+// 搜索页交互模式：normal=验收/查看（点条目进详情页）；pick=选择（点条目直接回带来源页）。
+// 由来源页 navigateTo 的 query.mode 决定。发起方与搜索页共用此常量，禁两处各写 'pick' 字面量。
+const SEARCH_MODE = {
+  NORMAL: 'normal',
+  PICK: 'pick',
+};
+
+// EventChannel 事件名：pick 模式下搜索页选中番剧后，emit 此事件把选中数据回传给来源页。
+const PICK_EVENT = 'pickAnime';
+
+// pick 模式（从加番/补绑跳入）的引导文案：告诉用户点条目=选中带回，而非进详情页。
+const PICK_COPY = {
+  TOP_HINT: '点选一部，自动带回番名·封面·集数',
+  ACTION: '选择', // 列表项右侧动作标签（取代 normal 模式的 › 箭头）
+};
+
 // 大图预览 URL：当前弹弹play 图源只有 small(141×200) 一个尺寸，无更大原图，
 // 故预览用的就是原封面 URL（诚实：全屏是「看得更大 + 可缩放」，非更高清）。
 // 留此 helper 是为将来接到有大图变体的图源时，只改此处即可让预览取高清、缩略仍用小图。
@@ -97,6 +113,9 @@ module.exports = {
   airDateLabel,
   EMPTY,
   EP_UNKNOWN_LABEL,
+  SEARCH_MODE,
+  PICK_EVENT,
+  PICK_COPY,
   previewCoverUrl,
   SECTION_TITLES,
   EPISODE_PREVIEW_MAX,

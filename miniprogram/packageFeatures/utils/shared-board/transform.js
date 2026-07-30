@@ -19,6 +19,7 @@ const {
   SECTION_TITLES,
   SECTION_TITLES_SOLO,
   COVER_PALETTE,
+  AIR_STATUS,
   AIR_STATUS_LABELS,
   TOTAL_EP_MAX,
   TOTAL_EP_MIN,
@@ -240,6 +241,8 @@ function buildItemViewModel(item, myOpenid, peerOpenid) {
     subtitle,
     cover: item.cover || '',
     coverFallback: pickCoverColor(item.name), // cover 为空时页面用它
+    // 是否已绑定弹play（sourceId 有值）：详情弹层据此显示「关联」or「刷新」入口
+    sourceId: Number.isInteger(item.sourceId) && item.sourceId > 0 ? item.sourceId : null,
     pair,
     sortValue: (item.sortOrder && item.sortOrder[myOpenid]) || item.createTime || 0,
     sectionKey: sectionOf(pair.mine.status, pair.peer ? pair.peer.status : null),

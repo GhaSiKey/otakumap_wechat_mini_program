@@ -21,7 +21,12 @@ const {
   AIR_STATUS_OPTIONS,
   PICKER_COPY,
   PEER_UPDATE_COPY,
+  ANIME_BIND_COPY,
 } = require('../../utils/shared-board/config');
+// 搜索页交互模式 + 回带事件名（跨包同一 miniprogram 内，直接 require anime-meta 配置层）
+const { SEARCH_MODE, PICK_EVENT } = require('../../utils/anime-meta/config');
+
+const ANIME_SEARCH_URL = '/packageFeatures/pages/anime-search/anime-search';
 
 // 占位符插值：{key} → vars[key]。用回调式 replace，避免番名等值含 $&/$1 等
 // 被 String.replace 第二参当特殊模式解析（番名用户可自由输入，属必防的注入面）。
@@ -53,6 +58,7 @@ Page({
     airStatusOptions: AIR_STATUS_OPTIONS, // 番剧信息弹层放送状态可选项（放送中/已完结/未定）
     pickerCopy: PICKER_COPY, // 选集器取消/确认按钮文案（覆盖 t-picker 布尔默认值渲染成 "true" 的问题）
     peerUpdateCopy: PEER_UPDATE_COPY, // 「TA 更新了」信息条图标等视觉文案（正文已在 _load 插值成 peerUpdateText）
+    animeBindCopy: ANIME_BIND_COPY, // 关联番剧（搜索区标题/入口/手填分隔/预览提示 + 补绑入口）文案
     boardId: '',
     token: '',            // 分享卡片带的配对 token
     myOpenid: '',
@@ -64,6 +70,10 @@ Page({
     showAdd: false,
     newItemName: '',
     newItemTotalEp: '', // 选填总集数（字符串，空=不填），提交时归一
+    newItemCover: '',   // 搜番剧带回的封面预览 URL（可能为空——番剧无封面）
+    newItemPicked: false, // 是否已通过搜索选中一部（控制弹层顶部预览区 vs 搜索入口区）
+    newItemCoverError: false, // 预览封面加载失败（回退首字色块，避免 cloud:// 或坏链裸奔）
+    newItemFallback: null, // 预览无封面/加载失败时的首字色块 {color,char}（同卡片兜底语言）
     adding: false,
     // 进度编辑弹层（P3）
     showDetail: false,
@@ -94,6 +104,8 @@ Page({
     // 头像加载失败标记（不开云存储时对方常读不到，回退首字母；换头像后 _load 重置重试）
     meAvatarError: false,
     peerAvatarError: false,
+    // 番剧封面加载失败的 itemId 映射（{itemId:true}）：失败即回退首字色块，不每次渲染重试免闪烁
+    coverErrorIds: {},
     // 设置昵称弹层（头像上传已砍，统一首字色块）
     showProfile: false,
     profileNickname: '',
@@ -252,6 +264,13 @@ Page({
     this.setData({ peerAvatarError: true });
   },
 
+  // 番剧封面加载失败：记下该 itemId，wxml 据此回退首字色块，不再重试（避免每次渲染闪烁）
+  onItemCoverError(e) {
+    const { itemId } = e.currentTarget.dataset;
+    if (!itemId || this.data.coverErrorIds[itemId]) return;
+    this.setData({ [`coverErrorIds.${itemId}`]: true });
+  },
+
   // ==================== 设置昵称（微信不能自动读，用户主动设）====================
   // 头像上传已砍：cloud:// 头像连自己都读不到，双方统一昵称首字色块。只设昵称。
   onEditProfileTap() {
@@ -343,6 +362,7 @@ Page({
       itemInfoAirStatus: d.airStatus || '',
     });
   },
+
 
   onItemInfoVisibleChange(e) {
     // 点遮罩关闭 → 回详情（与 ep 输入弹层同款出口）
@@ -452,7 +472,58 @@ Page({
 
   // ==================== 加番 ====================
   onAddTap() {
-    this.setData({ showAdd: true, newItemName: '', newItemTotalEp: '' });
+    this._pickedMeta = null; // 新一轮加番，清掉上次搜番剧带出的暂存封面/sourceId
+    this.setData({
+      showAdd: true,
+      newItemName: '',
+      newItemTotalEp: '',
+      newItemCover: '',
+      newItemPicked: false,
+      newItemCoverError: false,
+    });
+  },
+
+  // 加番弹层「搜番剧」：跳搜索页 pick 模式，选中后回带填入番名/总集数（封面在提交时随 addItem 一起存）。
+  // 用 EventChannel 单层回写：navigateTo 打开搜索页，搜索页选中 emit PICK_EVENT，此处 on 接收。
+  onAddSearchTap() {
+    wx.navigateTo({
+      url: `${ANIME_SEARCH_URL}?mode=${SEARCH_MODE.PICK}`,
+      events: {
+        [PICK_EVENT]: (picked) => this._onPickedForAdd(picked),
+      },
+    });
+  },
+
+  // 加番场景收到选中番剧：回填番名 + 总集数，并暂存封面/sourceId 待提交时随 addItem 存。
+  // 不直接 addItem——让用户回到弹层还能改名/改集数再确认，选中只是「带出」不是「提交」。
+  _onPickedForAdd(picked) {
+    if (!picked) return;
+    const cover = picked.cover || '';
+    this._pickedMeta = {
+      cover,
+      sourceId: Number.isInteger(picked.sourceId) && picked.sourceId > 0 ? picked.sourceId : null,
+    };
+    const name = picked.name || this.data.newItemName;
+    this.setData({
+      newItemName: name,
+      newItemTotalEp: picked.totalEp ? String(picked.totalEp) : this.data.newItemTotalEp,
+      newItemCover: cover, // 弹层顶部显示封面缩略图，让「已选中这部」所见即所得
+      newItemPicked: true,
+      newItemCoverError: false, // 新封面给一次加载机会
+      newItemFallback: T.pickCoverColor(name), // 无封面/加载失败时的首字色块兜底
+    });
+  },
+
+  // 预览封面加载失败：回退首字色块（同卡片封面兜底，避免坏链/cloud:// 裸奔）
+  onAddCoverError() {
+    this.setData({ newItemCoverError: true });
+  },
+
+  // 已选中后「重选」：清预览与暂存，回到搜索入口态，再次跳搜索页
+  onReselectAnime() {
+    this._pickedMeta = null;
+    this.setData({ newItemPicked: false, newItemCover: '', newItemCoverError: false });
+    this.onAddSearchTap();
   },
 
   onAddVisibleChange(e) {
@@ -501,15 +572,22 @@ Page({
     }
     // 总集数选填：归一为合法整数或 null（空/非法/越界都落 null，与云函数同规则）
     const totalEp = T.normalizeTotalEp(this.data.newItemTotalEp);
+    // 从「搜番剧」带出的封面/sourceId（若有）随本次 addItem 一并存；手打加番时为空不带
+    const meta = this._pickedMeta || {};
+    const extra = {};
+    if (totalEp != null) extra.totalEp = totalEp;
+    if (meta.cover) extra.cover = meta.cover;
+    if (meta.sourceId) extra.sourceId = meta.sourceId;
     this.setData({ adding: true });
-    const r = await api.addItem(this.data.boardId, name, totalEp != null ? { totalEp } : {});
+    const r = await api.addItem(this.data.boardId, name, extra);
     this.setData({ adding: false });
     if (!r.ok) {
       const msg = r.code === 'ERR_DUPLICATE_ITEM' ? '这部番已经在单里啦' : '添加失败';
       wx.showToast({ title: msg, icon: 'none' });
       return;
     }
-    this.setData({ showAdd: false });
+    this._pickedMeta = null; // 用完即清，避免下次手打加番误带上一次的封面
+    this.setData({ showAdd: false, newItemCover: '', newItemPicked: false, newItemCoverError: false });
     this._load(); // 重新拉取，卡片出现
   },
 

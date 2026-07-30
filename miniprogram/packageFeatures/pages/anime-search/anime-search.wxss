@@ -85,3 +85,26 @@
   color: var(--td-text-color-placeholder, #ccc);
   flex-shrink: 0;
 }
+
+/* pick 模式顶部引导条：浅品牌底 + 对勾图标，点明「点选即带回」 */
+.pick-hint {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 16rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  color: var(--td-brand-color, #0052d9);
+  background: var(--td-brand-color-light, #f2f3ff);
+}
+
+/* pick 模式列表项右侧「选择」标签：取代 › 箭头，明确点击=选中带回而非进详情 */
+.pick-action {
+  flex-shrink: 0;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  color: var(--td-brand-color, #0052d9);
+  background: var(--td-brand-color-light, #f2f3ff);
+}

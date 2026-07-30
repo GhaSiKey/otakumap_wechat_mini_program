@@ -12,6 +12,12 @@
     />
   </view>
 
+  <!-- pick 模式引导条：明确「点一部就选中带回」，区别于 normal 模式的「点进详情」 -->
+  <view wx:if="{{isPick && animes.length}}" class="pick-hint">
+    <t-icon name="check-circle" size="32rpx" />
+    <text>{{pickCopy.TOP_HINT}}</text>
+  </view>
+
   <!-- 命中缓存提示（验收期观察缓存用，接入正式流程后可撤） -->
   <view wx:if="{{fromCache && animes.length}}" class="cache-flag">已命中缓存（6h 内不重复请求上游）</view>
 
@@ -51,7 +57,9 @@
           <text wx:if="{{item.rating}}" class="rating">★ {{item.rating}}</text>
         </view>
       </view>
-      <text class="arrow">›</text>
+      <!-- 右侧动作：pick 模式显示「选择」标签（点了就带回），normal 模式显示 › 进详情 -->
+      <view wx:if="{{isPick}}" class="pick-action">{{pickCopy.ACTION}}</view>
+      <text wx:else class="arrow">›</text>
     </view>
   </view>
 </view>

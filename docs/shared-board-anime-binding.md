@@ -1,8 +1,13 @@
 # 共享追番板 × 弹弹play 数据绑定 —— 集成方案
 
-> 状态：待 review（2026-07-27）
+> 状态：代码已实现，待用户部署云函数 + 真机验证（2026-07-27）
 > 前置：弹play API 接入已完成（`animeMeta` 云函数 + 独立搜索/详情验收页，commit fbaf3db）
 > 本文档描述如何把「弹play 番剧数据」接入共享追番板的加番与卡片流程。
+>
+> **实现与原方案的两处偏离**（均用户 2026-07-27 拍板，见 §4.3/§5）：
+> ① 搜索选择由「走详情页确认（方案 B）」改为**列表直选**；
+> ② 回带字段不含 `airStatus`（列表直选拿不到 isOnAir）。
+> 另修复了一个**文档此前漏记的既有 bug**：卡片封面从未渲染真图 `it.cover`，只渲染首字色块——本轮补 `<image>` + binderror 回退（见 §4.4）。
 
 ## 0. 定位与边界
 
@@ -100,28 +105,36 @@
 - 点击 → 跳搜索页选择模式 → 选中 → 调 `bindItemMeta`（只填空）。
 - 提示用户：只补全空缺信息，你改过的不会被覆盖。
 
-### 4.3 搜索页「选择模式」（走详情确认，方案 B）
+### 4.4 卡片封面渲染（修复文档漏记的既有 bug）
 
-现有 `anime-search` 页当前是「点击进详情」，详情页当前是纯展示。选择模式改动：
-- 来源页跳搜索页时带 `mode=pick`。
-- 搜索列表项点击 → 进详情页（把 `mode=pick` 一路透传给详情页 query）。
-- 详情页在 `mode=pick` 时底部显示「选它」按钮；纯浏览态（无 mode）不显示。
-- 点「选它」→ 通过 EventChannel 把 `{ sourceId, name, cover, totalEp, airStatus }` emit 回来源页，然后 `navigateBack({ delta: 2 })` 一路退回加番/详情弹层所在页。
-- 详情页的 totalEp/airStatus：detail 接口无 episodeCount，故 totalEp 由搜索列表带入详情页的 query（已实现）；airStatus 由详情接口 isOnAir 映射。「选它」回带时两者都要带上。
+绑定弹play 后 item 有了真封面 `cover`（https 外链），但卡片此前**只渲染首字色块，从不渲染 `it.cover`**——即使有封面也看不到。本轮修复：
+- 卡片封面：`<image wx:if="{{it.cover && !coverErrorIds[it.itemId]}}" ... binderror="onItemCoverError">`，加载失败或无封面回退 `<view>` 首字色块。
+- `coverErrorIds`（`{itemId:true}`）标记加载失败的封面，避免每次渲染重试闪烁（同头像兜底的教训）。
+- `onItemCoverError` 只在首次失败时置标记；补绑成功后 `_onPickedForBind` 精准清该条标记，给新封面一次加载机会。
+- 不在 `_load` 无脑清 `coverErrorIds`（对方恒失败的封面会反复重试闪烁），只在补绑/URL 变化时精准清。
 
-**EventChannel 链路**：来源页 `navigateTo(搜索页, events)` → 搜索页 `navigateTo(详情页)` 时把来源页的 eventChannel 透传（或详情页选中时反向 emit 经搜索页中转）。倾向：来源页监听 `pickAnime` 事件；详情页「选它」时经 `getOpenerEventChannel` 逐层 emit。具体链路实现时确认（跨两层 navigate 的 EventChannel 需要中转，或改用全局事件/页面栈回写）。
+### 4.3 搜索页「选择模式」（列表直选，实现定案）
 
-## 5. 交互细节（已定 2026-07-27）
+> ⚠️ 原方案 B（走详情页确认）已被列表直选取代（用户 2026-07-27 二次拍板），下方为**实际实现**。
 
-1. **搜索选择走详情页确认**（方案 B）
-   - 搜索列表项点击 → 进详情页看清楚（类型/年份/首播/集数/简介等），详情页加「选它」按钮。
-   - 点「选它」→ 回带数据给来源页 + navigateBack（一路退回加番/详情弹层）。
-   - 理由：呼应「搜索列表展示全、防止选错季/版本」，进详情确认最稳。
-   - 影响：搜索页与详情页都要感知「选择模式」（mode=pick 需一路透传：列表页 → 详情页 → 回带）。
+现有 `anime-search` 页 normal 模式是「点击进详情」，pick 模式改为「点击直接选中回带」：
+- 来源页 `wx.navigateTo` 跳搜索页带 `mode=pick`（`SEARCH_MODE.PICK`，config 常量，不硬编码）。
+- 搜索列表项点击 → **不进详情页**，直接把选中数据 `emit` 回来源页 + `navigateBack`（单层，无 delta:2）。
+- 回带字段：`{ sourceId, name, cover, totalEp }` —— **不含 airStatus**。放送状态只有详情接口的 `isOnAir` 才有，列表直选不进详情、拿不到，故不带（用户接受：加番先带名/封面/集数，放送状态需要时进番剧信息弹层手设）。
 
-2. **加番弹层显示封面预览**：回带预填后，加番弹层显示封面缩略图 + 已填字段（集数/状态），所见即所得，用户确认无误再提交。
+**EventChannel 链路（单层，最稳）**：来源页 `navigateTo(搜索页, { events: { pickAnime: cb } })` → 搜索页选中时 `getOpenerEventChannel().emit('pickAnime', picked)` → 来源页 `cb` 收到。事件名 `PICK_EVENT` 走 config 常量。只跨一层 navigate，无需中转。
 
-3. **补绑成功 toast 反馈**：绑定成功后 toast「已关联，补全了 N 项信息」，N = 实际填充的空字段数（bindItemMeta 返回填充计数）。卡片封面随之从首字色块变真封面（_load 重拉自然刷新，不额外做动效）。
+## 5. 交互细节（实现定案 2026-07-27）
+
+1. **列表直选**（取代原方案 B 的详情页确认）
+   - 搜索列表项点击 → 直接选中回带 + navigateBack，不进详情页。
+   - 理由：加番/补绑是高频轻动作，多一层详情页徒增点击；选错季/版本可回搜索页重选或事后在番剧信息弹层改。
+   - 影响：只搜索页感知 `mode=pick`，详情页无需透传（normal 模式才进详情）。
+   - 代价：列表直选拿不到 airStatus（仅详情接口有 isOnAir），故不带放送状态，见 §4.3。
+
+2. **加番场景「带出不提交」**：搜番剧回带只预填加番弹层的番名/总集数（封面/sourceId 暂存 `_pickedMeta`），用户可再改名/改集数，点「添加」才随 `addItem` 一并提交。选中 ≠ 提交。
+
+3. **补绑成功 toast 反馈**：`bindItemMeta` 返回 `filledCount`，前端 toast「补全了 N 项信息」（N>0，success 图标）或「信息都已齐全，无需补全」（N=0，普通图标）。成功后清该条 `coverErrorIds` 标记 + `_load` 重拉，卡片封面从首字色块自然变真封面（不额外做动效）。文案全在 `ANIME_BIND_COPY` 配置。
 
 ## 6. 测试与验证
 
@@ -132,15 +145,37 @@
   - 非法 totalEp → 归一/跳过
 - 真机验证：加新番搜索选择、老卡片补绑、只填空不覆盖手改。
 
-## 7. 部署清单（用户操作）
+## 7. 部署清单（用户操作，⚠️ 阻塞真机验证）
 
-- 新增 `bindItemMeta` 云函数：上传并部署。
+**本轮共享板绑定相关**：
+- 新增 `bindItemMeta` 云函数：上传并部署（云端安装依赖）。constants 子集已拷入其目录（与 `_shared-board/constants.js` 一致）。
 - 修改 `addItem` 云函数（接受 sourceId）：重新部署。
-- constants 子集拷贝到新云函数目录。
 
-## 8. 实施顺序
+**弹play API 接入遗留（若上一轮未部署，一并处理）**：
+- `animeMeta` 云函数：重新部署（https 修复 + pickDetail 富化）。
+- 云函数环境变量 `DDP_APP_ID` / `DDP_APP_SECRET`：在云开发控制台该云函数配置里填（**绝不写进代码/git**）。用完建议去弹play 开发者中心重置 AppSecret。
+- 集合 `anime_meta_cache`：新建（搜索/详情结果缓存，6h TTL 逻辑在云函数内）。
+- `downloadFile` 合法域名白名单：加封面图源域名（`assets.anixplayer.net`），否则真机加载不出封面（开发者工具「详情 → 域名信息」或小程序后台配）。
+- 清理旧详情缓存脏数据（若之前验收期写过）。
 
-1. 数据层：config/constants 加 sourceId 相关，transform 加 `mergeMetaFillEmpty` + tests
-2. 云函数：addItem 改造 + bindItemMeta 新建 + constants 同步
-3. 前端：搜索页选择模式 → 加新番入口 → 老卡片补绑入口
-4. 真机验证 → 撤首页「番剧搜索（验收）」临时入口 → 文档收尾
+## 8. 实施顺序与进度
+
+1. ✅ 数据层：config/constants 加 sourceId，transform 加 `mergeMetaFillEmpty` + tests（127 断言全绿）
+2. ✅ 云函数：addItem 改造 + bindItemMeta 新建 + constants 同步（node --check 全过，待部署）
+3. ✅ 前端：搜索页 pick 模式（列表直选）→ 加新番搜索入口 → 老卡片补绑入口 → 卡片封面渲染修复
+4. ✅ 撤首页「番剧搜索（验收）」临时入口（页面代码保留）+ 文档收尾
+5. ⏳ **待用户**：部署云函数（§7）→ 真机验证（加番搜索选择 / 老卡片补绑 / 只填空不覆盖 / 封面真机加载）
+
+## 9. 老卡片补绑功能下架（2026-07-27）
+
+存量老卡片想绑番剧数据的都已手动操作完，补绑（bindItemMeta）不再需要，**已下架**。§3.2 / §4.2 / §6 相关设计作废留档（说明曾经为何有、现在为何下）。
+
+**保留**：加番时的「搜番剧带回数据」链路（`onAddSearchTap` / `_onPickedForAdd`，走 addItem）不受影响；`item.sourceId` 数据字段保留（封面渲染/详情用），只是不再有补绑这条写入路径——没绑过的老卡从此补不上，这正是下架前提（存量已清）。
+
+**删除清单**（本地已删，测试 109 断言全绿）：
+- 云函数 `cloudfunctions/bindItemMeta/`（本地目录已删，**待用户在开发者工具删除云端部署**）
+- 前端 `cloud-api.js` 的 `bindItemMeta` 定义 + export
+- `shared-board.js` 的 `onBindSearchTap` / `_onPickedForBind`
+- `shared-board.wxml` 详情弹层「关联番剧信息」入口块；`shared-board.wxss` 的 `.anime-bind-entry` / `--detail`
+- `config.js` 的 `ANIME_BIND_COPY.BIND_ENTRY` / `FILLED` / `NOTHING_FILLED` / `BIND_FAIL`（保留加番搜索用的 SEARCH_TITLE/SEARCH_ENTRY/MANUAL_TITLE/EDIT_TITLE/PICKED_HINT/RESELECT）
+- `transform.js` 纯函数 `mergeMetaFillEmpty` + 导出 + tests 对应 18 条用例（保留 buildItemViewModel 透出 sourceId 的 3 条）

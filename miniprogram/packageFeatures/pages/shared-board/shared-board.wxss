@@ -342,6 +342,11 @@ page {
   box-shadow: inset 0 0 0 1rpx rgba(0, 0, 0, 0.04);
 }
 
+/* 真封面图：复用上面的尺寸/圆角/阴影，加载中的占位底避免透白 */
+.item-cover--img {
+  background: var(--td-bg-color-component, #e7e7e7);
+}
+
 .item-head__main {
   flex: 1;
   min-width: 0;
@@ -632,6 +637,118 @@ page {
 }
 
 .detail-sub__arrow {
+  color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
+}
+
+/* ===== 加番弹层：搜索区（推荐主路径，整块可点，右箭头表「会跳转」） ===== */
+.add-search-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx;
+  border-radius: var(--td-radius-large, 18rpx);
+  background: var(--td-brand-color-light, #f2f3ff);
+  border: 2rpx solid var(--td-brand-color-focus, #b5c7ff);
+}
+
+.add-search-block__main {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  color: var(--td-brand-color, #0052d9);
+}
+
+.add-search-block__title {
+  font-size: var(--td-font-size-body-medium, 28rpx);
+  font-weight: 600;
+  color: var(--td-brand-color, #0052d9);
+}
+
+.add-search-block__sub {
+  margin-top: 4rpx;
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-brand-color-7, #366ef4);
+}
+
+.add-search-block__arrow {
+  color: var(--td-brand-color, #0052d9);
+}
+
+/* ===== 加番弹层：已选中预览卡（封面缩略图 + 番名 + 重选，所见即所得） ===== */
+.picked-preview {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx;
+  border-radius: var(--td-radius-large, 18rpx);
+  background: var(--td-bg-color-secondarycontainer, #f3f3f3);
+}
+
+.picked-preview__cover {
+  flex: none;
+  width: 96rpx;
+  height: 128rpx;
+  border-radius: var(--td-radius-default, 12rpx);
+  box-shadow: inset 0 0 0 2rpx rgba(0, 0, 0, 0.06);
+}
+
+/* 封面缺失/加载失败：首字色块兜底（复用番卡同套首字语言） */
+.picked-preview__cover--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #fff;
+}
+
+.picked-preview__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.picked-preview__name {
+  font-size: var(--td-font-size-body-large, 32rpx);
+  font-weight: 600;
+  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picked-preview__hint {
+  margin-top: 6rpx;
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-success-color, #2ba471);
+}
+
+.picked-preview__reselect {
+  flex: none;
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-brand-color, #0052d9);
+  background: var(--td-brand-color-light, #f2f3ff);
+}
+
+/* ===== 加番弹层：手填区分隔标题（「或手动填写」，左右细线夹中间文字） ===== */
+.add-divider {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin: var(--td-spacer-2, 32rpx) 0 var(--td-spacer-1, 16rpx);
+}
+
+.add-divider::before,
+.add-divider::after {
+  content: '';
+  flex: 1;
+  height: 2rpx;
+  background: var(--td-component-stroke, rgba(0, 0, 0, 0.08));
+}
+
+.add-divider__label {
+  font-size: var(--td-font-size-body-small, 24rpx);
   color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
 }
 

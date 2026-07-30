@@ -391,6 +391,13 @@ eq('多部 TA 更新 count=2', puM.count, 2);
 eq('多部按更新时间倒序（最新在前）', puM.items[0].name, '晚更新');
 
 // ============================================================
+// buildItemViewModel 透出 sourceId（绑定标记字段，加番时随 addItem 存）
+// ============================================================
+eq('VM 透出 sourceId（有值）', T.buildItemViewModel(item({ sourceId: 555 }), 'me', null).sourceId, 555);
+eq('VM sourceId 缺省为 null', T.buildItemViewModel(item({}), 'me', null).sourceId, null);
+eq('VM 非法 sourceId 归 null', T.buildItemViewModel(item({ sourceId: 0 }), 'me', null).sourceId, null);
+
+// ============================================================
 // config 前后端漂移守卫（docs/shared-board-data.md §5.2）
 // 云函数侧 constants.js 是前端 config.js 服务端子集的拷贝，键值必须一致。
 // ============================================================

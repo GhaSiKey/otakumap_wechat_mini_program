@@ -91,7 +91,18 @@
       >
         <!-- 番名 + 状态标签 -->
         <view class="item-head">
-          <view class="item-cover" style="background:{{it.coverFallback.color}}">{{it.coverFallback.char}}</view>
+          <!-- 封面：有真图（弹play https 外链）则渲染，加载失败 binderror 回退首字色块；
+               无图直接首字色块。coverErrorIds 记失败的 itemId，避免每次渲染重试闪烁 -->
+          <image
+            wx:if="{{it.cover && !coverErrorIds[it.itemId]}}"
+            class="item-cover item-cover--img"
+            src="{{it.cover}}"
+            mode="aspectFill"
+            lazy-load
+            data-item-id="{{it.itemId}}"
+            binderror="onItemCoverError"
+          />
+          <view wx:else class="item-cover" style="background:{{it.coverFallback.color}}">{{it.coverFallback.char}}</view>
           <view class="item-head__main">
             <text class="item-name">{{it.name}}</text>
             <text wx:if="{{it.subtitle}}" class="item-sub">{{it.subtitle}}</text>
@@ -185,6 +196,39 @@
     <view class="sheet__handle"></view>
     <view class="sheet__header"><text class="sheet__title">添加番剧</text></view>
     <view class="sheet__body">
+
+      <!-- ① 搜索区（推荐主路径）：未选中显示搜索入口；已选中换成封面预览卡（wx:else 须紧跟 wx:if，中间不能夹注释） -->
+      <block wx:if="{{!newItemPicked}}">
+        <view class="add-search-block" bindtap="onAddSearchTap">
+          <view class="add-search-block__main">
+            <t-icon name="search" size="40rpx" />
+            <view class="add-search-block__text">
+              <view class="add-search-block__title">{{animeBindCopy.SEARCH_TITLE}}</view>
+              <view class="add-search-block__sub">{{animeBindCopy.SEARCH_ENTRY}}</view>
+            </view>
+          </view>
+          <t-icon name="chevron-right" size="36rpx" class="add-search-block__arrow" />
+        </view>
+      </block>
+      <view wx:else class="picked-preview">
+        <image
+          wx:if="{{newItemCover && !newItemCoverError}}"
+          class="picked-preview__cover"
+          src="{{newItemCover}}"
+          mode="aspectFill"
+          binderror="onAddCoverError"
+        />
+        <view wx:else class="picked-preview__cover picked-preview__cover--fallback" style="background:{{newItemFallback.color}}">{{newItemFallback.char}}</view>
+        <view class="picked-preview__info">
+          <view class="picked-preview__name">{{newItemName}}</view>
+          <view class="picked-preview__hint">{{animeBindCopy.PICKED_HINT}}</view>
+        </view>
+        <view class="picked-preview__reselect" catchtap="onReselectAnime">{{animeBindCopy.RESELECT}}</view>
+      </view>
+
+      <!-- ② 手填区：分隔标题随状态走——未选中「或手动填写」（另一条路），已选中「确认信息（可修改）」（带回的可编辑区，非手动） -->
+      <view class="add-divider"><text class="add-divider__label">{{newItemPicked ? animeBindCopy.EDIT_TITLE : animeBindCopy.MANUAL_TITLE}}</text></view>
+
       <t-input placeholder="输入番剧名称" value="{{newItemName}}" maxlength="60" bind:change="onItemNameInput" />
 
       <!-- 总集数（选填）：自建步进器 −/输入/+，不引 t-stepper（免构建 npm） -->

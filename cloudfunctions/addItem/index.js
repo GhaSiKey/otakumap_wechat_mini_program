@@ -17,7 +17,7 @@ exports.main = async (event) => {
     const { OPENID } = cloud.getWXContext();
     if (!OPENID) return fail(C.ERR.UNAUTHENTICATED);
 
-    const { boardId, name, totalEp, airStatus, cover } = event || {};
+    const { boardId, name, totalEp, airStatus, cover, sourceId } = event || {};
     if (!boardId) return fail(C.ERR.INVALID_PARAM);
 
     const trimmed = (typeof name === 'string' ? name.trim() : '').slice(0, C.ITEM_NAME_MAX);
@@ -30,6 +30,8 @@ exports.main = async (event) => {
     // 放送状态归一：非枚举值一律回落 UNKNOWN
     const airValues = Object.values(C.AIR_STATUS);
     const normAirStatus = airValues.includes(airStatus) ? airStatus : C.AIR_STATUS.UNKNOWN;
+    // 弹play animeId 归一：正整数才存（标记「绑过弹play」），否则 null（手动番无 sourceId）
+    const normSourceId = Number.isInteger(sourceId) && sourceId > 0 ? sourceId : null;
 
     // 成员校验
     const board = (await db.collection(C.COLLECTION.BOARD).doc(boardId).get().catch(() => null)) || null;
@@ -53,6 +55,7 @@ exports.main = async (event) => {
         totalEp: normTotalEp,
         airStatus: normAirStatus,
         cover: cover || '',
+        sourceId: normSourceId,
         alias: [],
         addBy: OPENID,
         progress: { [OPENID]: { ep: 0, status: C.PROGRESS_STATUS_DEFAULT, updateTime: now } },
