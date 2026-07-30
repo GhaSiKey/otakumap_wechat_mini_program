@@ -168,10 +168,12 @@ worldcup-data.js (冻结快照, CommonJS)
     ├── createBoard / joinBoard   建板 / 配对入板（一次性 token 防抢坑 + 原子条件更新防并发）
     ├── addItem / updateItem / deleteItem   加番去重 / 改共享字段 / 软删除
     ├── updateProgress            只改 progress.${OPENID} 子键（动态 key 保私有性）
-    └── listMyBoards / getBoardDetail   读（也走云函数，逻辑集中服务端）
+    ├── listMyBoards / getBoardDetail   读（也走云函数，逻辑集中服务端）
+    ├── updateMemberProfile / markViewed  改昵称 / 记查看时间（未读红点）
+    └── animeMeta                 弹play 番剧搜索/详情（加番时搜番名带出封面/集数）
               │
 utils/shared-board/transform.js (纯逻辑，可 Node 测试)
-    ├── buildProgressPair()   同轴双游标百分比 + 领先关系 + 防剧透模糊档
+    ├── buildProgressPair()   同轴双游标百分比 + 领先关系（进度全透明，v1.4.2 已砍防剧透）
     ├── groupItems()          按状态分区（一起追/还没开追/暂缓/追完），排序各存各的
     └── buildBoardViewModel() 整板视图模型 + 筹备态(单人)/配对态判定
 ```
@@ -179,7 +181,7 @@ utils/shared-board/transform.js (纯逻辑，可 Node 测试)
 **关键设计决策**：
 - **进度内嵌非拆表**：微信安全规则是「文档级」权限、管不到字段级，故「只准改自己子键」靠云函数（动态 key `progress.${OPENID}` + 可信身份）实现，是官方标准「读走规则、写走云函数」。
 - **筹备态**：单人可先用（加番、追进度），双人 UI 靠 `hasPeer`/`vm.peer` 天然隐藏，只留虚位空椅 + 邀请入口。定位是「候场室」非「单人模式」，避免稀释「共享」命根。
-- **数据来源无关**：cover/totalEp 谁填都行，不绑定外部源 ID（Bangumi/TMDB 被墙，MVP 全手动输入）。
+- **数据来源无关**：cover/totalEp 可手填，也可加番时搜弹play 带出（Bangumi/TMDB 被墙，选了境内可用的弹play）；`sourceId` 记来源但功能不依赖它，换源不返工。
 
 详见 [shared-board.md](shared-board.md)（PRD）、[shared-board-ui.md](shared-board-ui.md)（UI）、[shared-board-data.md](shared-board-data.md)（数据层）。
 

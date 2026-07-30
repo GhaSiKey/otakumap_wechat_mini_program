@@ -48,8 +48,8 @@
 | `status` | string | 否 | `'active'` | ✅ | `active` / `full` / `archived` |
 | `pairing` | Pairing | 否 | 见 §2.2 | ✅ | 一次性配对 token（防抢坑） |
 | `lastViewedAt` | `{ [openid]: Date }` | 是 | `{}` | ⏳Should | 每人上次查看时间，未读红点用 |
-| `archivedBy` | string | 是 | `''` | ⏳Should | 谁归档的（退出/解散） |
-| `archivedAt` | Date | 是 | `null` | ⏳Should | 归档时间 |
+| ~~`archivedBy`~~ | string | 是 | `''` | ❌作废 | 退出/解散功能已砍（2026-07-27），字段不再启用 |
+| ~~`archivedAt`~~ | Date | 是 | `null` | ❌作废 | 同上，见 shared-board.md §13 甲 |
 | `createTime` | Date | 否 | `serverDate()` | ✅ | |
 | `updateTime` | Date | 否 | `serverDate()` | ✅ | **兼作 lastActiveAt**，任一写路径都 bump |
 

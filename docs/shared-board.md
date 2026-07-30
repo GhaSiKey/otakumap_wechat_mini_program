@@ -443,7 +443,7 @@ tests/shared-board.test.js                         # 对齐现有零依赖 Node 
 
 **做「一份共享番单 + 同轴双头像对比页 + 进度状态机 + 一个催更红点」，进度先不带分母、同步先不上 watch、番名先手动输入。** 把"同轴对比页"这一个门面打磨到位，其余往后放——这是验证"两人黏性"核心假设的最小切片。
 
-真实用户的判断作为北极星：**核心价值是"我俩现在能安全聊到第几集"，不是"谁快"。** 命名对齐与"追平待更/弃番"状态是能不能用的**及格线**；按集解锁的剧透安全短评区是让人**天天想开**的钩子；分手/绝交的干净退出是决定情侣用户**敢不敢用**的生死线。
+真实用户的判断作为北极星：**核心价值是"我俩现在能安全聊到第几集"，不是"谁快"。** 命名对齐与"追平待更/弃番"状态是能不能用的**及格线**；按集解锁的剧透安全短评区是让人**天天想开**的钩子。~~分手/绝交的干净退出~~ 曾被列为生死线，**2026-07-27 决策砍掉，坚决不做**（见 §13 甲）。
 
 ---
 
@@ -458,20 +458,50 @@ tests/shared-board.test.js                         # 对齐现有零依赖 Node 
 - [x] `project.config.json` 加 `cloudfunctionRoot: "cloudfunctions/"`
 - [x] 建探针云函数 `cloudfunctions/getMyOpenid`，从小程序客户端验证全链路通过（成功返回真实 openid）
 
-### 阶段二：数据层（下一步）
+### 阶段二：数据层 ✅ 已完成（2026-07-22 ~ 07-23）
 
-- [ ] 建云数据库两集合 `shared_boards` / `shared_board_items` + 配置权限规则（读限成员、写禁止走云函数）
-- [ ] 建业务云函数：`createBoard` / `joinBoard` / `addItem` / `updateProgress` / `updateItem` / `deleteItem`
-- [ ] `packageFeatures/utils/shared-board/{config,transform}.js` + `tests/shared-board.test.js`
+- [x] 建云数据库两集合 `shared_boards` / `shared_board_items` + 配置权限规则（读限成员、写禁止走云函数）
+- [x] 业务云函数：`createBoard` / `joinBoard` / `addItem` / `updateProgress` / `updateItem` / `deleteItem`，另补读函数 `listMyBoards` / `getBoardDetail`
+- [x] `packageFeatures/utils/shared-board/{config,transform}.js` + `tests/shared-board.test.js`（109 断言全绿）
 
-### 阶段三：页面
+### 阶段三：页面 ✅ 已完成（2026-07-23）
 
-- [ ] `packageFeatures/pages/shared-board/` 页面（同轴对比视图、亮暗双模式）
-- [ ] `app.json` 分包 pages + 首页 `features` 加入口
+- [x] `packageFeatures/pages/shared-board/{board-list,shared-board}` 页面（同轴对比视图、亮暗双模式、P3 详情弹层、P4 配对流）
+- [x] `app.json` 分包 pages + 首页 `features` 加入口（👫）
+- [x] 头像昵称设置（`updateMemberProfile`）、未读红点（`markViewed` + `lastViewedAt`）
+
+### 后续增强：弹play 数据接入 ✅（2026-07-27）
+
+- [x] `animeMeta` 云函数（搜索/详情，弹play 数据源）+ 加番搜索带回（见 `docs/shared-board-anime-binding.md`）
+- [x] 补绑功能上线后下架（存量数据补完）
 
 ### 收尾
 
-- [ ] 更新 `docs/README.md`（"纯原生无云开发"改写）、`docs/architecture.md`、MEMORY
+- [x] 更新 `docs/README.md`、`docs/architecture.md`、MEMORY（云开发已引入的改写）
+
+## 13. 未实现总览（Should / 长尾，截至 2026-07-27）
+
+MVP 核心链路（建板/配对/加番/进度/对比/红点/加番搜索带回）已全部上线并真机验证。以下为**主动决策缓做**的项，非遗漏。按「是否阻碍正常使用」分档：
+
+### 甲 · 已决策不做（2026-07-27 用户拍板）
+
+- **干净退出 / 解散板**：~~PRD §11 曾列为「情侣用户敢不敢用的生死线」~~。**决策：坚决不做**，连隐藏/归档也不做。配对后板子长期保留，无退出出口。数据层预留的 `archivedBy` / `archivedAt` 字段作废留档，不建 `leaveBoard` / `dissolveBoard` 云函数。PRD §11 对应表述一并作废。
+
+### 乙 · 留存钩子（让人第二天想开，工作量大 / 有前置依赖）
+
+- **按集解锁短评区**：UI 已留「短评（追平后解锁）🔒」占位（`shared-board-ui.md`），四方评审公认的「灵魂」。需新数据模型 + 云函数，未做。
+- **订阅消息推送召回**（TA 加入 / 追平提醒）：合规正路是微信一次性订阅消息，须先去小程序后台确认公共模板库有无贴切模板 + 抄回字段名，再建发送云函数。列为未来项。
+
+### 丙 · 体验增强（有它更好，缺它不影响用）
+
+- **催更 / 戳一下**：数据层已预留 `shared_board_nudges` 子集合 + 冷却常量（`shared-board-data.md` §2.5），未建函数。
+- **入伙交接时刻**：对方加入时「TA 为你俩攒了 N 部番」片单速览 + 建板方「TA 加入了」兑现。
+- **token 过期续期** `refreshPairToken`：现 24h 过期后需重新建板（`shared-board-data.md` O5）。
+- **昵称 / 头像过时刷新**：`onShow` 静默比对更新，结构已支持（O4）。
+- **接更多外部数据源自动带元信息**：已接弹play 搜索；Bangumi/TMDB 被墙、弹play 禁商用，长尾。
+- **里程碑动效增强、拖拽排序、个人版番单导入、防稀释精细机制**（上锁 teaser / 情绪峰值推邀请）。
+
+> 埋点提醒（`shared-board-data.md` O7）：`lastViewedAt` 已在 MVP 写入，未来点亮相关功能零回填。
 
 
 
