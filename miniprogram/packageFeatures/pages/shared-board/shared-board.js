@@ -22,9 +22,12 @@ const {
   PICKER_COPY,
   PEER_UPDATE_COPY,
   ANIME_BIND_COPY,
+  AIR_META_WAIT_MS,
 } = require('../../utils/shared-board/config');
 // 搜索页交互模式 + 回带事件名（跨包同一 miniprogram 内，直接 require anime-meta 配置层）
 const { SEARCH_MODE, PICK_EVENT } = require('../../utils/anime-meta/config');
+// 番剧详情云调用：加番选中后补拉 airDay/isOnAir（搜索结果无此二字段，只详情接口给）
+const animeApi = require('../../utils/anime-meta/cloud-api');
 
 const ANIME_SEARCH_URL = '/packageFeatures/pages/anime-search/anime-search';
 
@@ -473,6 +476,7 @@ Page({
   // ==================== 加番 ====================
   onAddTap() {
     this._pickedMeta = null; // 新一轮加番，清掉上次搜番剧带出的暂存封面/sourceId
+    this._airMetaWait = null; // 同步清补拉 promise，避免本轮等到上一轮的旧回包
     this.setData({
       showAdd: true,
       newItemName: '',
@@ -499,10 +503,9 @@ Page({
   _onPickedForAdd(picked) {
     if (!picked) return;
     const cover = picked.cover || '';
-    this._pickedMeta = {
-      cover,
-      sourceId: Number.isInteger(picked.sourceId) && picked.sourceId > 0 ? picked.sourceId : null,
-    };
+    const sourceId = Number.isInteger(picked.sourceId) && picked.sourceId > 0 ? picked.sourceId : null;
+    // 先存搜索结果已有的字段（cover/sourceId）；airDay/isOnAir 由下方补调详情异步补入。
+    this._pickedMeta = { cover, sourceId };
     const name = picked.name || this.data.newItemName;
     this.setData({
       newItemName: name,
@@ -512,6 +515,37 @@ Page({
       newItemCoverError: false, // 新封面给一次加载机会
       newItemFallback: T.pickCoverColor(name), // 无封面/加载失败时的首字色块兜底
     });
+    // 补拉放送信息：搜索接口不给 airDay/isOnAir，只详情接口给（见 animeMeta 云函数）。
+    // 异步进行，不阻塞选中回填；失败仅 toast 提示、不影响加番（用户已确认的降级策略）。
+    // 存下这次补拉的 promise：用户可能在详情回来前就点确认，onConfirmAdd 提交前 await 它
+    // （带超时），确保放送信息尽量赶上落库，避免竞态导致 airStatus/airDay 双缺失。
+    this._airMetaWait = sourceId ? this._fetchAirMeta(sourceId) : null;
+  },
+
+  // 按 sourceId 补拉详情，取 airDay/isOnAir 存入 _pickedMeta，供提交时随 addItem 落库。
+  // 加番弹层可能在 detail 返回前就被重选/关闭，故回来时校验 sourceId 仍是当前选中的那部，
+  // 避免慢回包把上一部的放送信息串到新选的番上。
+  async _fetchAirMeta(sourceId) {
+    const r = await animeApi.getAnimeDetail(sourceId);
+    // 弹层已重选/关闭（_pickedMeta 变了或清了）→ 丢弃这次回包，不串档
+    if (!this._pickedMeta || this._pickedMeta.sourceId !== sourceId) return;
+    if (!r || !r.ok || !r.data || !r.data.bangumi) {
+      wx.showToast({ title: ANIME_BIND_COPY.META_FAIL, icon: 'none' });
+      return;
+    }
+    const b = r.data.bangumi;
+    if (Number.isInteger(b.airDay)) this._pickedMeta.airDay = b.airDay;
+    if (typeof b.isOnAir === 'boolean') this._pickedMeta.isOnAir = b.isOnAir;
+  },
+
+  // 提交前等补拉详情就绪：race「补拉 promise」与「AIR_META_WAIT_MS 超时」。
+  // 补拉先回 → 放送信息已写回 _pickedMeta，带上落库；超时先到 → 照旧加番（降级）。
+  // _fetchAirMeta 内部已 catch 失败并 toast，故这里对其结果 catch 兜底即可，不重复提示。
+  _waitAirMeta() {
+    const wait = this._airMetaWait;
+    if (!wait) return Promise.resolve();
+    const timeout = new Promise((resolve) => setTimeout(resolve, AIR_META_WAIT_MS));
+    return Promise.race([wait.catch(() => {}), timeout]);
   },
 
   // 预览封面加载失败：回退首字色块（同卡片封面兜底，避免坏链/cloud:// 裸奔）
@@ -522,6 +556,7 @@ Page({
   // 已选中后「重选」：清预览与暂存，回到搜索入口态，再次跳搜索页
   onReselectAnime() {
     this._pickedMeta = null;
+    this._airMetaWait = null; // 重选清补拉 promise，旧回包因 sourceId 不匹配也会被丢弃
     this.setData({ newItemPicked: false, newItemCover: '', newItemCoverError: false });
     this.onAddSearchTap();
   },
@@ -570,6 +605,10 @@ Page({
       wx.showToast({ title: '输入番剧名称', icon: 'none' });
       return;
     }
+    // 放送信息补拉可能还在路上（用户选完番很快点确认）。提交前最多等 AIR_META_WAIT_MS，
+    // 等到就带上 airDay/isOnAir 落库，超时则照旧加（降级策略）。_fetchAirMeta 已把结果
+    // 写回 _pickedMeta，这里只等它「跑完/超时」，不关心返回值。
+    if (this._airMetaWait) await this._waitAirMeta();
     // 总集数选填：归一为合法整数或 null（空/非法/越界都落 null，与云函数同规则）
     const totalEp = T.normalizeTotalEp(this.data.newItemTotalEp);
     // 从「搜番剧」带出的封面/sourceId（若有）随本次 addItem 一并存；手打加番时为空不带
@@ -578,6 +617,9 @@ Page({
     if (totalEp != null) extra.totalEp = totalEp;
     if (meta.cover) extra.cover = meta.cover;
     if (meta.sourceId) extra.sourceId = meta.sourceId;
+    // 放送信息（补调详情拉到才有）：airDay 落库供更新日角标，isOnAir 供云函数校准 airStatus
+    if (Number.isInteger(meta.airDay)) extra.airDay = meta.airDay;
+    if (typeof meta.isOnAir === 'boolean') extra.isOnAir = meta.isOnAir;
     this.setData({ adding: true });
     const r = await api.addItem(this.data.boardId, name, extra);
     this.setData({ adding: false });
@@ -587,6 +629,7 @@ Page({
       return;
     }
     this._pickedMeta = null; // 用完即清，避免下次手打加番误带上一次的封面
+    this._airMetaWait = null; // 补拉 promise 已消费，清掉不留给下一轮
     this.setData({ showAdd: false, newItemCover: '', newItemPicked: false, newItemCoverError: false });
     this._load(); // 重新拉取，卡片出现
   },
@@ -797,5 +840,6 @@ Page({
       if (this.data.syncItemId === itemId) this.setData({ syncItemId: '' });
     }, 600);
   },
+
 });
 

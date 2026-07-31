@@ -17,7 +17,7 @@ exports.main = async (event) => {
     const { OPENID } = cloud.getWXContext();
     if (!OPENID) return fail(C.ERR.UNAUTHENTICATED);
 
-    const { boardId, name, totalEp, airStatus, cover, sourceId } = event || {};
+    const { boardId, name, totalEp, airStatus, cover, sourceId, airDay, isOnAir } = event || {};
     if (!boardId) return fail(C.ERR.INVALID_PARAM);
 
     const trimmed = (typeof name === 'string' ? name.trim() : '').slice(0, C.ITEM_NAME_MAX);
@@ -29,7 +29,14 @@ exports.main = async (event) => {
       Number.isInteger(totalEp) && totalEp >= C.TOTAL_EP_MIN && totalEp <= C.TOTAL_EP_MAX ? totalEp : null;
     // 放送状态归一：非枚举值一律回落 UNKNOWN
     const airValues = Object.values(C.AIR_STATUS);
-    const normAirStatus = airValues.includes(airStatus) ? airStatus : C.AIR_STATUS.UNKNOWN;
+    let normAirStatus = airValues.includes(airStatus) ? airStatus : C.AIR_STATUS.UNKNOWN;
+    // isOnAir 校准放送状态：客户端未显式给出有效 airStatus 时（加番走搜索，搜索结果无此字段），
+    // 用详情接口的 isOnAir 推导——true→放送中、false→已完结。客户端显式传了 airStatus 则以它为准。
+    if (!airValues.includes(airStatus) && typeof isOnAir === 'boolean') {
+      normAirStatus = isOnAir ? C.AIR_STATUS.AIRING : C.AIR_STATUS.FINISHED;
+    }
+    // 更新日归一：0-6 整数才存（周几更新），否则 null（手动番/详情没拉到都视作未知）
+    const normAirDay = Number.isInteger(airDay) && airDay >= 0 && airDay <= 6 ? airDay : null;
     // 弹play animeId 归一：正整数才存（标记「绑过弹play」），否则 null（手动番无 sourceId）
     const normSourceId = Number.isInteger(sourceId) && sourceId > 0 ? sourceId : null;
 
@@ -54,6 +61,7 @@ exports.main = async (event) => {
         name: trimmed,
         totalEp: normTotalEp,
         airStatus: normAirStatus,
+        airDay: normAirDay, // 周几更新（0-6），仅弹play 详情带回；手动番为 null
         cover: cover || '',
         sourceId: normSourceId,
         alias: [],

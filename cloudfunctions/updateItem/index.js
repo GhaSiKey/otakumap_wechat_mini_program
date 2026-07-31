@@ -60,6 +60,13 @@ exports.main = async (event) => {
       if (!Object.values(C.AIR_STATUS).includes(allow.airStatus)) return fail(C.ERR.INVALID_STATUS);
     }
 
+    // 更新日：允许 null（显式清空），否则须为 0-6 整数（周几更新）。
+    // 与 totalEp 同风格——用户主动编辑，非法直接拒绝而非静默落 null。
+    if (allow.airDay !== undefined && allow.airDay !== null) {
+      const d = allow.airDay;
+      if (!Number.isInteger(d) || d < 0 || d > 6) return fail(C.ERR.INVALID_PARAM);
+    }
+
     const now = db.serverDate();
     await db
       .collection(C.COLLECTION.ITEM)

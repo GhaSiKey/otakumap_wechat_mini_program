@@ -364,11 +364,13 @@ page {
   white-space: nowrap;
 }
 
+/* 放送元信息「放送中 · 12集 · 周六更新」：单行灰字，更新日并入同权重呈现。
+   display:block 使其独占一行落在番名下方，margin-top 与番名拉开间距。 */
 .item-sub {
   display: block;
+  margin-top: 4rpx;
   font-size: var(--td-font-size-body-small, 24rpx);
   color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
-  margin-top: 4rpx;
 }
 
 /* ==================== 同轴集数轴 ==================== */
@@ -1007,5 +1009,3 @@ page {
   border-radius: 50%;
   flex-shrink: 0;
 }
-
-

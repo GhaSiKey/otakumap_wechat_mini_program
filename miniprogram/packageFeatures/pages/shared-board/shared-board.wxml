@@ -105,6 +105,7 @@
           <view wx:else class="item-cover" style="background:{{it.coverFallback.color}}">{{it.coverFallback.char}}</view>
           <view class="item-head__main">
             <text class="item-name">{{it.name}}</text>
+            <!-- 放送元信息：「放送中 · 12集 · 周六更新」一句灰字，更新日已并入 subtitle 同权重呈现 -->
             <text wx:if="{{it.subtitle}}" class="item-sub">{{it.subtitle}}</text>
           </view>
           <t-tag wx:if="{{statusLabels[it.pair.mine.status]}}" size="small" variant="light" theme="{{statusTagTheme[it.pair.mine.status] || 'default'}}">{{statusLabels[it.pair.mine.status]}}</t-tag>

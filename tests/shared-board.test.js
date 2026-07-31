@@ -391,6 +391,45 @@ eq('多部 TA 更新 count=2', puM.count, 2);
 eq('多部按更新时间倒序（最新在前）', puM.items[0].name, '晚更新');
 
 // ============================================================
+// ============================================================
+// airDayLabelOf / VM airDayLabel：更新日角标（仅在播 + airDay 合法才显示）
+// ============================================================
+eq('airDayLabelOf 在播周四', T.airDayLabelOf('airing', 4), '周四' + C.AIR_DAY_COPY.SUFFIX);
+eq('airDayLabelOf 在播周日(边界0)', T.airDayLabelOf('airing', 0), '周日' + C.AIR_DAY_COPY.SUFFIX);
+eq('airDayLabelOf 在播周六(边界6)', T.airDayLabelOf('airing', 6), '周六' + C.AIR_DAY_COPY.SUFFIX);
+eq('airDayLabelOf 完结不显示', T.airDayLabelOf('finished', 4), '');
+eq('airDayLabelOf 未知不显示', T.airDayLabelOf('unknown', 4), '');
+eq('airDayLabelOf 越界(7)不显示', T.airDayLabelOf('airing', 7), '');
+eq('airDayLabelOf 负数不显示', T.airDayLabelOf('airing', -1), '');
+eq('airDayLabelOf 非整数不显示', T.airDayLabelOf('airing', 3.5), '');
+eq('airDayLabelOf null 不显示', T.airDayLabelOf('airing', null), '');
+eq(
+  'VM 在播带 airDayLabel',
+  T.buildItemViewModel(item({ airStatus: 'airing', airDay: 4 }), 'me', null).airDayLabel,
+  '周四' + C.AIR_DAY_COPY.SUFFIX
+);
+eq(
+  'VM 完结不带 airDayLabel',
+  T.buildItemViewModel(item({ airStatus: 'finished', airDay: 4 }), 'me', null).airDayLabel,
+  ''
+);
+eq(
+  'VM 无 airDay 不带 airDayLabel',
+  T.buildItemViewModel(item({ airStatus: 'airing' }), 'me', null).airDayLabel,
+  ''
+);
+// subtitle 三段拼接：放送状态 · 集数 · 更新日（更新日已并入 subtitle，同权重灰字，不再单列角标）
+eq(
+  'VM subtitle 三段全含更新日',
+  T.buildItemViewModel(item({ airStatus: 'airing', totalEp: 12, airDay: 6 }), 'me', null).subtitle,
+  [C.AIR_STATUS_LABELS.airing, '12 集', '周六' + C.AIR_DAY_COPY.SUFFIX].join(' · ')
+);
+eq(
+  'VM subtitle 完结无更新日段',
+  T.buildItemViewModel(item({ airStatus: 'finished', totalEp: 12, airDay: 6 }), 'me', null).subtitle,
+  [C.AIR_STATUS_LABELS.finished, '12 集'].join(' · ')
+);
+
 // buildItemViewModel 透出 sourceId（绑定标记字段，加番时随 addItem 存）
 // ============================================================
 eq('VM 透出 sourceId（有值）', T.buildItemViewModel(item({ sourceId: 555 }), 'me', null).sourceId, 555);

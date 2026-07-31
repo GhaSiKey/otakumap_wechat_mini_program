@@ -21,6 +21,8 @@ const {
   COVER_PALETTE,
   AIR_STATUS,
   AIR_STATUS_LABELS,
+  AIR_DAY_LABELS,
+  AIR_DAY_COPY,
   TOTAL_EP_MAX,
   TOTAL_EP_MIN,
   VIEW,
@@ -84,6 +86,18 @@ function pickCoverColor(name, palette) {
     hash = (hash + str.charCodeAt(i)) % pal.length;
   }
   return { char, color: pal[hash] };
+}
+
+/**
+ * 更新日可读标签：「周四更新」。
+ * 仅在「在播（airing）+ airDay 为 0-6 整数」时给，否则空串——
+ * 完结/未知的番挂更新日是噪音（都完结了还提「周四更新」误导），一律不显示。
+ * airDay 的 0-6 语义映射见 config.AIR_DAY_LABELS（待真机校准，只此一处）。
+ */
+function airDayLabelOf(airStatus, airDay) {
+  if (airStatus !== AIR_STATUS.AIRING) return '';
+  if (!Number.isInteger(airDay) || airDay < 0 || airDay >= AIR_DAY_LABELS.length) return '';
+  return AIR_DAY_LABELS[airDay] + AIR_DAY_COPY.SUFFIX;
 }
 
 /** 「能安全聊到第几集」= 双方进度的较小值（对方未翻牌则为 0）。核心价值锚点。 */
@@ -231,12 +245,16 @@ function buildItemViewModel(item, myOpenid, peerOpenid) {
   // 卡片副信息：放送状态 + 总集数，拼成一句「放送中 · 28 集」（缺则省略），提升信息密度
   const airLabel = AIR_STATUS_LABELS[item.airStatus] || '';
   const epLabel = totalEp ? `${totalEp} 集` : '';
-  const subtitle = [airLabel, epLabel].filter(Boolean).join(' · ');
+  // 更新日「周四更新」：仅在播且 airDay 合法时给（详情见 airDayLabelOf）。
+  // 与放送状态、集数同属放送元信息，一并拼进 subtitle 以 ` · ` 分隔，同权重灰字呈现，不再单列强调角标。
+  const airDayLabel = airDayLabelOf(item.airStatus, item.airDay);
+  const subtitle = [airLabel, epLabel, airDayLabel].filter(Boolean).join(' · ');
   return {
     itemId: item._id,
     name: item.name,
     airStatus: item.airStatus,
     airLabel,
+    airDayLabel,
     totalEp,
     subtitle,
     cover: item.cover || '',
@@ -388,6 +406,7 @@ module.exports = {
   resolvePeer,
   sanitizeAvatar,
   pickCoverColor,
+  airDayLabelOf,
   safeTalkEp,
   buildProgressPair,
   sectionOf,

@@ -57,7 +57,20 @@ const BOARD_NAME_MAX = 20;
 const ITEM_NAME_MAX = 60;
 
 // updateItem 可改的共享字段白名单（防越权改私有/受控字段）
-const ITEM_SHARED_FIELDS = ['name', 'totalEp', 'airStatus', 'cover'];
+// airDay（周几更新，0-6）加入白名单：加番时随详情接口落库，也允许后台/编辑弹层订正
+const ITEM_SHARED_FIELDS = ['name', 'totalEp', 'airStatus', 'cover', 'airDay'];
+
+// ── 更新日（放送星期）──
+// airDay 取自弹弹play 详情接口（animeMeta detail），0-6 表示周几更新。
+// ⚠️ 语义待真机校准：弹弹play 未在文档明确 0 是周日还是周一，接入时用一部已知
+// 更新日的在播番实测确认后再定。此处按「0=周日 … 6=周六」（JS Date.getDay 同约定）
+// 先行，若实测不符只改本映射一处，不动其它逻辑。
+const AIR_DAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+// 番卡「周四更新」角标文案：{day} 由 AIR_DAY_LABELS 插值，前后缀集中配置不硬编码进 wxml。
+// 仅在播（airStatus=airing）且 airDay 合法时显示，完结/未知不挂，避免噪音。
+const AIR_DAY_COPY = {
+  SUFFIX: '更新', // 「周四」+「更新」= 「周四更新」
+};
 
 // 催更冷却（Should）
 const NUDGE_COOLDOWN_MS = 4 * 60 * 60 * 1000;
@@ -172,6 +185,11 @@ const PICKER_COPY = {
   CONFIRM: '确认',
 };
 
+// ── 补拉放送信息（airDay/isOnAir）超时 ──
+// 选中番剧后异步补拉详情，用户可能在详情回来前就点确认（尤其番名已带出、无需改）。
+// 提交时最多等这么久，等到就带上放送信息落库，超时则照旧加番（不卡用户，降级已定策略）。
+const AIR_META_WAIT_MS = 3000;
+
 // ── 关联番剧（弹弹play 数据绑定）文案 ──
 // 加番弹层「搜番剧」入口区文案：搜索为推荐主路径、手填为备选，选中后转预览+确认态。
 const ANIME_BIND_COPY = {
@@ -182,6 +200,7 @@ const ANIME_BIND_COPY = {
   EDIT_TITLE: '确认信息（可修改）', // 手填区分隔标题（已选中态：下面是带回的可编辑区，非「手动」）
   PICKED_HINT: '已选中，可修改后添加', // 选中番剧后弹层顶部预览区提示
   RESELECT: '重选', // 已选中后重新搜索的按钮
+  META_FAIL: '放送信息没拉到，不影响添加', // 补调详情拉 airDay 失败的 toast（不阻塞加番）
 };
 
 // ── P2 顶部「TA 更新了」信息条文案 ──
@@ -241,8 +260,11 @@ module.exports = {
   MEMBER_COLORS,
   AIR_STATUS_LABELS,
   AIR_STATUS_OPTIONS,
+  AIR_DAY_LABELS,
+  AIR_DAY_COPY,
   TOTAL_EP_COPY,
   PICKER_COPY,
   PEER_UPDATE_COPY,
   ANIME_BIND_COPY,
+  AIR_META_WAIT_MS,
 };

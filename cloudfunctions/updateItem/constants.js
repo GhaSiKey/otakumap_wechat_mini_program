@@ -36,7 +36,7 @@ const DEFAULT_BOARD_NAME = '我俩的番单';
 const BOARD_NAME_MAX = 20;
 const ITEM_NAME_MAX = 60;
 
-const ITEM_SHARED_FIELDS = ['name', 'totalEp', 'airStatus', 'cover'];
+const ITEM_SHARED_FIELDS = ['name', 'totalEp', 'airStatus', 'cover', 'airDay'];
 
 const ERR = {
   OK: 'OK',
