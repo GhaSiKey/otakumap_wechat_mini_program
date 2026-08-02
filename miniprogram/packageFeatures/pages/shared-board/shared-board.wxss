@@ -58,10 +58,28 @@ page {
 }
 
 .sb-skeleton .skeleton-card {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
   margin: 0 var(--td-spacer-2, 32rpx) var(--td-spacer, 16rpx);
   padding: var(--td-spacer-2, 32rpx);
   background: var(--td-bg-color-container, #ffffff);
   border-radius: var(--td-radius-large, 18rpx);
+}
+
+/* 骨架封面：与真实卡片 .item-cover-wrap 同尺寸（3:4）/同圆角 */
+.skeleton-cover {
+  flex-shrink: 0;
+  width: 160rpx;
+  height: 213rpx;
+  border-radius: var(--td-radius-default, 12rpx);
+  background: var(--td-bg-color-component, #e7e7e7);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .skeleton-line {
@@ -310,41 +328,77 @@ page {
      否则游标会逃到根层级盖住 fixed 的加番 FAB（层级 bug 根因） */
   position: relative;
   z-index: 0;
+  display: flex;
+  align-items: center; /* 封面按固定比例定形，与内容列在垂直方向居中对齐 */
+  gap: 24rpx; /* 封面与内容列的间距 */
   background-color: var(--td-bg-color-container, #ffffff);
   border-radius: var(--td-radius-large, 18rpx);
-  padding: var(--td-spacer-2, 32rpx);
+  /* 内边距：封面四周留一圈等距白边，成为「内嵌悬浮海报」而非贴边全出血。
+     四角对称，不再有「左圆右直」的割裂感。 */
+  padding: 24rpx;
+  overflow: hidden; /* 保住卡片圆角 */
   margin-bottom: var(--td-spacer, 16rpx);
-  box-shadow: var(--td-shadow-1, 0 1px 10px rgba(0, 0, 0, 0.05));
+}
+
+/* ===== 左侧封面区：内嵌悬浮竖版海报，固定 3:4 比例，四角全圆 =====
+   宽高直接写死锁定比例（padding-top 定比会按父宽算、在此 flex 定宽场景反而失真，故用显式宽高）：
+   160 × 213 ≈ 3:4 标准动画海报，比原来的窄竖条明显更宽。
+   想要横版 4:3 就把宽高对调（但竖版海报会被裁成中间横条，慎用）。 */
+.item-cover-wrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 160rpx;
+  height: 213rpx;
+  border-radius: var(--td-radius-default, 12rpx); /* 封面自身四角圆角 */
+  overflow: hidden; /* 裁掉封面图四角，使圆角生效（不影响外侧 box-shadow） */
+  background: var(--td-bg-color-component, #e7e7e7); /* 图加载中的占位底，避免透白 */
+  /* 悬浮海报的柔和投影：卡片已去阴影，改由封面自己「浮」起来。
+     模糊半径控制在卡片 32rpx 内边距内，不会被卡片 overflow 裁掉。 */
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.12);
+}
+
+/* 真封面图：绝对定位铺满封面区，aspectFill 裁切填充（竖版海报最贴合） */
+.item-cover-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 无图占位：首字色块铺满封面区，居中大字 */
+.item-cover-ph {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 56rpx; /* 封面区放大，首字也随之放大 */
+  font-weight: 600;
+}
+
+/* ===== 右侧内容列 ===== */
+.item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* 内容较少时在封面高度内垂直居中，避免顶部堆挤 */
 }
 
 .item-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* tag 顶对齐番名首行，而非居中夹在番名/副标题之间显得错位 */
   gap: 20rpx;
 }
 
 /* 状态 tag 不被长番名压扁：flex 行里 t-tag 需固定宽度，否则 __main 撑满后 tag 被挤没 */
 .item-head t-tag {
   flex-shrink: 0;
-}
-
-.item-cover {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: var(--td-radius-default, 12rpx);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-size: 36rpx; /* ≥36rpx：配深色调色板稳达大字对比度阈值（3:1） */
-  font-weight: 600;
-  flex-shrink: 0;
-  box-shadow: inset 0 0 0 1rpx rgba(0, 0, 0, 0.04);
-}
-
-/* 真封面图：复用上面的尺寸/圆角/阴影，加载中的占位底避免透白 */
-.item-cover--img {
-  background: var(--td-bg-color-component, #e7e7e7);
 }
 
 .item-head__main {
@@ -427,14 +481,14 @@ page {
 .cursor--merged { z-index: 4; }
 
 .cursor-dot {
-  width: 48rpx;
-  height: 48rpx;
+  width: 42rpx;
+  height: 42rpx;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  font-size: 22rpx;
+  font-size: 20rpx;
   border: 3rpx solid var(--td-bg-color-container, #ffffff);
   box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.12);
 }
@@ -447,14 +501,14 @@ page {
 
 /* 追平合并态 ◉：success 色 + 光晕脉冲，兑现追平仪式感（情绪峰值） */
 .cursor-dot--merged {
-  width: 52rpx;
-  height: 52rpx;
+  width: 46rpx;
+  height: 46rpx;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  font-size: 28rpx;
+  font-size: 24rpx;
   background: var(--td-success-color, #2ba471);
   border: 3rpx solid var(--td-bg-color-container, #ffffff);
   box-shadow: 0 0 0 6rpx var(--sb-success-glow, rgba(43, 164, 113, 0.25));
@@ -519,24 +573,6 @@ page {
 /* 弃番文案：灰化，去追赶感，与游标灰化呼应 */
 .item-diff .dropped-txt {
   color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
-}
-
-/* 「能一起聊到 E几」核心卖点：浅绿底 pill，抬成卡片里仅次于轴的第二焦点 */
-.safe-talk-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6rpx;
-  margin-top: 12rpx;
-  padding: 6rpx 16rpx;
-  background: var(--td-success-color-1, #e8f8f2);
-  border-radius: 999rpx;
-  font-size: var(--td-font-size-body-small, 24rpx);
-  font-weight: 600;
-  color: var(--td-success-color, #2ba471);
-}
-
-.safe-talk-pill__icon {
-  font-size: 24rpx;
 }
 
 /* ==================== 详情弹层（外壳由 .sheet 提供，此处只补内容样式）==================== */
@@ -885,9 +921,10 @@ page {
   animation: sbSyncGlow 0.5s ease;
 }
 @keyframes sbSyncGlow {
-  0% { transform: scale(1); box-shadow: var(--td-shadow-1, 0 1px 10px rgba(0, 0, 0, 0.05)); }
+  /* 卡片已去阴影，故起止帧回落到 none（否则追平动画后又冒出阴影）；仅中间帧闪一下 success 光晕 */
+  0% { transform: scale(1); box-shadow: none; }
   40% { transform: scale(1.03); box-shadow: 0 8rpx 32rpx var(--sb-success-glow, rgba(43, 164, 113, 0.25)); }
-  100% { transform: scale(1); box-shadow: var(--td-shadow-1, 0 1px 10px rgba(0, 0, 0, 0.05)); }
+  100% { transform: scale(1); box-shadow: none; }
 }
 
 /* 对方加入：虚位头像 360° 弹入（复用 bounceIn 基因） */

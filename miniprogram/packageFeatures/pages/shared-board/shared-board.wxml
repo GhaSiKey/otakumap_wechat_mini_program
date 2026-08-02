@@ -89,20 +89,26 @@
         data-item-id="{{it.itemId}}"
         bindtap="onItemTap"
       >
-        <!-- 番名 + 状态标签 -->
-        <view class="item-head">
-          <!-- 封面：有真图（弹play https 外链）则渲染，加载失败 binderror 回退首字色块；
-               无图直接首字色块。coverErrorIds 记失败的 itemId，避免每次渲染重试闪烁 -->
+        <!-- 左侧封面：撑满卡片高度的竖版展示区。有真图（弹play https 外链）则渲染，
+             加载失败 binderror 回退首字色块；无图直接首字色块。
+             coverErrorIds 记失败的 itemId，避免每次渲染重试闪烁 -->
+        <view class="item-cover-wrap">
           <image
             wx:if="{{it.cover && !coverErrorIds[it.itemId]}}"
-            class="item-cover item-cover--img"
+            class="item-cover-img"
             src="{{it.cover}}"
             mode="aspectFill"
             lazy-load
             data-item-id="{{it.itemId}}"
             binderror="onItemCoverError"
           />
-          <view wx:else class="item-cover" style="background:{{it.coverFallback.color}}">{{it.coverFallback.char}}</view>
+          <view wx:else class="item-cover-ph" style="background:{{it.coverFallback.color}}">{{it.coverFallback.char}}</view>
+        </view>
+
+        <!-- 右侧内容列：番名/状态、进度轴、双人进度说明 -->
+        <view class="item-body">
+        <!-- 番名 + 状态标签 -->
+        <view class="item-head">
           <view class="item-head__main">
             <text class="item-name">{{it.name}}</text>
             <!-- 放送元信息：「放送中 · 12集 · 周六更新」一句灰字，更新日已并入 subtitle 同权重呈现 -->
@@ -158,12 +164,6 @@
           </block>
         </view>
 
-        <!-- 核心卖点：能一起聊到第几集（双方都追了才有意义）——单拎一行做浅底 pill 抬权重 -->
-        <view wx:if="{{it.pair.hasPeer && it.pair.safeTalkEp > 0}}" class="safe-talk-pill">
-          <text class="safe-talk-pill__icon">💬</text>
-          <text>能一起聊到 第{{it.pair.safeTalkEp}}话</text>
-        </view>
-
         <!-- 超出预设提示：某方集数已超过设定的总集数（漏设/特别篇），点击改总集数纠正 -->
         <view
           wx:if="{{it.pair.epExceedsTotal}}"
@@ -171,6 +171,7 @@
           catchtap="onExceedHintTap"
           data-item-id="{{it.itemId}}"
         >{{totalEpCopy.EXCEED_HINT}}</view>
+        </view>
       </view>
     </view>
 
@@ -185,9 +186,12 @@
 <view wx:if="{{loading}}" class="sb-skeleton">
   <view class="skeleton-memberbar"></view>
   <view class="skeleton-card" wx:for="{{[1,2,3]}}" wx:key="*this">
-    <view class="skeleton-line skeleton-line--title"></view>
-    <view class="skeleton-axis"></view>
-    <view class="skeleton-line skeleton-line--meta"></view>
+    <view class="skeleton-cover"></view>
+    <view class="skeleton-body">
+      <view class="skeleton-line skeleton-line--title"></view>
+      <view class="skeleton-axis"></view>
+      <view class="skeleton-line skeleton-line--meta"></view>
+    </view>
   </view>
 </view>
 
