@@ -437,11 +437,198 @@ eq('VM sourceId 缺省为 null', T.buildItemViewModel(item({}), 'me', null).sour
 eq('VM 非法 sourceId 归 null', T.buildItemViewModel(item({ sourceId: 0 }), 'me', null).sourceId, null);
 
 // ============================================================
+// foldEvents 历史事件折叠（阶段一 §5）
+// 入参倒序（新→旧）；同番同人相邻 progress 折叠，其余独立成条。
+// ============================================================
+const PT = C.EVENT_TYPE.PROGRESS;
+// 造一条 progress 事件（倒序里越靠前越新）
+function ev(o) {
+  return Object.assign(
+    { _id: 'e', boardId: 'b', actor: 'me', type: PT, itemId: 'i1', itemName: '番A', payload: {}, createTime: 0 },
+    o
+  );
+}
+
+// 空/非数组
+eq('foldEvents 空数组', T.foldEvents([]), []);
+eq('foldEvents 非数组归空', T.foldEvents(null), []);
+
+// 连续同番同人 progress（倒序：5→4→3）折叠成一条：区间 prevEp 取最老(2)、ep 取最新(5)
+(() => {
+  const events = [
+    ev({ _id: 'e3', createTime: 300, payload: { prevEp: 4, ep: 5, prevStatus: 'watching', status: 'watching' } }),
+    ev({ _id: 'e2', createTime: 200, payload: { prevEp: 3, ep: 4, prevStatus: 'watching', status: 'watching' } }),
+    ev({ _id: 'e1', createTime: 100, payload: { prevEp: 2, ep: 3, prevStatus: 'watching', status: 'watching' } }),
+  ];
+  const folded = T.foldEvents(events);
+  eq('折叠连续 progress → 1 条', folded.length, 1);
+  eq('折叠 foldedCount=3', folded[0].foldedCount, 3);
+  eq('折叠区间 prevEp 取最老', folded[0].payload.prevEp, 2);
+  eq('折叠区间 ep 取最新', folded[0].payload.ep, 5);
+  eq('折叠 createTime 保留最新', folded[0].createTime, 300);
+  eq('折叠 firstCreateTime 取最老', folded[0].firstCreateTime, 100);
+})();
+
+// 不同人不折叠
+(() => {
+  const events = [
+    ev({ _id: 'e2', actor: 'me', createTime: 200, payload: { prevEp: 4, ep: 5 } }),
+    ev({ _id: 'e1', actor: 'ta', createTime: 100, payload: { prevEp: 3, ep: 4 } }),
+  ];
+  eq('不同人不折叠', T.foldEvents(events).length, 2);
+})();
+
+// 不同番不折叠
+(() => {
+  const events = [
+    ev({ _id: 'e2', itemId: 'i2', createTime: 200, payload: { prevEp: 4, ep: 5 } }),
+    ev({ _id: 'e1', itemId: 'i1', createTime: 100, payload: { prevEp: 3, ep: 4 } }),
+  ];
+  eq('不同番不折叠', T.foldEvents(events).length, 2);
+})();
+
+// 中间夹非 progress 事件 → 断开，两段各自不与对方合并
+(() => {
+  const events = [
+    ev({ _id: 'e3', createTime: 300, payload: { prevEp: 4, ep: 5 } }),
+    ev({ _id: 'e2', type: C.EVENT_TYPE.ITEM_EDIT, createTime: 200, payload: { fields: ['name'] } }),
+    ev({ _id: 'e1', createTime: 100, payload: { prevEp: 2, ep: 3 } }),
+  ];
+  const folded = T.foldEvents(events);
+  eq('夹非 progress 断开 → 3 条', folded.length, 3);
+  eq('夹断后各段 foldedCount=1', folded.map((f) => f.foldedCount), [1, 1, 1]);
+})();
+
+// 加番/移出等非 progress 从不折叠，即便相邻同番同人
+(() => {
+  const events = [
+    ev({ _id: 'e2', type: C.EVENT_TYPE.ITEM_ADD, createTime: 200 }),
+    ev({ _id: 'e1', type: C.EVENT_TYPE.ITEM_ADD, createTime: 100 }),
+  ];
+  eq('非 progress 不折叠', T.foldEvents(events).length, 2);
+})();
+
+// 不改入参（纯函数）
+(() => {
+  const events = [
+    ev({ _id: 'e2', createTime: 200, payload: { prevEp: 4, ep: 5 } }),
+    ev({ _id: 'e1', createTime: 100, payload: { prevEp: 3, ep: 4 } }),
+  ];
+  const before = JSON.stringify(events);
+  T.foldEvents(events);
+  eq('foldEvents 不改入参', JSON.stringify(events), before);
+})();
+
+// ============================================================
+// describeEvent 历史事件解读（选模板 + 插值变量，不拼串）
+// ============================================================
+// 主语判定
+eq('describeEvent 我发起 → mine=true', T.describeEvent(ev({ actor: 'me' }), 'me').mine, true);
+eq('describeEvent 对方发起 → mine=false', T.describeEvent(ev({ actor: 'ta' }), 'me').mine, false);
+
+// 加番/移出/恢复直接映射类型
+eq(
+  'describeEvent item_add',
+  T.describeEvent(ev({ type: C.EVENT_TYPE.ITEM_ADD, itemName: '番A' }), 'me').actionKey,
+  'item_add'
+);
+eq(
+  'describeEvent item_remove',
+  T.describeEvent(ev({ type: C.EVENT_TYPE.ITEM_REMOVE }), 'me').actionKey,
+  'item_remove'
+);
+
+// item_edit：改名分流 item_rename（带 from），非改名走 item_edit
+(() => {
+  const renamed = T.describeEvent(
+    ev({ type: C.EVENT_TYPE.ITEM_EDIT, itemName: '新名', payload: { fields: ['name'], prevName: '旧名' } }),
+    'me'
+  );
+  eq('describeEvent 改名 → item_rename', renamed.actionKey, 'item_rename');
+  eq('describeEvent 改名带 from', renamed.vars.from, '旧名');
+  eq(
+    'describeEvent 改总集数 → item_edit',
+    T.describeEvent(ev({ type: C.EVENT_TYPE.ITEM_EDIT, payload: { fields: ['totalEp'] } }), 'me').actionKey,
+    'item_edit'
+  );
+})();
+
+// progress：终止态优先于集数推进
+eq(
+  'describeEvent 看完 → progress_done',
+  T.describeEvent(ev({ payload: { prevEp: 11, ep: 12, prevStatus: 'watching', status: 'done' } }), 'me').actionKey,
+  'progress_done'
+);
+eq(
+  'describeEvent 弃番 → progress_dropped',
+  T.describeEvent(ev({ payload: { prevEp: 3, ep: 3, prevStatus: 'watching', status: 'dropped' } }), 'me').actionKey,
+  'progress_dropped'
+);
+
+// progress：折叠区间用 from_to，单步用 to
+(() => {
+  const range = T.describeEvent(
+    ev({ foldedCount: 3, payload: { prevEp: 2, ep: 5, prevStatus: 'watching', status: 'watching' } }),
+    'me'
+  );
+  eq('describeEvent 折叠区间 → progress_from_to', range.actionKey, 'progress_from_to');
+  eq('describeEvent 区间 from', range.vars.from, 2);
+  eq('describeEvent 区间 to', range.vars.to, 5);
+  const step = T.describeEvent(
+    ev({ foldedCount: 1, payload: { prevEp: 4, ep: 5, prevStatus: 'watching', status: 'watching' } }),
+    'me'
+  );
+  eq('describeEvent 单步 → progress_to', step.actionKey, 'progress_to');
+  eq('describeEvent 单步 to', step.vars.to, 5);
+})();
+
+// progress：仅状态变化（想看→在追，ep 未动）
+eq(
+  'describeEvent 仅状态变化 → progress_status',
+  T.describeEvent(ev({ payload: { prevEp: 0, ep: 0, prevStatus: 'want', status: 'watching' } }), 'me').actionKey,
+  'progress_status'
+);
+
+// 每个 actionKey 在 config.HISTORY_COPY.ACTION 都有对应模板（防漏配）
+(() => {
+  const keys = [
+    'item_add', 'item_remove', 'item_restore', 'item_edit', 'item_rename',
+    'progress_done', 'progress_dropped', 'progress_paused', 'progress_to', 'progress_from_to', 'progress_status',
+  ];
+  const missing = keys.filter((k) => !C.HISTORY_COPY.ACTION[k]);
+  eq('HISTORY_COPY.ACTION 覆盖所有 actionKey', missing, []);
+})();
+
+// ============================================================
+// relativeTime 相对时间（纯函数，now 外部传入）
+// 基准 now 用固定本地时间，避免依赖真实时钟。
+// ============================================================
+(() => {
+  const now = new Date(2026, 6, 27, 15, 0, 0).getTime(); // 2026-07-27 15:00 本地
+  const MIN = 60 * 1000;
+  const HOUR = 60 * MIN;
+  eq('relativeTime 非法 → 空', T.relativeTime('not-a-date', now), '');
+  eq('relativeTime 30秒内 → 刚刚', T.relativeTime(now - 30 * 1000, now), '刚刚');
+  eq('relativeTime 5分钟前', T.relativeTime(now - 5 * MIN, now), '5 分钟前');
+  eq('relativeTime 3小时前', T.relativeTime(now - 3 * HOUR, now), '3 小时前');
+  // 昨天 09:30
+  const yst = new Date(2026, 6, 26, 9, 30, 0).getTime();
+  eq('relativeTime 昨天 HH:mm', T.relativeTime(yst, now), '昨天 09:30');
+  // 同年更早：M月D日 HH:mm
+  const early = new Date(2026, 2, 3, 8, 5, 0).getTime();
+  eq('relativeTime 同年更早 → M月D日 HH:mm', T.relativeTime(early, now), '3月3日 08:05');
+  // 跨年：YYYY年M月D日
+  const lastYear = new Date(2025, 11, 31, 20, 0, 0).getTime();
+  eq('relativeTime 跨年 → YYYY年M月D日', T.relativeTime(lastYear, now), '2025年12月31日');
+})();
+
+// ============================================================
 // config 前后端漂移守卫（docs/shared-board-data.md §5.2）
 // 云函数侧 constants.js 是前端 config.js 服务端子集的拷贝，键值必须一致。
 // ============================================================
 const S = require('../cloudfunctions/_shared-board/constants');
 eq('漂移守卫 COLLECTION 一致', S.COLLECTION, C.COLLECTION);
+eq('漂移守卫 EVENT_TYPE 一致', S.EVENT_TYPE, C.EVENT_TYPE);
 eq('漂移守卫 人数上限一致', S.BOARD_MEMBER_LIMIT, C.BOARD_MEMBER_LIMIT);
 eq('漂移守卫 BOARD_STATUS 一致', S.BOARD_STATUS, C.BOARD_STATUS);
 eq('漂移守卫 MEMBER_ROLE 一致', S.MEMBER_ROLE, C.MEMBER_ROLE);

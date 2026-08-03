@@ -5,6 +5,7 @@
 
 const cloud = require('wx-server-sdk');
 const C = require('./constants');
+const { appendEvent } = require('./event-log');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
@@ -78,6 +79,16 @@ exports.main = async (event) => {
 
     // 顺带 bump 板活跃时间
     await db.collection(C.COLLECTION.BOARD).doc(boardId).update({ data: { updateTime: now } });
+
+    // 历史事件：加番（失败不影响返回）
+    await appendEvent(db, C, {
+      boardId,
+      memberOpenids: bd.memberOpenids,
+      actor: OPENID,
+      type: C.EVENT_TYPE.ITEM_ADD,
+      itemId: res._id,
+      itemName: trimmed,
+    });
 
     return ok({ itemId: res._id });
   } catch (e) {

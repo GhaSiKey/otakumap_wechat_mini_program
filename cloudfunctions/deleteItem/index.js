@@ -5,6 +5,7 @@
 
 const cloud = require('wx-server-sdk');
 const C = require('./constants');
+const { appendEvent } = require('./event-log');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
@@ -44,6 +45,16 @@ exports.main = async (event) => {
 
     // bump 所属板 updateTime，让 P1 板列表红点能感知对方移出/恢复番剧
     await db.collection(C.COLLECTION.BOARD).doc(item.boardId).update({ data: { updateTime: now } });
+
+    // 历史事件：移出 / 恢复
+    await appendEvent(db, C, {
+      boardId: item.boardId,
+      memberOpenids: board.memberOpenids,
+      actor: OPENID,
+      type: deleted ? C.EVENT_TYPE.ITEM_REMOVE : C.EVENT_TYPE.ITEM_RESTORE,
+      itemId,
+      itemName: item.name || '',
+    });
 
     return ok({ itemId, deleted });
   } catch (e) {

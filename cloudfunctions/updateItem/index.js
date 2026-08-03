@@ -5,6 +5,7 @@
 
 const cloud = require('wx-server-sdk');
 const C = require('./constants');
+const { appendEvent } = require('./event-log');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
@@ -75,6 +76,23 @@ exports.main = async (event) => {
 
     // bump 所属板 updateTime，让 P1 板列表红点能感知对方的番剧信息编辑（改名/总集数等）
     await db.collection(C.COLLECTION.BOARD).doc(item.boardId).update({ data: { updateTime: now } });
+
+    // 历史事件：改共享字段。payload 带改了哪些字段 + 新值 + 番名前后（改名时用得上）。
+    // itemName 存**新名**快照，历史列表直接可读；prevName 仅在改名时有意义。
+    const changedFields = Object.keys(allow);
+    await appendEvent(db, C, {
+      boardId: item.boardId,
+      memberOpenids: board.memberOpenids,
+      actor: OPENID,
+      type: C.EVENT_TYPE.ITEM_EDIT,
+      itemId,
+      itemName: allow.name !== undefined ? allow.name : item.name || '',
+      payload: {
+        fields: changedFields,
+        changes: allow,
+        prevName: allow.name !== undefined ? item.name || '' : undefined,
+      },
+    });
 
     return ok({ itemId });
   } catch (e) {

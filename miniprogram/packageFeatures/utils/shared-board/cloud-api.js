@@ -42,6 +42,9 @@ const deleteItem = (itemId, deleted) => invoke('deleteItem', { itemId, deleted }
 const updateMemberProfile = (boardId, nickname, avatar) =>
   invoke('updateMemberProfile', { boardId, nickname, avatar });
 const markViewed = (boardId) => invoke('markViewed', { boardId });
+// 历史事件倒序分页：before 为上一页最后一条的 createTime（毫秒），首页不传
+const listBoardEvents = (boardId, opts) =>
+  invoke('listBoardEvents', Object.assign({ boardId }, opts || {}));
 
 // 头像临时文件上传云存储，resolve fileID（失败 resolve null，调用方兜底）
 // ⚠️ 已弃用（2026-07-23）：cloud:// 头像连自己都读不到（云存储公开读要付费套餐），
@@ -71,4 +74,5 @@ module.exports = {
   updateMemberProfile,
   uploadAvatar,
   markViewed,
+  listBoardEvents,
 };

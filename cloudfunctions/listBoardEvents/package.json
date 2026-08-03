@@ -1,0 +1,9 @@
+{
+  "name": "listBoardEvents",
+  "version": "1.0.0",
+  "description": "返回一个板的改动历史事件（createTime 倒序，游标分页）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

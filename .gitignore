@@ -19,6 +19,9 @@ project.private.config.json
 *.swo
 *~
 
+# AI 助手本地配置
+.claude/
+
 # 日志
 *.log
 npm-debug.log*

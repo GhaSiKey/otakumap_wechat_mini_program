@@ -14,6 +14,16 @@ const COLLECTION = {
   BOARD: 'shared_boards',
   ITEM: 'shared_board_items',
   NUDGE: 'shared_board_nudges',
+  EVENT: 'shared_board_events', // 板改动历史事件流（历史页 + 周报数据源）
+};
+
+// 板改动事件类型（与前端 config.js 同源）
+const EVENT_TYPE = {
+  ITEM_ADD: 'item_add',
+  ITEM_REMOVE: 'item_remove',
+  ITEM_RESTORE: 'item_restore',
+  ITEM_EDIT: 'item_edit',
+  PROGRESS: 'progress',
 };
 
 const BOARD_MEMBER_LIMIT = 2;
@@ -57,6 +67,7 @@ const ERR = {
 
 module.exports = {
   COLLECTION,
+  EVENT_TYPE,
   BOARD_MEMBER_LIMIT,
   BOARD_STATUS,
   MEMBER_ROLE,

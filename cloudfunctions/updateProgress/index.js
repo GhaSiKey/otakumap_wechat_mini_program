@@ -6,6 +6,7 @@
 
 const cloud = require('wx-server-sdk');
 const C = require('./constants');
+const { appendEvent } = require('./event-log');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
@@ -41,6 +42,11 @@ exports.main = async (event) => {
     const epFinal = clampEp(ep, item.totalEp);
     if (epFinal === null) return fail(C.ERR.INVALID_EP);
 
+    // 记录旧值（用于历史事件的 prev；只在真变化时记，避免幂等重提刷屏）
+    const prev = (item.progress && item.progress[OPENID]) || {};
+    const prevEp = typeof prev.ep === 'number' ? prev.ep : 0;
+    const prevStatus = prev.status || null;
+
     const now = db.serverDate();
     await db
       .collection(C.COLLECTION.ITEM)
@@ -57,6 +63,19 @@ exports.main = async (event) => {
     // bump 所属板的 updateTime：P1 板列表红点判定 hasUnread = board.updateTime > 我的 lastViewedAt。
     // 改进度是最高频事件，不 bump 则对方追番时我在板列表看不到未读红点（红点形同虚设）。
     await db.collection(C.COLLECTION.BOARD).doc(item.boardId).update({ data: { updateTime: now } });
+
+    // 历史事件：仅在 ep 或 status 真变化时记（幂等重提交、无变更的提交不记，避免刷屏）
+    if (epFinal !== prevEp || status !== prevStatus) {
+      await appendEvent(db, C, {
+        boardId: item.boardId,
+        memberOpenids: board.memberOpenids,
+        actor: OPENID,
+        type: C.EVENT_TYPE.PROGRESS,
+        itemId,
+        itemName: item.name || '',
+        payload: { prevEp, ep: epFinal, prevStatus, status },
+      });
+    }
 
     // 回传服务端裁决后的权威值，供前端对账（被 clamp 时前端 snap 到此值）
     return ok({ itemId, mine: { ep: epFinal, status } });

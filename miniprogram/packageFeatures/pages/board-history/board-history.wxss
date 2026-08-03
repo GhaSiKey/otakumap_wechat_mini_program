@@ -1,0 +1,185 @@
+view, text {
+  box-sizing: border-box;
+}
+
+/* 身份色走 --sb-color-*（与 P2 同源），定义在 page 根节点，亮暗两套。
+   本页无 t-popup，但沿用同一约定保持一致。 */
+page {
+  background-color: var(--td-bg-color-page, #f5f5f5);
+  --sb-color-me: #0052d9;
+  --sb-color-peer: #834ec2;
+}
+
+@media (prefers-color-scheme: dark) {
+  page {
+    --sb-color-me: #4582e6;
+    --sb-color-peer: #9560d0;
+  }
+}
+
+.page {
+  min-height: 100vh;
+  padding: 24rpx 32rpx calc(48rpx + env(safe-area-inset-bottom, 0px));
+}
+
+/* ==================== 时间线 ==================== */
+.timeline {
+  position: relative;
+}
+
+.row {
+  display: flex;
+  gap: 20rpx;
+}
+
+/* 左侧轨道：圆点 + 贯穿竖线（相邻行连成一条时间轴） */
+.row-rail {
+  position: relative;
+  width: 24rpx;
+  flex: none;
+  display: flex;
+  justify-content: center;
+}
+
+/* 竖线：从圆点中心往下贯穿，最后一行也画到底（视觉收尾靠 foot 遮挡）。
+   用伪元素铺满整条 rail 高度，圆点覆在其上。 */
+.row-rail::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2rpx;
+  transform: translateX(-50%);
+  background: var(--td-component-stroke, #e7e7e7);
+}
+
+/* 第一行竖线从圆点起（不往上露头） */
+.row:first-child .row-rail::before {
+  top: 16rpx;
+}
+
+.row-dot {
+  position: relative;
+  z-index: 1;
+  width: 16rpx;
+  height: 16rpx;
+  margin-top: 10rpx;
+  border-radius: 50%;
+  /* 圆点外圈用页面底色描边，压住穿过的竖线，让圆点更"实" */
+  box-shadow: 0 0 0 4rpx var(--td-bg-color-page, #f5f5f5);
+}
+
+.row--me .row-dot {
+  background: var(--sb-color-me);
+}
+
+.row--peer .row-dot {
+  background: var(--sb-color-peer);
+}
+
+.row-body {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 32rpx;
+}
+
+.row-line {
+  font-size: var(--td-font-size-body-medium, 28rpx);
+  line-height: 1.5;
+  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
+}
+
+.row-subject {
+  font-weight: 600;
+  margin-right: 8rpx;
+}
+
+.row--me .row-subject {
+  color: var(--sb-color-me);
+}
+
+.row--peer .row-subject {
+  color: var(--sb-color-peer);
+}
+
+.row-text {
+  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
+}
+
+.row-time {
+  display: block;
+  margin-top: 6rpx;
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
+}
+
+.foot {
+  padding: 24rpx 0 8rpx;
+  text-align: center;
+}
+
+.foot-txt {
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
+}
+
+/* ==================== 空态 ==================== */
+.empty {
+  padding: 160rpx 48rpx;
+  text-align: center;
+}
+
+.empty-title {
+  font-size: var(--td-font-size-body-large, 32rpx);
+  color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
+  margin-bottom: 16rpx;
+}
+
+.empty-hint {
+  font-size: var(--td-font-size-body-medium, 28rpx);
+  color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
+  line-height: 1.6;
+}
+
+/* ==================== 骨架屏 ==================== */
+.sk-row {
+  display: flex;
+  gap: 20rpx;
+  margin-bottom: 40rpx;
+}
+
+.sk-dot {
+  width: 16rpx;
+  height: 16rpx;
+  margin-top: 10rpx;
+  border-radius: 50%;
+  background: var(--td-bg-color-component, #e7e7e7);
+  flex: none;
+}
+
+.sk-lines {
+  flex: 1;
+}
+
+.sk-line {
+  height: 28rpx;
+  border-radius: 8rpx;
+  background: var(--td-bg-color-component, #e7e7e7);
+  animation: sk-shimmer 1.4s ease-in-out infinite;
+}
+
+.sk-line--main {
+  width: 70%;
+  margin-bottom: 14rpx;
+}
+
+.sk-line--time {
+  width: 30%;
+  height: 22rpx;
+}
+
+@keyframes sk-shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

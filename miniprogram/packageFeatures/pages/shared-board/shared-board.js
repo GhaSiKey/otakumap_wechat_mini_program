@@ -23,6 +23,7 @@ const {
   PEER_UPDATE_COPY,
   ANIME_BIND_COPY,
   AIR_META_WAIT_MS,
+  HISTORY_COPY,
 } = require('../../utils/shared-board/config');
 // 搜索页交互模式 + 回带事件名（跨包同一 miniprogram 内，直接 require anime-meta 配置层）
 const { SEARCH_MODE, PICK_EVENT } = require('../../utils/anime-meta/config');
@@ -62,6 +63,7 @@ Page({
     pickerCopy: PICKER_COPY, // 选集器取消/确认按钮文案（覆盖 t-picker 布尔默认值渲染成 "true" 的问题）
     peerUpdateCopy: PEER_UPDATE_COPY, // 「TA 更新了」信息条图标等视觉文案（正文已在 _load 插值成 peerUpdateText）
     animeBindCopy: ANIME_BIND_COPY, // 关联番剧（搜索区标题/入口/手填分隔/预览提示 + 补绑入口）文案
+    historyCopy: HISTORY_COPY, // 改动历史入口文案
     boardId: '',
     token: '',            // 分享卡片带的配对 token
     myOpenid: '',
@@ -652,6 +654,16 @@ Page({
   onDetailVisibleChange(e) {
     // 关闭详情时一并退出番名编辑态，避免下次打开残留
     this.setData({ showDetail: e.detail.visible, editingName: false });
+  },
+
+  // 进改动历史页（独立时间线，带 boardId）。
+  // 顺带把对方昵称经 URL 传过去（本页已有 vm.peer.nickname），省掉历史页再拉一次板详情。
+  onHistoryTap() {
+    if (!this.data.boardId) return;
+    const peer = this.data.vm && this.data.vm.peer;
+    const peerName = peer && peer.nickname ? peer.nickname : '';
+    const q = peerName ? `&peerName=${encodeURIComponent(peerName)}` : '';
+    wx.navigateTo({ url: `/packageFeatures/pages/board-history/board-history?boardId=${this.data.boardId}${q}` });
   },
 
   // +1：本地即时累加（连点基于最新本地态，五连点=+5），_commitProgress 内部乐观更新 + 异步对账

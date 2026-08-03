@@ -1,0 +1,43 @@
+<view class="page">
+
+  <!-- 时间线 -->
+  <view wx:if="{{!loading && rows.length}}" class="timeline">
+    <view class="row {{item.mine ? 'row--me' : 'row--peer'}}" wx:for="{{rows}}" wx:key="id">
+      <!-- 身份圆点（我/TA 身份色，走 --sb-color-* 变量，亮暗自适应）+ 竖线连成时间轴 -->
+      <view class="row-rail">
+        <view class="row-dot"></view>
+      </view>
+      <view class="row-body">
+        <view class="row-line">
+          <text class="row-subject">{{item.subject}}</text>
+          <text class="row-text">{{item.text}}</text>
+        </view>
+        <text class="row-time">{{item.time}}</text>
+      </view>
+    </view>
+
+    <!-- 底部加载态 / 到底提示 -->
+    <view class="foot">
+      <text wx:if="{{loadingMore}}" class="foot-txt">{{historyCopy.LOADING}}</text>
+      <text wx:elif="{{!hasMore}}" class="foot-txt">{{historyCopy.NO_MORE}}</text>
+    </view>
+  </view>
+
+  <!-- 空态：历史从埋点起记，存量无回溯 -->
+  <view wx:if="{{!loading && empty}}" class="empty">
+    <view class="empty-title">{{historyCopy.EMPTY}}</view>
+    <view class="empty-hint">{{historyCopy.EMPTY_HINT}}</view>
+  </view>
+
+  <!-- 加载骨架 -->
+  <view wx:if="{{loading}}" class="skeleton">
+    <view class="sk-row" wx:for="{{[1,2,3,4,5]}}" wx:key="*this">
+      <view class="sk-dot"></view>
+      <view class="sk-lines">
+        <view class="sk-line sk-line--main"></view>
+        <view class="sk-line sk-line--time"></view>
+      </view>
+    </view>
+  </view>
+
+</view>

@@ -12,6 +12,7 @@
 const {
   EP_MAX_WHEN_UNKNOWN,
   PROGRESS_STATUS,
+  EVENT_TYPE,
   BOARD_MEMBER_LIMIT,
   BOARD_STATUS,
   SECTION,
@@ -400,6 +401,166 @@ function buildPeerUpdates(board, items, myOpenid) {
   return { count: updated.length, items: updated.map(({ _at, ...rest }) => rest) };
 }
 
+// ── 历史事件折叠（历史页数据源，PRD 阶段一 §5）──
+
+/** 一条事件是否可参与「同番同人连续 progress」折叠。 */
+function isFoldableProgress(e) {
+  return !!(e && e.type === EVENT_TYPE.PROGRESS && e.itemId && e.actor);
+}
+
+/**
+ * 折叠历史事件：把「同一番、同一人、相邻的连续 progress」合并为一条。
+ *
+ * 入参 events 按 createTime 倒序（最新在前，listBoardEvents 已排好）。
+ * 连点 +1 会产生一串 progress（第 3→4→5 话三条），展示时折叠成一条
+ *   「从 prevEp 追到 ep」（区间取最老的 prevEp、最新的 ep），避免刷屏。
+ * 仅相邻同番同人的 progress 折叠——中间夹了别的事件/别的番就断开，保留时间真相。
+ * 加番/移出/改信息等非 progress 事件从不折叠，各自独立成条。
+ *
+ * 纯函数：克隆输出，不改入参。折叠条带：
+ *   foldedCount（合并了几条原始事件，未折叠为 1）
+ *   firstCreateTime（该折叠段最早一条的时间，供页面显示时间区间）
+ *   payload.prevEp/prevStatus 取最老一条，payload.ep/status 取最新一条。
+ */
+function foldEvents(events) {
+  if (!Array.isArray(events)) return [];
+  const out = [];
+  events.forEach((e) => {
+    if (!e) return;
+    const last = out.length ? out[out.length - 1] : null;
+    const canMerge =
+      last &&
+      isFoldableProgress(last) &&
+      isFoldableProgress(e) &&
+      last.actor === e.actor &&
+      last.itemId === e.itemId;
+
+    if (canMerge) {
+      // e 比 last 更老（倒序）：把区间起点回退到 e 的 prev
+      const lp = last.payload || {};
+      const ep = e.payload || {};
+      last.payload = {
+        prevEp: ep.prevEp,
+        ep: lp.ep,
+        prevStatus: ep.prevStatus,
+        status: lp.status,
+      };
+      last.foldedCount += 1;
+      last.firstCreateTime = e.createTime;
+      return;
+    }
+
+    // 新起一条（克隆，避免改入参）
+    out.push({
+      _id: e._id,
+      boardId: e.boardId,
+      actor: e.actor,
+      type: e.type,
+      itemId: e.itemId || '',
+      itemName: e.itemName || '',
+      payload: Object.assign({}, e.payload || {}),
+      createTime: e.createTime,
+      firstCreateTime: e.createTime,
+      foldedCount: 1,
+    });
+  });
+  return out;
+}
+
+/**
+ * 把一条（已折叠的）事件解读成「谁 + 做了什么」的结构化描述，供历史页渲染。
+ *
+ * 纯决策逻辑（选哪个文案模板 + 插值变量），不拼字符串——具体文案模板在
+ * config.HISTORY_COPY.ACTION，插值由页面 fillTemplate 完成，保持措辞集中可改。
+ *
+ * 返回：{ mine, actionKey, vars }
+ *   mine     —— 是否我发起（决定主语「我」/对方昵称）
+ *   actionKey—— HISTORY_COPY.ACTION 里的键（progress 已按语义分流）
+ *   vars     —— { name, from, to, status } 供模板插值（status 为原始枚举，页面转标签）
+ *
+ * progress 分流优先级：终止态（看完/弃番/暂缓）＞ 集数推进 ＞ 纯状态变化。
+ * 终止态情绪信号最重，即便同时推进了集数也以终止态叙述（「看完了」比「追到第12话」更该被看见）。
+ */
+function describeEvent(e, myOpenid) {
+  const mine = !!(e && e.actor && e.actor === myOpenid);
+  const name = (e && e.itemName) || '';
+  const p = (e && e.payload) || {};
+
+  let actionKey = e ? e.type : '';
+  const vars = { name };
+
+  if (e && e.type === EVENT_TYPE.ITEM_EDIT) {
+    // 改名单独成句（改名比「更新了信息」更具体、更值得看见）
+    const fields = Array.isArray(p.fields) ? p.fields : [];
+    const renamed = fields.indexOf('name') >= 0 && p.prevName != null && p.prevName !== name;
+    if (renamed) {
+      actionKey = 'item_rename';
+      vars.from = p.prevName;
+    } else {
+      actionKey = 'item_edit';
+    }
+  } else if (e && e.type === EVENT_TYPE.PROGRESS) {
+    const status = p.status || null;
+    const prevStatus = p.prevStatus || null;
+    const statusChanged = status !== prevStatus;
+    const epChanged = typeof p.ep === 'number' && p.ep !== p.prevEp;
+
+    if (statusChanged && (status === 'done' || status === 'dropped' || status === 'paused')) {
+      actionKey = 'progress_' + status; // 终止/暂缓态优先
+    } else if (epChanged) {
+      // 折叠区间（合并多步）用 from-to，单步只报到达话数
+      if (e.foldedCount > 1 && typeof p.prevEp === 'number') {
+        actionKey = 'progress_from_to';
+        vars.from = p.prevEp;
+      } else {
+        actionKey = 'progress_to';
+      }
+      vars.to = p.ep;
+    } else if (statusChanged) {
+      actionKey = 'progress_status'; // 仅状态变化（如 想看→在追）
+      vars.status = status;
+    } else {
+      // 理论上不会到（只记真变化），兜底给到达话数
+      actionKey = 'progress_to';
+      vars.to = typeof p.ep === 'number' ? p.ep : 0;
+    }
+  }
+
+  return { mine, actionKey, vars };
+}
+
+/**
+ * 相对时间（历史页时间戳）：刚刚 / N 分钟前 / N 小时前 / 昨天 HH:mm / M月D日 [HH:mm]。
+ *
+ * 纯函数：createTime 与「当前时刻」nowMs 都从外部传入（页面用设备 Date.now()），
+ * 便于 Node 测试且不在纯模块里读时钟。用设备本地时间显示（历史无需北京时区严格分桶，
+ * 那是周报阶段的事），跨年补「YYYY年」。非法时间返回 ''。
+ */
+function relativeTime(createTime, nowMs) {
+  const t = toMillis(createTime);
+  if (Number.isNaN(t)) return '';
+  const now = typeof nowMs === 'number' ? nowMs : t;
+  const diff = now - t;
+  const MIN = 60 * 1000;
+  const HOUR = 60 * MIN;
+  if (diff < 0) return '刚刚';
+  if (diff < MIN) return '刚刚';
+  if (diff < HOUR) return `${Math.floor(diff / MIN)} 分钟前`;
+  if (diff < 24 * HOUR) return `${Math.floor(diff / HOUR)} 小时前`;
+
+  const d = new Date(t);
+  const nd = new Date(now);
+  const p = (n) => String(n).padStart(2, '0');
+  const hm = `${p(d.getHours())}:${p(d.getMinutes())}`;
+  // 「昨天」：本地日历日相差 1 天
+  const dayStart = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const dayGap = Math.round((dayStart(nd) - dayStart(d)) / (24 * HOUR));
+  if (dayGap === 1) return `昨天 ${hm}`;
+  const md = `${d.getMonth() + 1}月${d.getDate()}日`;
+  if (d.getFullYear() !== nd.getFullYear()) return `${d.getFullYear()}年${md}`;
+  return `${md} ${hm}`;
+}
+
 module.exports = {
   clampEp,
   normalizeTotalEp,
@@ -414,5 +575,8 @@ module.exports = {
   groupItems,
   buildBoardViewModel,
   buildPeerUpdates,
+  foldEvents,
+  describeEvent,
+  relativeTime,
 };
 

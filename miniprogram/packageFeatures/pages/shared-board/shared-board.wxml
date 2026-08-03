@@ -38,6 +38,7 @@
     </view>
   </view>
 
+
   <!-- ============ 「TA 更新了」信息条（进板结算一次，展示对方在我上次查看后的新动向）============ -->
   <!-- 点击收起。用 TA 身份色 --sb-color-peer 呼应，与「N 部能一起聊」（绿）区分开 -->
   <view wx:if="{{showPeerUpdate}}" class="peer-update" bindtap="onDismissPeerUpdate">
@@ -177,6 +178,9 @@
 
     <!-- 加番 FAB：筹备态和配对态都能加，仅归档态隐藏（t-fab 抛 click 事件） -->
     <t-fab wx:if="{{vm.phase !== 'archived'}}" icon="add" text="加番" bind:click="onAddTap" />
+    <!-- 历史 FAB：镜像加番按钮到左下角。无 text → circle 小圆钮，不撑满半屏。
+         归档态也可查历史，故不设 phase 限制。 -->
+    <t-fab icon="history" style="left: 16px; bottom: 32px;" bind:click="onHistoryTap" />
   </block>
 
 

@@ -14,6 +14,18 @@ const COLLECTION = {
   BOARD: 'shared_boards',
   ITEM: 'shared_board_items',
   NUDGE: 'shared_board_nudges', // Should：催更事件流，MVP 不建
+  EVENT: 'shared_board_events', // 板改动历史事件流（历史页 + 周报数据源）
+};
+
+// ── 板改动事件类型（历史页 + 周报数据源）──
+// 每个「会改变板状态」的写操作在服务端成功后追加一条事件。
+// progress 含集数(+1/改话数)与状态(在追/看完/弃番等)变更，payload 里带 prev/新值。
+const EVENT_TYPE = {
+  ITEM_ADD: 'item_add', // 加番
+  ITEM_REMOVE: 'item_remove', // 移出（软删）
+  ITEM_RESTORE: 'item_restore', // 恢复
+  ITEM_EDIT: 'item_edit', // 改共享字段（番名/总集数/放送状态等）
+  PROGRESS: 'progress', // 改自己进度（集数 / 状态）
 };
 
 // ── 人数上限（固定 2 人配对，不写死数字 2）──
@@ -213,6 +225,36 @@ const PEER_UPDATE_COPY = {
   PEER_DEFAULT: 'TA', // 对方没设昵称时的兜底称呼
 };
 
+// ── 改动历史页文案（board-history）──
+// 每条历史 = 谁 + 做了什么 + 何时。动作文案按事件类型分模板，{name}/{from}/{to}/{status}
+// 由页面插值（复用 fillTemplate），集中配置不硬编码进 wxml/js。
+const HISTORY_COPY = {
+  TITLE: '改动历史',
+  ENTRY: '历史', // 板页头入口文案
+  EMPTY: '还没有改动记录',
+  EMPTY_HINT: '从现在起，加番、追进度都会记在这里',
+  LOAD_MORE: '加载更多',
+  LOADING: '加载中…',
+  NO_MORE: '没有更多了',
+  ME: '我', // 我发起的动作主语
+  PEER_DEFAULT: 'TA', // 对方没设昵称时的主语兜底
+  // 动作模板（主语在前面单独渲染，这里只描述「做了什么」）
+  ACTION: {
+    item_add: '添加了《{name}》',
+    item_remove: '移出了《{name}》',
+    item_restore: '把《{name}》加回来了',
+    item_edit: '更新了《{name}》的信息',
+    item_rename: '把《{from}》改名为《{name}》',
+    // progress：按语义分流，终止态（看完/弃番/暂缓）优先于集数推进，情绪信号更重要
+    progress_done: '看完了《{name}》',
+    progress_dropped: '弃了《{name}》',
+    progress_paused: '暂缓了《{name}》',
+    progress_to: '把《{name}》追到第 {to} 话', // 单步/未折叠推进
+    progress_from_to: '把《{name}》从第 {from} 话追到第 {to} 话', // 折叠区间
+    progress_status: '把《{name}》标记为「{status}」', // 仅状态变化
+  },
+};
+
 // ── 首字色块调色板（封面为空时占位）──
 // JS 侧取不到 WXSS 的 --td-* 变量，故从 TDesign 品牌色阶人工派生并集中于此，
 // 属「配置层集中管理」而非「散落硬编码」。真按变量取色需 wx.getComputedStyle，MVP 不做。
@@ -228,6 +270,7 @@ const MEMBER_COLORS = { me: '#0052D9', peer: '#834EC2' };
 
 module.exports = {
   COLLECTION,
+  EVENT_TYPE,
   BOARD_MEMBER_LIMIT,
   BOARD_STATUS,
   MEMBER_ROLE,
@@ -267,4 +310,5 @@ module.exports = {
   PEER_UPDATE_COPY,
   ANIME_BIND_COPY,
   AIR_META_WAIT_MS,
+  HISTORY_COPY,
 };
