@@ -241,6 +241,12 @@ Page({
     this.setData({ showPeerUpdate: false });
   },
 
+  // 点摘要下钻到改动历史看 TA 具体动向。先收起（要去看明细了，摘要留着无意义），再跳转。
+  onPeerUpdateTap() {
+    this.setData({ showPeerUpdate: false });
+    this.onHistoryTap();
+  },
+
   // 对方加入庆祝：成员条虚位实体化动画 + toast + 震动
   _celebrateJoin(peer) {
     wx.vibrateShort({ type: 'medium' });

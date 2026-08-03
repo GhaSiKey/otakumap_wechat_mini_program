@@ -40,11 +40,13 @@
 
 
   <!-- ============ 「TA 更新了」信息条（进板结算一次，展示对方在我上次查看后的新动向）============ -->
-  <!-- 点击收起。用 TA 身份色 --sb-color-peer 呼应，与「N 部能一起聊」（绿）区分开 -->
-  <view wx:if="{{showPeerUpdate}}" class="peer-update" bindtap="onDismissPeerUpdate">
+  <!-- 摘要点击下钻到改动历史（看 TA 具体动了啥）；✕ 用 catchtap 阻止冒泡，只收起不跳转。
+       用 TA 身份色 --sb-color-peer 呼应，与「N 部能一起聊」（绿）区分开 -->
+  <view wx:if="{{showPeerUpdate}}" class="peer-update" hover-class="peer-update--hover" bindtap="onPeerUpdateTap">
     <text class="peer-update__icon">{{peerUpdateCopy.ICON}}</text>
     <text class="peer-update__text">{{peerUpdateText}}</text>
-    <text class="peer-update__close">✕</text>
+    <text class="peer-update__arrow">›</text>
+    <text class="peer-update__close" catchtap="onDismissPeerUpdate">✕</text>
   </view>
 
   <!-- ============ 共同话题带（门面核心卖点：N 部能一起聊）============ -->
@@ -179,8 +181,11 @@
     <!-- 加番 FAB：筹备态和配对态都能加，仅归档态隐藏（t-fab 抛 click 事件） -->
     <t-fab wx:if="{{vm.phase !== 'archived'}}" icon="add" text="加番" bind:click="onAddTap" />
     <!-- 历史 FAB：镜像加番按钮到左下角。无 text → circle 小圆钮，不撑满半屏。
-         归档态也可查历史，故不设 phase 限制。 -->
-    <t-fab icon="history" style="left: 16px; bottom: 32px;" bind:click="onHistoryTap" />
+         归档态也可查历史，故不设 phase 限制。
+         注意：t-fab 模板根 view 硬编码了 right:16px，只传 left 会导致左右双锁 →
+         fixed 容器宽度撑满全屏 → 透明横条盖住右下角加番按钮点不动。
+         必须显式 right:auto 覆盖，容器宽度才收回按钮本身。 -->
+    <t-fab icon="history" style="left: 16px; bottom: 32px; right: auto;" bind:click="onHistoryTap" />
   </block>
 
 

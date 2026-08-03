@@ -192,11 +192,24 @@ page {
   white-space: nowrap;
 }
 
+/* 下钻箭头：暗示整条可点进历史，用 TA 身份色弱化呈现 */
+.peer-update__arrow {
+  font-size: 32rpx;
+  color: var(--sb-color-peer, #834ec2);
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
 .peer-update__close {
   font-size: 24rpx;
   color: var(--td-text-color-placeholder, #bbb);
   flex-shrink: 0;
   padding-left: 8rpx;
+}
+
+/* 按压反馈：整条轻微加深，配合下钻箭头强化「可点」认知 */
+.peer-update--hover {
+  background: var(--sb-peer-tint-active, rgba(131, 78, 194, 0.18));
 }
 
 .member {
