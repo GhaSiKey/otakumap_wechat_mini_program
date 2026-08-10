@@ -24,6 +24,7 @@ const {
   ANIME_BIND_COPY,
   AIR_META_WAIT_MS,
   HISTORY_COPY,
+  REPORT_COPY,
 } = require('../../utils/shared-board/config');
 // 搜索页交互模式 + 回带事件名（跨包同一 miniprogram 内，直接 require anime-meta 配置层）
 const { SEARCH_MODE, PICK_EVENT } = require('../../utils/anime-meta/config');
@@ -64,6 +65,7 @@ Page({
     peerUpdateCopy: PEER_UPDATE_COPY, // 「TA 更新了」信息条图标等视觉文案（正文已在 _load 插值成 peerUpdateText）
     animeBindCopy: ANIME_BIND_COPY, // 关联番剧（搜索区标题/入口/手填分隔/预览提示 + 补绑入口）文案
     historyCopy: HISTORY_COPY, // 改动历史入口文案
+    reportCopy: REPORT_COPY, // 追番小结入口文案
     boardId: '',
     token: '',            // 分享卡片带的配对 token
     myOpenid: '',
@@ -670,6 +672,12 @@ Page({
     const peerName = peer && peer.nickname ? peer.nickname : '';
     const q = peerName ? `&peerName=${encodeURIComponent(peerName)}` : '';
     wx.navigateTo({ url: `/packageFeatures/pages/board-history/board-history?boardId=${this.data.boardId}${q}` });
+  },
+
+  // 进追番小结页（独立报告，仅需 boardId；双人昵称/集数由 getBoardReport 云函数返回）
+  onReportTap() {
+    if (!this.data.boardId) return;
+    wx.navigateTo({ url: `/packageFeatures/pages/board-report/board-report?boardId=${this.data.boardId}` });
   },
 
   // +1：本地即时累加（连点基于最新本地态，五连点=+5），_commitProgress 内部乐观更新 + 异步对账

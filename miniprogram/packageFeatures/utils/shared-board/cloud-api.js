@@ -45,6 +45,9 @@ const markViewed = (boardId) => invoke('markViewed', { boardId });
 // 历史事件倒序分页：before 为上一页最后一条的 createTime（毫秒），首页不传
 const listBoardEvents = (boardId, opts) =>
   invoke('listBoardEvents', Object.assign({ boardId }, opts || {}));
+// 追番小结/周报：服务端取全事件+items，调 transform.buildReportModel 一次算好返回。
+// nowMs 传客户端时钟，供服务端判「今天」做 streak 宽限（服务端时区/时钟不可信）。
+const getBoardReport = (boardId, nowMs) => invoke('getBoardReport', { boardId, nowMs });
 
 // 头像临时文件上传云存储，resolve fileID（失败 resolve null，调用方兜底）
 // ⚠️ 已弃用（2026-07-23）：cloud:// 头像连自己都读不到（云存储公开读要付费套餐），
@@ -75,4 +78,5 @@ module.exports = {
   uploadAvatar,
   markViewed,
   listBoardEvents,
+  getBoardReport,
 };

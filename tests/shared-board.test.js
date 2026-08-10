@@ -623,6 +623,275 @@ eq(
 })();
 
 // ============================================================
+// 周报 / 报告数据层（board-report）
+// 全用显式 UTC 毫秒构造，配固定时区偏移，不依赖运行机器时区。
+// ============================================================
+(() => {
+  const TZ = C.REPORT.TZ_OFFSET_MINUTES; // 480 (UTC+8)
+  const DAY = 24 * 60 * 60 * 1000;
+  const ME = 'me-openid';
+  const PEER = 'peer-openid';
+  // 「北京某日某时」→ UTC 毫秒：Date.UTC 给的是 UTC，减去 8h 偏移即为该北京墙钟时刻的 UTC 时间戳
+  const bj = (y, mo, d, h, mi) => Date.UTC(y, mo, d, h, mi) - TZ * 60 * 1000;
+  // progress 事件构造
+  const ev = (actor, itemId, prevEp, ep, at, extra) =>
+    Object.assign({ type: C.EVENT_TYPE.PROGRESS, actor, itemId, itemName: itemId, payload: { prevEp, ep }, createTime: at }, extra);
+
+  // ── localDayIndex：凌晨归本地日不漂前一天 ──
+  const d1noon = bj(2026, 7, 5, 12, 0); // 8/5 12:00 北京
+  const d1late = bj(2026, 7, 5, 1, 30); // 8/5 01:30 北京（凌晨）
+  const d2 = bj(2026, 7, 6, 9, 0); // 8/6
+  eq('localDayIndex 同日中午/凌晨同桶', T.localDayIndex(d1noon, TZ), T.localDayIndex(d1late, TZ));
+  eq('localDayIndex 跨日不同桶', T.localDayIndex(d2, TZ) - T.localDayIndex(d1noon, TZ), 1);
+  // dayIndexToMD 还原
+  eq('dayIndexToMD 还原月日', T.dayIndexToMD(T.localDayIndex(d1noon, TZ), TZ), { m: 8, d: 5 });
+  // dayIndexToWeekday 还原星期（0=周日 … 6=周六，与 AIR_DAY_LABELS 同序）
+  eq('dayIndexToWeekday 工作日(8/5=周三)', T.dayIndexToWeekday(T.localDayIndex(d1noon, TZ), TZ), 3);
+  eq('dayIndexToWeekday 周六(8/8)', T.dayIndexToWeekday(T.localDayIndex(bj(2026, 7, 8, 12, 0), TZ), TZ), 6);
+  eq('dayIndexToWeekday 周日(8/9)', T.dayIndexToWeekday(T.localDayIndex(bj(2026, 7, 9, 12, 0), TZ), TZ), 0);
+  eq('dayIndexToWeekday 凌晨不漂前一天', T.dayIndexToWeekday(T.localDayIndex(d1late, TZ), TZ), 3);
+
+  // ── daysTogether ──
+  const board = { _id: 'b1', createTime: bj(2026, 7, 1, 10, 0), members: [{ openid: ME }, { openid: PEER }], status: 'active' };
+  eq('daysTogether 建板当天=第1天', T.daysTogether(board, bj(2026, 7, 1, 22, 0), TZ), 1);
+  eq('daysTogether 第5天', T.daysTogether(board, bj(2026, 7, 5, 9, 0), TZ), 5);
+  eq('daysTogether 非法建板→0', T.daysTogether({ createTime: 'x' }, bj(2026, 7, 5, 9, 0), TZ), 0);
+
+  // ── windowProgress（progressGain 内部覆盖：回退不计负）──
+  const now = bj(2026, 7, 10, 12, 0);
+  const winEvents = [
+    ev(ME, 'i1', 2, 5, bj(2026, 7, 9, 20, 0)), // 近窗，我 +3
+    ev(PEER, 'i1', 0, 4, bj(2026, 7, 8, 20, 0)), // 近窗，TA +4
+    ev(ME, 'i2', 10, 8, bj(2026, 7, 7, 20, 0)), // 近窗，回退不计负 → 0
+    ev(ME, 'i1', 0, 6, bj(2026, 7, 1, 20, 0)), // 前窗，我 +6
+    ev(PEER, 'i2', 0, 2, bj(2026, 7, 2, 20, 0)), // 前窗，TA +2
+  ];
+  const recent = T.windowProgress(winEvents, ME, PEER, now - 7 * DAY, now);
+  eq('windowProgress 近窗我+3', recent.me, 3);
+  eq('windowProgress 近窗TA+4', recent.peer, 4);
+  const prev = T.windowProgress(winEvents, ME, PEER, now - 14 * DAY, now - 7 * DAY);
+  eq('windowProgress 前窗我+6', prev.me, 6);
+  eq('windowProgress 前窗TA+2', prev.peer, 2);
+
+  // ── momentumOf 方向（稳定带=1）──
+  const band = C.REPORT.MOMENTUM_STABLE_BAND;
+  eq('momentum 升', T.momentumOf(10, 5, band), 'up');
+  eq('momentum 降', T.momentumOf(3, 10, band), 'down');
+  eq('momentum 带内稳定', T.momentumOf(6, 5, band), 'flat');
+  eq('momentum 相等稳定', T.momentumOf(4, 4, band), 'flat');
+
+  // ── currentStreakDays（宽限=1，Duolingo 式）──
+  const grace = C.REPORT.STREAK_GRACE_DAYS;
+  // 连续 8/8、8/9、8/10 三天有追，now=8/10 → streak 3
+  const streakEvents = [
+    ev(ME, 'i1', 0, 1, bj(2026, 7, 10, 21, 0)),
+    ev(ME, 'i1', 1, 2, bj(2026, 7, 9, 21, 0)),
+    ev(PEER, 'i1', 0, 1, bj(2026, 7, 8, 21, 0)),
+  ];
+  eq('streak 连续3天', T.currentStreakDays(streakEvents, bj(2026, 7, 10, 23, 0), TZ, grace), 3);
+  // 清晨宽限：now=8/11 06:00，最近追番在 8/10（昨天）→ 仍存活=3
+  eq('streak 清晨宽限仍存活', T.currentStreakDays(streakEvents, bj(2026, 7, 11, 6, 0), TZ, grace), 3);
+  // 断超过宽限：now=8/13，最近追番 8/10（3天前）→ 归零
+  eq('streak 断超宽限归零', T.currentStreakDays(streakEvents, bj(2026, 7, 13, 12, 0), TZ, grace), 0);
+  eq('streak 无记录→0', T.currentStreakDays([], now, TZ, grace), 0);
+  // 中间断开：8/10 有、8/9 无、8/8 有 → 从最近往回只连到 8/10 =1
+  const gapEvents = [ev(ME, 'i1', 0, 1, bj(2026, 7, 10, 21, 0)), ev(ME, 'i1', 1, 2, bj(2026, 7, 8, 21, 0))];
+  eq('streak 中间断开只数最近段', T.currentStreakDays(gapEvents, bj(2026, 7, 10, 23, 0), TZ, grace), 1);
+
+  // ── syncDays（同天两人追同番）──
+  const syncEvents = [
+    ev(ME, 'i1', 0, 1, bj(2026, 7, 5, 10, 0)), // 8/5 我追 i1
+    ev(PEER, 'i1', 0, 2, bj(2026, 7, 5, 22, 0)), // 8/5 TA 也追 i1 → 神同步日
+    ev(ME, 'i2', 0, 1, bj(2026, 7, 6, 10, 0)), // 8/6 我追 i2
+    ev(PEER, 'i3', 0, 1, bj(2026, 7, 6, 10, 0)), // 8/6 TA 追 i3（不同番，不算）
+  ];
+  eq('syncDays 同天同番=1', T.syncDays(syncEvents, ME, PEER, TZ), 1);
+  eq('syncDays 未配对=0', T.syncDays(syncEvents, ME, null, TZ), 0);
+
+  // ── bingePeak（单日推进峰值）──
+  const bingeEvents = [
+    ev(ME, 'i1', 0, 3, bj(2026, 7, 5, 10, 0)), // 8/5 我 i1 +3
+    ev(ME, 'i2', 0, 5, bj(2026, 7, 5, 20, 0)), // 8/5 我 i2 +5 → 当天合计8，峰值番=i2
+    ev(PEER, 'i1', 0, 2, bj(2026, 7, 6, 10, 0)), // 8/6 TA +2
+  ];
+  const peak = T.bingePeak(bingeEvents, ME, TZ);
+  eq('bingePeak 峰值话数', peak.ep, 8);
+  eq('bingePeak 是我', peak.mine, true);
+  eq('bingePeak 峰值番', peak.itemName, 'i2');
+  eq('bingePeak 日期还原', T.dayIndexToMD(peak.dayIndex, TZ), { m: 8, d: 5 });
+  eq('bingePeak 无记录→null', T.bingePeak([], ME, TZ), null);
+
+  // ── currentStreakInfo（富信息：起始日）──
+  const si = T.currentStreakInfo(streakEvents, bj(2026, 7, 10, 23, 0), TZ, grace);
+  eq('streakInfo 天数', si.days, 3);
+  // 连续段 8/8~8/10，起始日=8/8
+  eq('streakInfo 起始日还原', T.dayIndexToMD(si.startDay, TZ), { m: 8, d: 8 });
+  eq('streakInfo 无记录 startDay=null', T.currentStreakInfo([], now, TZ, grace).startDay, null);
+
+  // ── syncInfo（富信息：最近同步日 + 番名）──
+  const syncEvents2 = [
+    ev(ME, 'i1', 0, 1, bj(2026, 7, 5, 10, 0), { itemName: '药屋' }),
+    ev(PEER, 'i1', 0, 2, bj(2026, 7, 5, 22, 0), { itemName: '药屋' }), // 8/5 同步《药屋》
+    ev(ME, 'i2', 0, 1, bj(2026, 7, 6, 10, 0), { itemName: '芙莉莲' }),
+    ev(PEER, 'i2', 0, 2, bj(2026, 7, 6, 20, 0), { itemName: '芙莉莲' }), // 8/6 同步《芙莉莲》→ 更近
+  ];
+  const syi = T.syncInfo(syncEvents2, ME, PEER, TZ);
+  eq('syncInfo 天数', syi.count, 2);
+  eq('syncInfo 最近同步日', T.dayIndexToMD(syi.lastDay, TZ), { m: 8, d: 6 });
+  eq('syncInfo 最近同步番名', syi.lastItemName, '芙莉莲');
+  eq('syncInfo 未配对 lastDay=null', T.syncInfo(syncEvents2, ME, null, TZ).lastDay, null);
+
+  // ── dailyProgressSeries（每日双色堆叠柱）──
+  const chartEvents = [
+    ev(ME, 'i1', 0, 3, bj(2026, 7, 8, 10, 0)), // 8/8 我+3
+    ev(PEER, 'i1', 0, 2, bj(2026, 7, 8, 20, 0)), // 8/8 TA+2 → 当天 total 5
+    // 8/9 无人推进 → 中间零柱
+    ev(ME, 'i2', 0, 4, bj(2026, 7, 10, 10, 0)), // 8/10 我+4
+    ev(ME, 'i2', 6, 2, bj(2026, 7, 10, 12, 0)), // 回退不计负
+  ];
+  const chart = T.dailyProgressSeries(chartEvents, ME, PEER, bj(2026, 7, 10, 23, 0), TZ, 14);
+  eq('chart 从首记录日到今天连续铺满', chart.bars.length, 3); // 8/8,8/9,8/10
+  eq('chart 首柱我', chart.bars[0].me, 3);
+  eq('chart 首柱TA', chart.bars[0].peer, 2);
+  eq('chart 中间零柱', chart.bars[1].total, 0);
+  eq('chart 末柱我', chart.bars[2].me, 4);
+  eq('chart 峰值', chart.max, 5);
+  eq('chart 窗口上限截断', T.dailyProgressSeries(chartEvents, ME, PEER, bj(2026, 7, 10, 23, 0), TZ, 2).bars.length, 2);
+  eq('chart 无记录→空', T.dailyProgressSeries([], ME, PEER, now, TZ, 14).bars.length, 0);
+
+  // ── mostInvestedItem（合计集数最高的本命番）──
+  const heroItems = [
+    item({ _id: 'h1', name: '芙莉莲', cover: 'https://x/f.jpg', progress: { [ME]: { ep: 8, status: 'watching' }, [PEER]: { ep: 6, status: 'watching' } } }), // 合计14
+    item({ _id: 'h2', name: '药屋', progress: { [ME]: { ep: 20, status: 'dropped' }, [PEER]: { ep: 2, status: 'watching' } } }), // 我弃番不计→合计2
+    item({ _id: 'h3', name: '软删', deleted: true, progress: { [ME]: { ep: 99, status: 'watching' } } }), // 软删不计
+  ];
+  const hero = T.mostInvestedItem(heroItems, ME, PEER);
+  eq('hero 取合计最高', hero.itemId, 'h1');
+  eq('hero 合计话数', hero.total, 14);
+  eq('hero 我方集数', hero.me, 8);
+  eq('hero 对方集数', hero.peer, 6);
+  eq('hero 带封面', hero.cover, 'https://x/f.jpg');
+  eq('hero 弃番方不计入合计', T.mostInvestedItem([heroItems[1]], ME, PEER).total, 2);
+  eq('hero 无有效番→null', T.mostInvestedItem([], ME, PEER), null);
+
+  // ── cumulativeStats（快照，任一人done）──
+  const cItems = [
+    item({ _id: 'a', progress: { [ME]: { ep: 12, status: 'done' }, [PEER]: { ep: 5, status: 'watching' } } }),
+    item({ _id: 'b', progress: { [ME]: { ep: 3, status: 'watching' }, [PEER]: { ep: 3, status: 'watching' } } }),
+    item({ _id: 'c', deleted: true, progress: { [ME]: { ep: 1, status: 'done' } } }), // 软删不计
+  ];
+  const cum = T.cumulativeStats(cItems, ME, PEER, 1);
+  eq('cumulative 一起追(未删)', cum.together, 2);
+  eq('cumulative 追完(任一done)', cum.done, 1);
+  eq('cumulative 能聊沿用commonCount', cum.common, 1);
+
+  // ── personalSummary（计数 + 足迹 + 各状态封面条）──
+  const ps = T.personalSummary(cItems, ME, 6);
+  eq('personal 追完', ps.done, 1);
+  eq('personal 在追', ps.watching, 1);
+  eq('personal 弃番', ps.dropped, 0);
+  // 足迹 = 我在所有番的 ep 累加：a(done ep12) + b(watching ep3) = 15（c 软删不计）
+  eq('personal 足迹累加 ep', ps.footprint, 15);
+  eq('personal done 封面条计数', ps.doneItems.count, 1);
+  eq('personal watching 封面条计数', ps.watchingItems.count, 1);
+  eq('personal dropped 封面条空', ps.droppedItems.count, 0);
+  eq('personal 封面条带番名', typeof ps.doneItems.items[0].name === 'string', true);
+  // strip limit：多番时按我方 ep 降序截断，count 仍全量
+  const manyItems = [
+    item({ _id: 'w1', name: 'A', progress: { [ME]: { ep: 2, status: 'watching' } } }),
+    item({ _id: 'w2', name: 'B', progress: { [ME]: { ep: 9, status: 'watching' } } }),
+    item({ _id: 'w3', name: 'C', progress: { [ME]: { ep: 5, status: 'watching' } } }),
+  ];
+  const psMany = T.personalSummary(manyItems, ME, 2);
+  eq('personal strip 截断到 limit', psMany.watchingItems.items.length, 2);
+  eq('personal strip count 全量', psMany.watchingItems.count, 3);
+  eq('personal strip 按 ep 降序首位', psMany.watchingItems.items[0].itemId, 'w2');
+
+  // ── firstEventDayIndex ──
+  eq('firstEventDay 取最早', T.firstEventDayIndex(winEvents, TZ), T.localDayIndex(bj(2026, 7, 1, 20, 0), TZ));
+  eq('firstEventDay 空→null', T.firstEventDayIndex([], TZ), null);
+
+  // ── recentItemsProgress（近窗推得最猛的番 top N，带封面）──
+  const riItems = [
+    item({ _id: 'i1', name: '芙莉莲', cover: 'https://x/1.jpg', progress: {} }),
+    item({ _id: 'i2', name: '药屋少女', cover: '', progress: {} }),
+    item({ _id: 'i3', name: '葬送', progress: {} }),
+    item({ _id: 'gone', name: '已删', deleted: true, progress: {} }),
+  ];
+  const riEvents = [
+    ev(ME, 'i1', 0, 5, bj(2026, 7, 9, 20, 0)), // 近窗 i1 我+5
+    ev(PEER, 'i1', 0, 3, bj(2026, 7, 9, 21, 0)), // 近窗 i1 TA+3 → i1 合计8
+    ev(ME, 'i2', 0, 4, bj(2026, 7, 8, 20, 0)), // 近窗 i2 我+4 → 合计4
+    ev(PEER, 'i3', 0, 2, bj(2026, 7, 8, 20, 0)), // 近窗 i3 TA+2 → 合计2
+    ev(ME, 'gone', 0, 9, bj(2026, 7, 9, 20, 0)), // 番已删 → 不列
+    ev(ME, 'i2', 5, 3, bj(2026, 7, 8, 22, 0)), // 回退不计负
+    ev(ME, 'i1', 0, 6, bj(2026, 7, 1, 20, 0)), // 前窗 → 不计入近窗
+  ];
+  const ri = T.recentItemsProgress(riEvents, riItems, ME, PEER, now - 7 * DAY, now, 3);
+  eq('recentItems 条数(过滤已删)', ri.length, 3);
+  eq('recentItems 按合计降序首位', ri[0].itemId, 'i1');
+  eq('recentItems 首位合计', ri[0].total, 8);
+  eq('recentItems 首位我方', ri[0].me, 5);
+  eq('recentItems 首位对方', ri[0].peer, 3);
+  eq('recentItems 带番名', ri[0].name, '芙莉莲');
+  eq('recentItems 有封面原样带', ri[0].cover, 'https://x/1.jpg');
+  eq('recentItems 无封面给首字兜底', ri[1].coverFallback.char, T.pickCoverColor('药屋少女').char);
+  eq('recentItems limit 生效', T.recentItemsProgress(riEvents, riItems, ME, PEER, now - 7 * DAY, now, 1).length, 1);
+  eq('recentItems 无事件→空', T.recentItemsProgress([], riItems, ME, PEER, now - 7 * DAY, now, 3).length, 0);
+
+  // ── myRecentProgress（只算我一人的近窗推进）──
+  const mr = T.myRecentProgress(riEvents, riItems, ME, now - 7 * DAY, now, 3);
+  // 我近窗推进：i1+5、i2+4（i2 回退不计负）、gone+9(番已删不列但计入total)；TA 的 i1+3/i3+2 不算
+  eq('myRecent total 只含我(5+4+9)', mr.total, 18);
+  eq('myRecent 列表排除已删番', mr.items.length, 2);
+  eq('myRecent 按我方话数降序首位', mr.items[0].itemId, 'i1');
+  eq('myRecent 首位我方话数', mr.items[0].me, 5);
+  eq('myRecent 次位', mr.items[1].itemId, 'i2');
+  eq('myRecent 不含对方字段', mr.items[0].peer, undefined);
+  eq('myRecent limit 生效', T.myRecentProgress(riEvents, riItems, ME, now - 7 * DAY, now, 1).items.length, 1);
+  eq('myRecent 无事件→空且total0', T.myRecentProgress([], riItems, ME, now - 7 * DAY, now, 3).total, 0);
+
+  // ── doneTogetherItems（任一人done，带封面）──
+  const dtItems = [
+    item({ _id: 'd1', name: '进击的巨人', progress: { [ME]: { ep: 25, status: 'done' }, [PEER]: { ep: 3, status: 'watching' } } }),
+    item({ _id: 'd2', name: '鬼灭', progress: { [ME]: { ep: 2, status: 'watching' }, [PEER]: { ep: 26, status: 'done' } } }),
+    item({ _id: 'd3', name: '在追', progress: { [ME]: { ep: 1, status: 'watching' } } }),
+    item({ _id: 'd4', name: '软删', deleted: true, progress: { [ME]: { ep: 1, status: 'done' } } }),
+  ];
+  const dt = T.doneTogetherItems(dtItems, ME, PEER, 8);
+  eq('doneTogether 总数(任一done,不含软删)', dt.total, 2);
+  eq('doneTogether 封面片段数', dt.items.length, 2);
+  eq('doneTogether 带番名', dt.items[0].name, '进击的巨人');
+  const dtCap = T.doneTogetherItems(dtItems, ME, PEER, 1);
+  eq('doneTogether limit 截断但 total 全量', dtCap.items.length === 1 && dtCap.total === 2, true);
+
+  // ── buildReportModel 组装 + 空窗 + 无行为数据 ──
+  const full = T.buildReportModel({ board, items: cItems, events: streakEvents, myOpenid: ME, nowMs: bj(2026, 7, 10, 23, 0), commonCount: 1 });
+  eq('report 天数', full.daysTogether, 10);
+  eq('report streak', full.streak.days, 3);
+  eq('report 有行为数据', full.hasBehaviorData, true);
+  eq('report 累计追完', full.cumulative.done, 1);
+  eq('report 含 recentItems 数组', Array.isArray(full.recentItems), true);
+  eq('report 含 doneItems 结构', typeof full.doneItems.total === 'number' && Array.isArray(full.doneItems.items), true);
+  eq('report doneItems 追完1部', full.doneItems.total, 1);
+  eq('report streak 富信息(含startDay)', typeof full.streak.days === 'number' && 'startDay' in full.streak, true);
+  eq('report sync 富信息(含lastDay)', typeof full.sync.count === 'number' && 'lastDay' in full.sync, true);
+  eq('report 含 dailySeries 结构', Array.isArray(full.dailySeries.bars) && typeof full.dailySeries.max === 'number', true);
+  eq('report hero 取本命(cItems合计最高=a)', full.hero.itemId, 'a');
+  // 无任何事件 → 只有快照，行为块隐藏
+  const bare = T.buildReportModel({ board, items: cItems, events: [], myOpenid: ME, nowMs: now, commonCount: 1 });
+  eq('report 无事件 hasBehaviorData=false', bare.hasBehaviorData, false);
+  eq('report 无事件仍有累计', bare.cumulative.together, 2);
+  eq('report 无事件 streak=0', bare.streak.days, 0);
+  eq('report 无事件 footnote 日=null', bare.firstEventDay, null);
+  // 空窗召回：有历史事件但都在窗外，近窗无推进、名场面全空
+  const oldOnly = [ev(ME, 'i1', 0, 1, bj(2026, 6, 1, 10, 0))]; // 7/1，远早于 now=8/10
+  const empty = T.buildReportModel({ board, items: cItems, events: oldOnly, myOpenid: ME, nowMs: bj(2026, 7, 10, 12, 0), commonCount: 1 });
+  eq('report 空窗召回', empty.emptyWindow, true);
+  eq('report 空窗仍标记有行为数据', empty.hasBehaviorData, true);
+})();
+
+// ============================================================
 // config 前后端漂移守卫（docs/shared-board-data.md §5.2）
 // 云函数侧 constants.js 是前端 config.js 服务端子集的拷贝，键值必须一致。
 // ============================================================
@@ -639,6 +908,17 @@ eq('漂移守卫 TOTAL_EP_MAX 一致', S.TOTAL_EP_MAX, C.TOTAL_EP_MAX);
 eq('漂移守卫 TOTAL_EP_MIN 一致', S.TOTAL_EP_MIN, C.TOTAL_EP_MIN);
 eq('漂移守卫 ITEM_SHARED_FIELDS 一致', S.ITEM_SHARED_FIELDS, C.ITEM_SHARED_FIELDS);
 eq('漂移守卫 ERR 一致', S.ERR, C.ERR);
+
+// getBoardReport 云函数复用前端同构纯模块（config/transform 逐字拷贝，算法单一实现）。
+// 拷贝必须与前端逐字一致，否则「搬 transform 进云函数」会退化成两份各改各的实现。
+(() => {
+  const fs = require('fs');
+  const path = require('path');
+  const front = (p) => fs.readFileSync(path.join(__dirname, '../miniprogram/packageFeatures/utils/shared-board', p), 'utf8');
+  const server = (p) => fs.readFileSync(path.join(__dirname, '../cloudfunctions/getBoardReport', p), 'utf8');
+  eq('漂移守卫 getBoardReport/config.js 逐字一致', server('config.js') === front('config.js'), true);
+  eq('漂移守卫 getBoardReport/transform.js 逐字一致', server('transform.js') === front('transform.js'), true);
+})();
 
 // ============================================================
 // 汇总输出

@@ -1,0 +1,210 @@
+<view class="page">
+
+  <block wx:if="{{!loading && view}}">
+
+    <!-- ① 头部卡：双人身份色 + 一起追番第 N 天 -->
+    <view class="card head">
+      <view class="head-dots">
+        <view class="dot identity--me">{{view.meName[0]}}</view>
+        <view wx:if="{{view.hasPeer}}" class="dot-link"></view>
+        <view wx:if="{{view.hasPeer}}" class="dot identity--peer">{{view.peerName[0]}}</view>
+      </view>
+      <view class="head-days">{{view.daysText}}</view>
+    </view>
+
+    <!-- ② 变化区（MAIN，仅 hasBehaviorData && !emptyWindow）：推得最猛的番清单，每行封面+番名+双人集数 -->
+    <view wx:if="{{view.showChange}}" class="card change">
+      <view class="sec-title">{{view.change.title}}</view>
+      <view class="ri-list">
+        <view class="ri-row" wx:for="{{view.change.items}}" wx:key="itemId">
+          <!-- 封面：有 https 图且未失败则渲染，否则首字色块（cloud:// 已在数据层净化为空） -->
+          <image
+            wx:if="{{item.cover && !coverErrorIds[item.itemId]}}"
+            class="ri-cover"
+            src="{{item.cover}}"
+            mode="aspectFill"
+            data-id="{{item.itemId}}"
+            binderror="onCoverError"
+          />
+          <view wx:else class="ri-cover ri-cover--ph" style="background:{{item.coverFallback.color}}">{{item.coverFallback.char}}</view>
+          <view class="ri-main">
+            <view class="ri-name">{{item.name}}</view>
+            <view class="ri-eps">
+              <text class="ri-ep identity-fg--me">{{item.meText}}</text>
+              <text wx:if="{{item.hasPeer}}" class="ri-ep identity-fg--peer">{{item.peerText}}</text>
+              <text class="ri-ep-unit">{{item.unit}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+      <view class="change-foot">
+        <text class="change-total">{{view.change.totalText}}</text>
+        <text class="change-momentum">{{view.change.momentum}}</text>
+      </view>
+      <view wx:if="{{view.change.activeLead}}" class="change-lead">{{view.change.activeLead}}</view>
+    </view>
+
+    <!-- ② 空窗召回卡（emptyWindow：有行为数据基础但近期歇了） -->
+    <view wx:if="{{view.showRecall}}" class="card recall">
+      <view class="recall-title">{{view.recallTitle}}</view>
+      <view class="recall-text">{{view.recallText}}</view>
+    </view>
+
+    <!-- 每日追番柱状图（双色堆叠：我蓝/TA紫），仅在活跃叙事下出现（歇脚态由召回卡承接，不铺空柱） -->
+    <view wx:if="{{view.showChange}}" class="card chart">
+      <view class="sec-title">{{view.chartTitle}}</view>
+      <block wx:if="{{view.chart.hasData}}">
+        <view class="chart-plot">
+          <view class="chart-col" wx:for="{{view.chart.bars}}" wx:key="dayIndex">
+            <view class="chart-bar-wrap">
+              <!-- 堆叠柱：我在下、TA 在上；高度按占峰值百分比。总为 0 时留一条极浅基线示意「这天没追」 -->
+              <view wx:if="{{item.total === 0}}" class="chart-bar-zero"></view>
+              <block wx:else>
+                <view wx:if="{{item.hasPeer && item.peerPct}}" class="chart-seg chart-seg--peer chart-seg--top" style="height:{{item.peerPct}}%"></view>
+                <view wx:if="{{item.mePct}}" class="chart-seg chart-seg--me {{item.hasPeer && item.peerPct ? '' : 'chart-seg--top'}}" style="height:{{item.mePct}}%"></view>
+              </block>
+            </view>
+            <view class="chart-axis {{item.isWeekend ? 'chart-axis--weekend' : ''}}">
+              <text class="chart-axis__wd">{{item.weekday}}</text>
+              <text class="chart-axis__day">{{item.day}}</text>
+            </view>
+          </view>
+        </view>
+        <!-- 图例：我/TA 双色 -->
+        <view class="chart-legend">
+          <view class="chart-lg"><view class="chart-lg__dot identity--me"></view><text>{{view.chartAxisMe}}</text></view>
+          <view wx:if="{{view.hasPeer}}" class="chart-lg"><view class="chart-lg__dot identity--peer"></view><text>{{view.chartAxisPeer}}</text></view>
+        </view>
+      </block>
+      <view wx:else class="chart-empty">{{view.chartEmpty}}</view>
+    </view>
+
+    <!-- ③ 名场面（三徽章横排，整区仅在有徽章时显示） -->
+    <view wx:if="{{view.badges.length}}" class="card highlight">
+      <view class="sec-title">{{view.highlightTitle}}</view>
+      <view class="badges">
+        <view class="badge" wx:for="{{view.badges}}" wx:key="key">
+          <view class="badge-icon">{{item.icon}}</view>
+          <view class="badge-value">{{item.value}}</view>
+          <view class="badge-label">{{item.label}}</view>
+          <view wx:if="{{item.sub}}" class="badge-sub">{{item.sub}}</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ④ 累计（本命番 Hero + 三统计格 + 一起追完的番封面色带，任何板都有） -->
+    <view class="card cumulative">
+      <view class="sec-title">{{view.cumulativeTitle}}</view>
+      <!-- 本命番 Hero：合计集数最高，情感锚点。仅在有本命番（total>0）时显示 -->
+      <view wx:if="{{view.hero}}" class="hero">
+        <image
+          wx:if="{{view.hero.cover && !coverErrorIds[view.hero.itemId]}}"
+          class="hero-cover"
+          src="{{view.hero.cover}}"
+          mode="aspectFill"
+          data-id="{{view.hero.itemId}}"
+          binderror="onCoverError"
+        />
+        <view wx:else class="hero-cover hero-cover--ph" style="background:{{view.hero.coverFallback.color}}">{{view.hero.coverFallback.char}}</view>
+        <view class="hero-main">
+          <view class="hero-tag">{{view.heroTitle}}</view>
+          <view class="hero-name">{{view.hero.name}}</view>
+          <view class="hero-eps">{{view.hero.epsText}}</view>
+          <view class="hero-pair">{{view.hero.pairText}}</view>
+        </view>
+      </view>
+      <!-- 三统计格：一起追 / 追完 / 能聊 -->
+      <view class="stat-grid">
+        <view class="stat" wx:for="{{view.stats}}" wx:key="key">
+          <view class="stat-value">{{item.value}}<text class="stat-unit">{{item.unit}}</text></view>
+          <view class="stat-label">{{item.label}}</view>
+        </view>
+      </view>
+      <!-- 一起追完的番封面条：仅在有追完番时显示 -->
+      <view wx:if="{{view.doneStrip.items.length}}" class="done-strip">
+        <view class="done-strip__title">{{view.doneStripTitle}}</view>
+        <view class="done-strip__covers">
+          <block wx:for="{{view.doneStrip.items}}" wx:key="itemId">
+            <image
+              wx:if="{{item.cover && !coverErrorIds[item.itemId]}}"
+              class="done-cover"
+              src="{{item.cover}}"
+              mode="aspectFill"
+              data-id="{{item.itemId}}"
+              binderror="onCoverError"
+            />
+            <view wx:else class="done-cover done-cover--ph" style="background:{{item.coverFallback.color}}">{{item.coverFallback.char}}</view>
+          </block>
+          <view wx:if="{{view.doneStrip.moreText}}" class="done-more">{{view.doneStrip.moreText}}</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ⑤ 个人小结（底部弱化）：我最近在推 + 足迹大数字 + 三状态封面组 -->
+    <view class="card personal">
+      <view class="sec-title sec-title--weak">{{view.personalTitle}}</view>
+      <!-- 我最近在推：近窗只算我一人的推进（有行为数据且非空窗时显示） -->
+      <view wx:if="{{view.showChange && view.myRecent.hasData}}" class="my-recent">
+        <view class="my-recent__title">{{view.myRecentTitle}}</view>
+        <view class="mr-list">
+          <view class="mr-row" wx:for="{{view.myRecent.items}}" wx:key="itemId">
+            <image
+              wx:if="{{item.cover && !coverErrorIds[item.itemId]}}"
+              class="mr-cover"
+              src="{{item.cover}}"
+              mode="aspectFill"
+              data-id="{{item.itemId}}"
+              binderror="onCoverError"
+            />
+            <view wx:else class="mr-cover mr-cover--ph" style="background:{{item.coverFallback.color}}">{{item.coverFallback.char}}</view>
+            <text class="mr-name">{{item.name}}</text>
+            <text class="mr-ep identity-fg--me">{{item.epText}}</text>
+          </view>
+        </view>
+        <view class="my-recent__total">{{view.myRecent.totalText}}</view>
+      </view>
+      <!-- 足迹：我一共追了 N 话 -->
+      <view class="personal-footprint">{{view.personalFootprint}}</view>
+      <!-- 三状态封面组：每组 标签·计数 + 封面条（空状态整组隐藏） -->
+      <view class="pg-list">
+        <view class="pg" wx:for="{{view.personalGroups}}" wx:key="key">
+          <view class="pg-head">
+            <text class="pg-label">{{item.label}}</text>
+            <text class="pg-count">{{item.count}}</text>
+          </view>
+          <view class="pg-covers">
+            <block wx:for="{{item.items}}" wx:for-item="anime" wx:key="itemId">
+              <image
+                wx:if="{{anime.cover && !coverErrorIds[anime.itemId]}}"
+                class="pg-cover"
+                src="{{anime.cover}}"
+                mode="aspectFill"
+                data-id="{{anime.itemId}}"
+                binderror="onCoverError"
+              />
+              <view wx:else class="pg-cover pg-cover--ph" style="background:{{anime.coverFallback.color}}">{{anime.coverFallback.char}}</view>
+            </block>
+            <view wx:if="{{item.moreText}}" class="pg-more">{{item.moreText}}</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- footnote：行为数据起记时间（hasBehaviorData 时） -->
+    <view wx:if="{{view.footnote}}" class="footnote">{{view.footnote}}</view>
+
+  </block>
+
+  <!-- 失败态 -->
+  <view wx:if="{{!loading && failed}}" class="state">
+    <view class="state-text">{{copy.LOAD_FAIL}}</view>
+  </view>
+
+  <!-- 加载骨架 -->
+  <view wx:if="{{loading}}" class="skeleton">
+    <view class="sk-card sk-head"></view>
+    <view class="sk-card sk-change"></view>
+    <view class="sk-card sk-badges"></view>
+  </view>
+
+</view>

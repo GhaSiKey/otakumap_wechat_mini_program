@@ -16,6 +16,7 @@
         "pages/shared-board/board-list",
         "pages/shared-board/shared-board",
         "pages/board-history/board-history",
+        "pages/board-report/board-report",
         "pages/anime-search/anime-search",
         "pages/anime-search/anime-detail"
       ]

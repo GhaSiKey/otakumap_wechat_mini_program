@@ -61,6 +61,14 @@
     <text class="common-talk__arrow">›</text>
   </view>
 
+  <!-- ============ 追番小结入口（常驻横条，风格同信息条；下钻到 board-report 报告页）============ -->
+  <!-- 用中性色（非 TA 紫），避免与「TA 更新了」混淆。归档态也可看小结，不设 phase 限制。 -->
+  <view class="report-entry" hover-class="report-entry--hover" bindtap="onReportTap">
+    <text class="report-entry__icon">📊</text>
+    <text class="report-entry__text">{{reportCopy.TITLE}}</text>
+    <text class="report-entry__arrow">›</text>
+  </view>
+
   <!-- ============ 筹备态邀请横幅（单人，紧凑不挡番单）============ -->
   <view wx:if="{{vm.phase === 'waiting'}}" class="invite-banner">
     <view class="invite-banner__text">

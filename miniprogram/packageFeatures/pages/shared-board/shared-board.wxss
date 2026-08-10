@@ -212,6 +212,39 @@ page {
   background: var(--sb-peer-tint-active, rgba(131, 78, 194, 0.18));
 }
 
+/* 追番小结入口：常驻横条，与信息条同结构但走中性色（非身份色），避免抢「TA 更新了」的注意力 */
+.report-entry {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin: var(--td-spacer, 16rpx) var(--td-spacer-2, 32rpx) 0;
+  padding: 16rpx var(--td-spacer-2, 32rpx);
+  background: var(--td-bg-color-container, #ffffff);
+  border-radius: 16rpx;
+}
+
+.report-entry__icon {
+  font-size: 30rpx;
+  flex-shrink: 0;
+}
+
+.report-entry__text {
+  flex: 1;
+  font-size: var(--td-font-size-body-medium, 28rpx);
+  font-weight: 600;
+  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
+}
+
+.report-entry__arrow {
+  font-size: 32rpx;
+  color: var(--td-text-color-placeholder, #bbb);
+  flex-shrink: 0;
+}
+
+.report-entry--hover {
+  background: var(--td-bg-color-component, #e7e7e7);
+}
+
 .member {
   display: flex;
   align-items: center;

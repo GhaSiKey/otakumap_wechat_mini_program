@@ -1,0 +1,9 @@
+{
+  "name": "getBoardReport",
+  "version": "1.0.0",
+  "description": "一次算全追番小结/周报数据（复用 transform 纯模块，服务端只取数）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}
