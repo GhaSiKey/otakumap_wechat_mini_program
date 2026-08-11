@@ -7,7 +7,7 @@
  * 注意：本文件依赖 wx.cloud（有副作用），故不进 transform.js 纯模块，供页面 require。
  */
 
-const { ERR } = require('./config');
+const { ERR, STORAGE_KEY } = require('./config');
 
 /** 调用云函数，resolve 云函数返回的信封对象；网络层失败 resolve 成统一失败信封。 */
 function invoke(name, data) {
@@ -31,7 +31,20 @@ function invoke(name, data) {
 }
 
 // 业务云函数薄封装（名字与 cloudfunctions/ 目录一一对应）
-const getMyOpenid = () => invoke('getMyOpenid');
+
+// getMyOpenid 带持久缓存：openid 对「用户 × 小程序」恒定不变，首次拉到后写 Storage，
+// 之后进任何板页同步命中直接返回，省掉一次串行云函数往返（冷启动尤明显）。
+// 返回信封与云函数一致（{ ok, data:{ openid } }），调用方无需感知缓存存在。
+function getMyOpenid() {
+  const cached = wx.getStorageSync(STORAGE_KEY.MY_OPENID);
+  if (cached) return Promise.resolve({ ok: true, data: { openid: cached } });
+  return invoke('getMyOpenid').then((r) => {
+    if (r && r.ok && r.data && r.data.openid) {
+      wx.setStorageSync(STORAGE_KEY.MY_OPENID, r.data.openid);
+    }
+    return r;
+  });
+}
 const listMyBoards = () => invoke('listMyBoards');
 const createBoard = (name, profile) => invoke('createBoard', { name, profile });
 const joinBoard = (boardId, token, profile) => invoke('joinBoard', { boardId, token, profile });

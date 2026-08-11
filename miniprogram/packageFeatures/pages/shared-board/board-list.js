@@ -17,12 +17,11 @@ Page({
   },
 
   onLoad() {
-    // 先拿到 openid 再加载列表，避免 _toVM 用空 openid 误判「我 vs 对方」
-    this._ensureOpenid();
+    this._init();
   },
 
   onShow() {
-    // openid 已就绪才刷新（onLoad 首次会自行触发加载）
+    // openid 已就绪才刷新（首次由 onLoad 的 _init 触发；此处覆盖切后台回来 / 建板页返回）
     if (this.data.myOpenid) this._loadBoards();
   },
 
@@ -30,27 +29,34 @@ Page({
     this._loadBoards().then(() => wx.stopPullDownRefresh());
   },
 
-  // 确保拿到自己的 openid（拿到后触发首次加载）
-  async _ensureOpenid() {
-    const r = await api.getMyOpenid();
-    if (r.ok && r.data && r.data.openid) {
-      this.setData({ myOpenid: r.data.openid });
-      this._loadBoards();
-    } else {
+  // 首次加载：openid 与板列表并行拉取，砍掉「先串行等 openid 再拉列表」的一次 RTT。
+  // listMyBoards 不依赖前端 openid（云端 getWXContext 自取身份），openid 仅在返回后
+  // _toVM 区分「我 vs 对方」时才用，故两请求可并行。getMyOpenid 缓存命中时同步返回，
+  // Promise.all 自然退化为「只等 listMyBoards」。
+  async _init() {
+    const [me, list] = await Promise.all([api.getMyOpenid(), api.listMyBoards()]);
+    if (!(me.ok && me.data && me.data.openid)) {
       this.setData({ loading: false });
       wx.showToast({ title: '身份获取失败，请重试', icon: 'none' });
+      return;
     }
+    this.setData({ myOpenid: me.data.openid });
+    this._applyBoards(list, me.data.openid);
   },
 
-  // 拉板列表并构建列表视图模型（对方头像、番数、归档态）
+  // 拉板列表（onShow / 下拉复用；此时 openid 已就绪，读 this.data）
   async _loadBoards() {
     const r = await api.listMyBoards();
+    this._applyBoards(r, this.data.myOpenid);
+  },
+
+  // listMyBoards 返回信封 → 列表视图模型（_init 并行路径与 _loadBoards 复用）
+  _applyBoards(r, myOpenid) {
     if (!r.ok) {
       this.setData({ loading: false });
       wx.showToast({ title: '加载失败', icon: 'none' });
       return;
     }
-    const myOpenid = this.data.myOpenid;
     const boards = (r.data.boards || []).map((b) => this._toVM(b, myOpenid));
     // 不重置 avatarErr：不开云存储时对方头像恒失败，每次 onShow 重置会导致列表头像反复闪烁。
     // 首字母兜底后保持稳定；按 boardId 索引，脏标记无害（首字母本就是兜底）

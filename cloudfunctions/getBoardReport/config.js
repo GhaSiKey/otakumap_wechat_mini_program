@@ -17,6 +17,14 @@ const COLLECTION = {
   EVENT: 'shared_board_events', // 板改动历史事件流（历史页 + 周报数据源）
 };
 
+// ── 本地存储 key（纯前端，云函数不用）──
+// openid 对「用户 × 小程序」恒定不变，首次拉到后持久化，之后进任何板页直接读，
+// 省掉每次进页面串行等一次 getMyOpenid 云函数往返（冷启动 1~3s 尤其明显）。
+// 用 Storage 而非 globalData：后者杀进程即失效，最慢的冷启动反而命中不到。
+const STORAGE_KEY = {
+  MY_OPENID: 'sb_my_openid',
+};
+
 // ── 板改动事件类型（历史页 + 周报数据源）──
 // 每个「会改变板状态」的写操作在服务端成功后追加一条事件。
 // progress 含集数(+1/改话数)与状态(在追/看完/弃番等)变更，payload 里带 prev/新值。
@@ -371,6 +379,7 @@ const MEMBER_COLORS = { me: '#0052D9', peer: '#834EC2' };
 
 module.exports = {
   COLLECTION,
+  STORAGE_KEY,
   EVENT_TYPE,
   BOARD_MEMBER_LIMIT,
   BOARD_STATUS,

@@ -71,8 +71,9 @@ Page({
     myOpenid: '',
     loading: true,
     vm: null,             // buildBoardViewModel 结果
-    rawBoard: null,       // 原始 board（分享用）
-    rawItems: [],         // 原始 items（改进度后局部更新用）
+    // 注意：原始 board/items 不进 data（wxml 不消费，纯 JS 逻辑用）。
+    // 它们只被 onItemTap/onShareAppMessage/_commitProgress 等读取，放实例属性
+    // this._rawBoard/this._rawItems，避免每次 _load 把整份原始数据序列化跨线程传到渲染层。
     // 加番弹层
     showAdd: false,
     newItemName: '',
@@ -131,17 +132,15 @@ Page({
     const token = query.token || '';
     this.setData({ boardId, token });
 
-    const me = await api.getMyOpenid();
-    if (!(me.ok && me.data && me.data.openid)) {
-      this.setData({ loading: false });
-      wx.showToast({ title: '身份获取失败，请重试', icon: 'none' });
-      return;
-    }
-    this.setData({ myOpenid: me.data.openid });
-
-    // 带 token 进来（来自分享卡片）→ 尝试配对入板
+    // getMyOpenid 不被 getBoardDetail/joinBoard 依赖（云端 getWXContext 自取身份），
+    // 故可与首屏数据请求并行，砍掉「先串行等 openid」的一个冷启动 RTT。
+    // 带 token：openid 与 joinBoard 并行（joinBoard→getBoardDetail 是真依赖，配对成功才拉最新）。
+    // 不带 token：openid 与 getBoardDetail 并行，两者齐了直接渲染（把并行拿到的 detail 交给 _load）。
+    let me;
+    let preloaded = null;
     if (boardId && token) {
-      const jr = await api.joinBoard(boardId, token);
+      const [meRes, jr] = await Promise.all([api.getMyOpenid(), api.joinBoard(boardId, token)]);
+      me = meRes;
       if (jr.ok) {
         // rejoin=true 是本人重复进入（如刷新），不弹提示；首次加入才庆祝
         if (!jr.data.rejoin) wx.showToast({ title: '加入成功，一起追吧 🎬', icon: 'none' });
@@ -150,10 +149,25 @@ Page({
         const m = JOIN_ERR_MESSAGES[jr.code] || JOIN_ERR_MESSAGES._default;
         wx.showModal({ title: m.title, content: m.content, showCancel: false });
       }
+    } else {
+      const [meRes, detail] = await Promise.all([
+        api.getMyOpenid(),
+        api.invoke('getBoardDetail', { boardId }),
+      ]);
+      me = meRes;
+      preloaded = detail; // 复用这份并行结果，避免 _load 再拉一次
     }
 
-    // openid 就绪后触发首次加载（onShow 的守卫会跳过重复加载）
-    this._load();
+    if (!(me.ok && me.data && me.data.openid)) {
+      this.setData({ loading: false });
+      wx.showToast({ title: '身份获取失败，请重试', icon: 'none' });
+      return;
+    }
+    this.setData({ myOpenid: me.data.openid });
+
+    // openid 就绪后首次渲染（onShow 的守卫会跳过重复加载）。
+    // 不带 token 时把并行预取的 detail 传入，_load 直接用不再请求。
+    this._load(preloaded);
   },
 
   onShow() {
@@ -171,10 +185,12 @@ Page({
     if (this._commonTalkTimer) clearTimeout(this._commonTalkTimer);
   },
 
-  // 拉板 + 番单，构建视图模型
-  async _load() {
+  // 拉板 + 番单，构建视图模型。
+  // preloaded：onLoad 首次并行已预取的 getBoardDetail 结果，有则直接用（省一次请求）；
+  //            onShow / 下拉 / +1 对账等复访不传，照常请求最新。
+  async _load(preloaded) {
     const { boardId, myOpenid } = this.data;
-    const res = await api.invoke('getBoardDetail', { boardId });
+    const res = preloaded || (await api.invoke('getBoardDetail', { boardId }));
     if (!res.ok) {
       this.setData({ loading: false });
       wx.showToast({ title: '加载失败', icon: 'none' });
@@ -191,7 +207,11 @@ Page({
     const curPeerUrl = (vm.peer && vm.peer.avatar) || '';
     const peerUrlChanged = curPeerUrl !== prevPeerUrl;
     this._lastPeerAvatarUrl = curPeerUrl;
-    const patch = { vm, rawBoard: board, rawItems: items, loading: false };
+    // 原始 board/items 存实例属性（wxml 不消费）——乐观对账靠 this._rawItems 的对象引用
+    // 累积（_commitProgress 直接改 raw.progress[myOpenid]），此处每次 _load 用最新权威值整份替换。
+    this._rawBoard = board;
+    this._rawItems = items;
+    const patch = { vm, loading: false };
     if (peerUrlChanged) patch.peerAvatarError = false; // 对方头像换了新 URL，给一次加载机会
     // 详情弹层打开时用最新数据重建 detailItem，否则改了总集数/放送状态/进度后弹层仍显示旧值。
     // pair 也从同一份权威 raw 重算，与 _commitProgress 的乐观对账一致，不冲突。
@@ -386,7 +406,7 @@ Page({
   // 不经详情弹层，故先备好 detailItem 再复用 onItemInfoTap 的开层逻辑。
   onExceedHintTap(e) {
     const { itemId } = e.currentTarget.dataset;
-    const raw = this.data.rawItems.find((it) => it._id === itemId);
+    const raw = (this._rawItems || []).find((it) => it._id === itemId);
     if (!raw) return;
     const peerOpenid = this.data.vm && this.data.vm.peer ? this.data.vm.peer.openid : null;
     const detailItem = T.buildItemViewModel(raw, this.data.myOpenid, peerOpenid);
@@ -474,7 +494,8 @@ Page({
   // ==================== 配对邀请（P4）====================
   // 空板态点「邀请 TA」→ 走 onShareAppMessage（button open-type=share）
   onShareAppMessage() {
-    const { boardId, rawBoard } = this.data;
+    const { boardId } = this.data;
+    const rawBoard = this._rawBoard;
     // 分享卡片带 boardId + 当前 token，对方点开即尝试 joinBoard
     const token = rawBoard && rawBoard.pairing ? rawBoard.pairing.token : '';
     return {
@@ -647,7 +668,7 @@ Page({
   // ==================== 进度编辑（P3 弹层）====================
   onItemTap(e) {
     const { itemId } = e.currentTarget.dataset;
-    const raw = this.data.rawItems.find((it) => it._id === itemId);
+    const raw = (this._rawItems || []).find((it) => it._id === itemId);
     if (!raw) return;
     const peerOpenid = this.data.vm && this.data.vm.peer ? this.data.vm.peer.openid : null;
     // 用 buildItemViewModel 构建：一并拿到 subtitle/airLabel（番剧信息行展示用），避免页面重复拼串
@@ -815,7 +836,7 @@ Page({
   // PRD §10 冷启动应对——云函数首次 1~3s，不能让最高频的 +1 手势卡在网络后面。
   _commitProgress(itemId, ep, status) {
     const myOpenid = this.data.myOpenid;
-    const raw = this.data.rawItems.find((it) => it._id === itemId);
+    const raw = (this._rawItems || []).find((it) => it._id === itemId);
     if (!raw) return;
     const peerOpenid = this.data.vm && this.data.vm.peer ? this.data.vm.peer.openid : null;
 
