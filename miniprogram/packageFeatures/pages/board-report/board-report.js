@@ -23,6 +23,8 @@ Page({
     failed: false,
     // 展示视图（_buildView 产出，wxml 直接消费）
     view: null,
+    // 柱状图当前周下标（swiper current + 标题栏翻周共享），_load 后置为「今天所在周」
+    chartWeekIndex: 0,
     // 封面图加载失败的 itemId 集合：failed 后回退首字色块，不再重试（同主页番卡兜底）
     coverErrorIds: {},
   },
@@ -57,13 +59,75 @@ Page({
       return;
     }
     const view = this._buildView(r.data.report, r.data.me, r.data.peer);
-    this.setData({ loading: false, view });
+    // 默认停在「今天所在周」；无数据时 currentIndex=-1，钳到 0 兜底（此时 swiper 不渲染）
+    const startWeek = view.chart && view.chart.currentIndex >= 0 ? view.chart.currentIndex : 0;
+    this.setData({ loading: false, view, chartWeekIndex: startWeek });
   },
 
   // dayIndex → 「M月D日」（复用 transform.dayIndexToMD + DATE_MD 模板）
   _mdOf(dayIndex, tz) {
     const md = T.dayIndexToMD(dayIndex, tz);
     return fillTemplate(REPORT_COPY.DATE_MD, md);
+  },
+
+  // 周视图：weeklyChart（数据层按自然周分桶）→ 每周柱高百分比 + 周标签 + 汇总行。
+  // 每周相对「本周峰值」归一（各周独立基准，轻的周也看得清）；未到的日不画柱（isFuture）。
+  _buildWeeklyView(weekly, hasPeer, tz) {
+    const wk = weekly || { weeks: [], currentIndex: -1 };
+    const total = wk.weeks.length;
+    const weeks = wk.weeks.map((w, idx) => {
+      const base = w.max > 0 ? w.max : 1; // 全零周防除零
+      const slots = w.slots.map((s) => ({
+        weekday: AIR_DAY_LABELS[s.weekday], // 轴标：周X（复用配置，不硬编码）
+        isWeekend: s.isWeekend,
+        isFuture: s.isFuture,
+        mePct: Math.round((s.me / base) * 100),
+        peerPct: Math.round((s.peer / base) * 100),
+        total: s.total,
+        animeCount: s.animeCount,
+        hasPeer,
+      }));
+      // 周标签：本周 / 上周 / 更早用 M/D–M/D 区间（distance 相对当前周）
+      const dist = wk.currentIndex - idx;
+      let label;
+      if (dist === 0) label = REPORT_COPY.CHART_WEEK_THIS;
+      else if (dist === 1) label = REPORT_COPY.CHART_WEEK_LAST;
+      else {
+        const from = fillTemplate(REPORT_COPY.CHART_WEEK_DATE, T.dayIndexToMD(w.startDayIndex, tz));
+        const to = fillTemplate(REPORT_COPY.CHART_WEEK_DATE, T.dayIndexToMD(w.startDayIndex + 6, tz));
+        label = fillTemplate(REPORT_COPY.CHART_WEEK_RANGE, { from, to });
+      }
+      // 汇总行：点明主语+范围（配对/单人分文案，筹备态不能说「你俩」）
+      let summary;
+      if (w.totalEp > 0) {
+        const tmpl = hasPeer ? REPORT_COPY.CHART_WEEK_SUMMARY : REPORT_COPY.CHART_WEEK_SUMMARY_SOLO;
+        summary = fillTemplate(tmpl, { anime: w.animeCount, ep: w.totalEp });
+      } else {
+        summary = hasPeer ? REPORT_COPY.CHART_WEEK_SUMMARY_EMPTY : REPORT_COPY.CHART_WEEK_SUMMARY_EMPTY_SOLO;
+      }
+      // 图例值：名后附本周各自集数（补堆叠柱读不出分段值的缺陷）
+      const legendMe = fillTemplate(REPORT_COPY.CHART_LEGEND_VALUE, { name: REPORT_COPY.CHART_AXIS_ME, ep: w.meEp });
+      const legendPeer = fillTemplate(REPORT_COPY.CHART_LEGEND_VALUE, { name: REPORT_COPY.CHART_AXIS_PEER, ep: w.peerEp });
+      return { label, summary, slots, legendMe, legendPeer, canPrev: idx > 0, canNext: idx < total - 1 };
+    });
+    return { weeks, currentIndex: wk.currentIndex, hasData: total > 0 };
+  },
+
+  // swiper 横滑翻周：同步当前周下标（驱动标题栏「本周/上周」联动）
+  onWeekChange(e) {
+    const idx = e.detail.current;
+    if (typeof idx === 'number' && idx !== this.data.chartWeekIndex) {
+      this.setData({ chartWeekIndex: idx });
+    }
+  },
+
+  // 标题栏 ‹ › 翻周按钮：夹在 [0, 周数-1]，驱动 swiper 跳周
+  onWeekStep(e) {
+    const dir = Number(e.currentTarget.dataset.dir) || 0;
+    const weeks = (this.data.view && this.data.view.chart && this.data.view.chart.weeks) || [];
+    const next = this.data.chartWeekIndex + dir;
+    if (next < 0 || next >= weeks.length) return;
+    this.setData({ chartWeekIndex: next });
   },
 
   // 封面图加载失败：标记该 itemId，wxml 转走首字色块兜底（cloud:// 已在数据层净化，此处兜 https 失效）
@@ -78,6 +142,27 @@ Page({
     const tz = report.tzOffsetMinutes;
     const meName = (me && me.nickname) || REPORT_COPY.ME_DEFAULT;
     const peerName = (peer && peer.nickname) || REPORT_COPY.PEER_DEFAULT;
+
+    // ① 头部 hero 卡：巨号天数（数字单独渲染成焦点）+ 副信息（起始日 · 一起追了 N 部番）。
+    // 副信息数据全复用：起始日 = sinceDay（建板日，与 daysTogether 同源）；部番数 = cumulative.together。
+    // 三种兜底：无 peer 走 SOLO 文案（不说「一起」）；没加过番只显起始日；无起始日则整条副信息不显示。
+    const togetherCount = (report.cumulative && report.cumulative.together) || 0;
+    let headSub = '';
+    if (report.sinceDay != null) {
+      const sinceDate = this._mdOf(report.sinceDay, tz);
+      if (togetherCount > 0) {
+        const tmpl = peer ? REPORT_COPY.HEAD_SINCE : REPORT_COPY.HEAD_SINCE_SOLO;
+        headSub = fillTemplate(tmpl, { date: sinceDate, anime: togetherCount });
+      } else {
+        headSub = fillTemplate(REPORT_COPY.HEAD_SINCE_NO_ANIME, { date: sinceDate });
+      }
+    }
+    const head = {
+      label: REPORT_COPY.DAYS_TOGETHER_LABEL,
+      days: report.daysTogether, // 巨号数字，视觉焦点
+      unit: REPORT_COPY.DAYS_TOGETHER_UNIT,
+      sub: headSub,
+    };
 
     // ② 变化区（仅 hasBehaviorData && !emptyWindow）
     // 主体从「两个大数字」改成「推得最猛的番」清单——每行封面 + 番名 + 双人集数，让数字挂到真实作品上。
@@ -144,27 +229,9 @@ Page({
       });
     }
 
-    // 每日追番柱状图：把每日 me/peer 话数换算成柱高百分比（相对峰值），双色堆叠。
-    // 峰值为 0（全零柱，理论上 bars 非空必有峰值>0，防御性兜底）时高度归 0。
-    const chartMax = report.dailySeries && report.dailySeries.max > 0 ? report.dailySeries.max : 1;
-    const chartBars = ((report.dailySeries && report.dailySeries.bars) || []).map((b) => {
-      const md = T.dayIndexToMD(b.dayIndex, tz);
-      const wd = T.dayIndexToWeekday(b.dayIndex, tz); // 0=周日 … 6=周六，与 AIR_DAY_LABELS 同序
-      return {
-        dayIndex: b.dayIndex,
-        day: md.d, // 轴标下行：日（月份靠标题/footnote 语境）
-        weekday: AIR_DAY_LABELS[wd], // 轴标上行：周X（复用配置，不硬编码）
-        isWeekend: wd === 0 || wd === 6, // 周末：轴标加重区分
-        mePct: Math.round((b.me / chartMax) * 100),
-        peerPct: Math.round((b.peer / chartMax) * 100),
-        total: b.total,
-        hasPeer: !!peer,
-      };
-    });
-    const chart = {
-      bars: chartBars,
-      hasData: chartBars.length > 0,
-    };
+    // 每日追番柱状图（周视图）：数据层已按自然周分桶，这里把每周每日 me/peer 话数
+    // 换算成柱高百分比（相对「本周」峰值，轻的周也看得清），并拼周标签 + 汇总行。
+    const chart = this._buildWeeklyView(report.weeklyChart, !!peer, tz);
 
     // ④ 本命番 Hero（快照，合计集数最高）——「一路追来」的情感锚点
     const h = report.hero;
@@ -199,6 +266,32 @@ Page({
         epText: fillTemplate(REPORT_COPY.PERSONAL_RECENT_ROW, { n: r.me }),
       })),
       totalText: fillTemplate(REPORT_COPY.PERSONAL_RECENT_TOTAL, { n: mr.total }),
+    };
+
+    // ⑤ 个人连续追番火苗（Duolingo 式）：四态措辞在此判定，文案全走 config。
+    // active=当前 streak 存活（days>0）：todayDone 决定「已续上 ✓」还是「火要灭了」紧迫钩子。
+    // broken=断了但有过行为数据；empty=从没追过。三档兜底文案区分「重新点火」vs「追第一集」。
+    const mst = report.myStreak || { days: 0, startDay: null, todayDone: false };
+    const myStreakActive = mst.days > 0;
+    let myStreakHint;
+    if (myStreakActive) {
+      myStreakHint = mst.todayDone ? REPORT_COPY.MY_STREAK.ALIVE_DONE : REPORT_COPY.MY_STREAK.ALIVE_PENDING;
+    } else if (report.hasBehaviorData) {
+      myStreakHint = REPORT_COPY.MY_STREAK.BROKEN;
+    } else {
+      myStreakHint = REPORT_COPY.MY_STREAK.EMPTY;
+    }
+    const myStreak = {
+      active: myStreakActive,
+      urgent: myStreakActive && !mst.todayDone, // 宽限内待续 → UI 可加紧迫强调
+      icon: REPORT_COPY.MY_STREAK.ICON,
+      days: mst.days, // 超大数字单独渲染，成为视觉焦点
+      daysLabel: REPORT_COPY.MY_STREAK.DAYS_LABEL, // 前缀小字「连续追番」
+      daysUnit: REPORT_COPY.MY_STREAK.DAYS_UNIT, // 后缀小字「天」
+      sub: myStreakActive && mst.startDay != null
+        ? fillTemplate(REPORT_COPY.MY_STREAK.SUB, { date: this._mdOf(mst.startDay, tz) })
+        : '',
+      hint: myStreakHint,
     };
 
     // ⑤ 个人小结：足迹大数字 + 三状态封面组（在追/追完/弃番，各挂封面条）
@@ -243,11 +336,11 @@ Page({
         : '';
 
     return {
-      // ① 头部
+      // ① 头部 hero 卡
       meName,
       peerName,
       hasPeer: !!peer,
-      daysText: fillTemplate(REPORT_COPY.DAYS_TOGETHER, { n: report.daysTogether }),
+      head,
       // ② 变化区 / 空窗召回
       showChange: report.hasBehaviorData && !report.emptyWindow,
       showRecall: report.emptyWindow,
@@ -270,8 +363,9 @@ Page({
       stats,
       doneStripTitle: REPORT_COPY.DONE_STRIP_TITLE,
       doneStrip,
-      // ⑤ 个人小结（我最近在推 + 足迹大数字 + 三状态封面组）
+      // ⑤ 个人小结（连续追番火苗 + 我最近在推 + 足迹大数字 + 三状态封面组）
       personalTitle: REPORT_COPY.PERSONAL_TITLE,
+      myStreak,
       myRecent,
       myRecentTitle: REPORT_COPY.PERSONAL_RECENT_TITLE,
       personalFootprint,

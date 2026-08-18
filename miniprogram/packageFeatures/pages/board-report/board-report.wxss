@@ -5,7 +5,20 @@
 page {
   --sb-color-me: #0052d9;
   --sb-color-peer: #834ec2;
+  /* 身份色的 R,G,B 分量（与上面 hex 同色，供 rgba() 调透明度用）。
+     头部 hero 卡的渐变底用半透明身份色：叠亮卡=浅蓝浅紫，叠暗卡自动变暗，亮暗都成立。 */
+  --sb-me-rgb: 0, 82, 217;
+  --sb-peer-rgb: 131, 78, 194;
+  /* 火苗色（单一色源）：连击/火苗自成一套暖色视觉语言，与身份蓝/紫解耦。
+     以 R,G,B 分量存，供 rgba() 调透明度复用（背景微染/投影/脉冲/辉光同色）。
+     暗色不覆写：火在暗处本就更亮，同色即可；半透明背景会自动叠底层深卡，亮暗都成立。 */
+  --sb-fire-rgb: 237, 123, 47;
   background: var(--td-bg-color-page, #f5f5f5);
+  /* 入场动效参数（集中管理，避免散落）：卡片上浮时长/缓动、逐卡步进、柱子生长步进 */
+  --sb-in-dur: 0.7s; /* 单卡上浮时长（放慢：0.5→0.7） */
+  --sb-in-ease: cubic-bezier(0.22, 0.61, 0.36, 1); /* ease-out 收尾，入场不回弹 */
+  --sb-in-step: 0.12s; /* 逐卡递延步进（放慢：0.07→0.12，节奏更从容） */
+  --sb-bar-step: 0.06s; /* 柱子逐列递延步进（放慢：0.04→0.06） */
 }
 
 .page {
@@ -47,16 +60,26 @@ page {
 .identity-fg--peer .ep-num {
   color: var(--sb-color-peer);
 }
-/* ① 头部 */
+/* ① 头部 hero 卡：整卡蓝→紫渐变底（半透明身份色叠卡，亮暗自适应），巨号天数成焦点 */
 .head {
   text-align: center;
-  padding: 44rpx 32rpx;
+  padding: 48rpx 32rpx 40rpx;
+  /* 左上偏「我」蓝、右下偏「TA」紫的对角渐变，象征两人相连；透明度低，不抢巨号数字 */
+  background:
+    linear-gradient(
+      135deg,
+      rgba(var(--sb-me-rgb), 0.14) 0%,
+      rgba(var(--sb-me-rgb), 0.06) 42%,
+      rgba(var(--sb-peer-rgb), 0.08) 58%,
+      rgba(var(--sb-peer-rgb), 0.16) 100%
+    ),
+    var(--td-bg-color-container, #fff);
 }
 .head-dots {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 20rpx;
+  margin-bottom: 24rpx;
 }
 .dot {
   width: 88rpx;
@@ -68,18 +91,47 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* 圆点浮在渐变底上，加与身份色同色的柔投影强化立体，呼应「相连」 */
+  box-shadow: 0 6rpx 16rpx rgba(0, 0, 0, 0.12);
 }
+.identity--me.dot { box-shadow: 0 6rpx 16rpx rgba(var(--sb-me-rgb), 0.35); }
+.identity--peer.dot { box-shadow: 0 6rpx 16rpx rgba(var(--sb-peer-rgb), 0.35); }
+/* 连线：由灰细线改蓝→紫渐变，视觉上「相连」而非「断开」 */
 .dot-link {
-  width: 64rpx;
-  height: 4rpx;
-  background: var(--td-component-border, #ddd);
+  width: 72rpx;
+  height: 6rpx;
+  border-radius: 3rpx;
+  background: linear-gradient(90deg, var(--sb-color-me), var(--sb-color-peer));
   margin: 0 -8rpx;
   z-index: 0;
 }
+/* 巨号天数：前缀小字 + 超大数字（焦点）+ 单位小字，基线对齐 */
 .head-days {
-  font-size: 34rpx;
-  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10rpx;
+}
+.head-days__label {
+  font-size: 30rpx;
+  color: var(--td-text-color-secondary, #888);
+}
+.head-days__num {
+  font-size: 88rpx;
+  font-weight: 800;
+  line-height: 1;
   color: var(--td-text-color-primary, #222);
+  font-variant-numeric: tabular-nums;
+}
+.head-days__unit {
+  font-size: 30rpx;
+  color: var(--td-text-color-secondary, #888);
+}
+/* 副信息：起始日 · 一起追了 N 部番，弱化不抢数字 */
+.head-sub {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: var(--td-text-color-placeholder, #bbb);
 }
 
 /* ② 变化区 MAIN —— 推得最猛的番清单 */
@@ -182,6 +234,59 @@ page {
   color: var(--td-text-color-secondary, #888);
 }
 
+/* 图表标题行：左标题 + 右上角翻周控件 */
+.chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+.chart-head__title {
+  margin-bottom: 0; /* 标题在 flex 行内，取消 sec-title 的下间距 */
+}
+/* 翻周控件：‹ 周标签 ›，标签定宽避免「本周/上周/M月D日」切换时抖动 */
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+.week-nav__btn {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  line-height: 1;
+  color: var(--td-text-color-primary, #333);
+  background: var(--td-bg-color-component, #f0f0f0);
+}
+.week-nav__btn--off {
+  color: var(--td-text-color-disabled, #ccc);
+  opacity: 0.5;
+}
+.week-nav__label {
+  min-width: 120rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: var(--td-text-color-secondary, #888);
+}
+/* 横滑翻周容器：swiper 需显式定高（内容高度 = 汇总行 + 柱区 + 轴标） */
+.week-swiper {
+  height: 300rpx;
+}
+.week-swiper__item {
+  box-sizing: border-box;
+}
+/* 当周汇总：几部番·几话，左对齐弱化，不抢柱子 */
+.week-summary {
+  text-align: left;
+  font-size: 24rpx;
+  color: var(--td-text-color-secondary, #888);
+  margin-bottom: 16rpx;
+}
+
 /* 每日追番柱状图（双色堆叠柱，纯 view + 高度百分比，无 canvas 无三方库） */
 .chart-plot {
   display: flex;
@@ -228,26 +333,25 @@ page {
   background: var(--td-component-border, #ddd);
   border-radius: 4rpx;
 }
-/* 轴标两行：上行周X（淡）、下行日（略深）；周末整体加重区分 */
+/* 轴标：仅周X（去掉日期数字后单行居中）；周末用对方色加重区分 */
 .chart-axis {
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  justify-content: center;
   line-height: 1.25;
   margin-top: 10rpx;
 }
 .chart-axis__wd {
-  font-size: 18rpx;
-  color: var(--td-text-color-placeholder, #bbb);
-}
-.chart-axis__day {
-  font-size: 20rpx;
+  font-size: 22rpx;
   color: var(--td-text-color-secondary, #888);
 }
-.chart-axis--weekend .chart-axis__wd,
-.chart-axis--weekend .chart-axis__day {
+.chart-axis--weekend .chart-axis__wd {
   color: var(--sb-color-peer);
   font-weight: 600;
+}
+/* 未来日（本周还没到）：轴标弱化，与已过日区分「还没追」而非「没追」 */
+.chart-axis--future .chart-axis__wd {
+  color: var(--td-text-color-placeholder, #bbb);
+  opacity: 0.5;
 }
 .chart-legend {
   display: flex;
@@ -393,6 +497,91 @@ page {
   color: var(--td-text-color-secondary, #888);
   margin-top: 6rpx;
 }
+/* ⑤ 个人连续追番火苗（Duolingo 式打卡钩子）。
+   暖色系不吃身份蓝——「火苗/连击」自成一套视觉语言，与追番进度的蓝/紫解耦。
+   火色用 TDesign 警示色阶（--td-warning-color 橙），亮暗自动切换，无硬编码色值。 */
+.streak {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  border-radius: 16rpx;
+  margin-bottom: 24rpx;
+}
+/* 点亮态：半透明火色微染底（替代 --td-warning-color-1）。
+   TDesign 暗色只覆写了 warning-color-5，warning-color-1 暗色下仍是近白 #fff1e9 会成刺眼白块；
+   改用 rgba 火色叠底：亮色叠白卡≈原浅橙观感不变，暗色叠深卡=暖色微染，一值适配亮暗。 */
+.streak--on {
+  background: rgba(var(--sb-fire-rgb), 0.1);
+}
+.streak--on .streak-flame {
+  font-size: 80rpx; /* 与超大天数呼应，火苗压得住场 */
+  filter: drop-shadow(0 0 8rpx rgba(var(--sb-fire-rgb), 0.5));
+}
+/* 熄灭态：灰底、火苗去色缩小，引导重新点火 */
+.streak--off {
+  background: var(--td-bg-color-component, #f0f0f0);
+}
+.streak--off .streak-flame {
+  font-size: 48rpx;
+  filter: grayscale(1) opacity(0.5);
+}
+/* 紧迫态（宽限内今天还没追）：脉冲呼吸，制造「别断」的心理压力 */
+.streak--urgent {
+  animation: streakPulse 1.6s ease-in-out infinite;
+}
+@keyframes streakPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--sb-fire-rgb), 0); }
+  50% { box-shadow: 0 0 0 6rpx rgba(var(--sb-fire-rgb), 0.18); }
+}
+.streak-flame {
+  flex-shrink: 0;
+  line-height: 1;
+}
+.streak-main {
+  flex: 1;
+  min-width: 0;
+}
+/* 左侧标签「连续追番」：与副行/提示同列，正常文字节奏，不撑行高 */
+.streak-label {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--td-warning-color, #ed7b2f);
+  line-height: 1.2;
+}
+/* 右侧超大天数块：独占卡片右侧空白区，垂直居中，数字与「天」基线对齐 */
+.streak-count {
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6rpx;
+  color: var(--td-warning-color, #ed7b2f);
+  line-height: 1;
+}
+.streak-count__num {
+  font-size: 96rpx; /* 超大数字：抽离首行后可放到最大，天数一眼可见 */
+  font-weight: 800;
+  font-variant-numeric: tabular-nums; /* 等宽数字，位数变化不跳动 */
+}
+.streak-count__unit {
+  font-size: 28rpx;
+  font-weight: 600;
+}
+.streak-sub {
+  font-size: 22rpx;
+  color: var(--td-text-color-secondary, #888);
+  margin-top: 4rpx;
+}
+.streak-hint {
+  font-size: 24rpx;
+  color: var(--td-text-color-secondary, #888);
+  margin-top: 8rpx;
+}
+/* 熄灭态提示更弱化 */
+.streak--off .streak-hint {
+  color: var(--td-text-color-placeholder, #bbb);
+}
+
 /* ⑤ 个人小结：我最近在推（轻量单行清单，区别于双人「推得最猛」的分列大数字） */
 .my-recent {
   margin-bottom: 24rpx;
@@ -589,4 +778,90 @@ page {
 }
 .sk-badges {
   height: 180rpx;
+}
+
+/* ============ 入场动效 ============
+   原则：只在进页面播一次、动完即静止。全用 transform+opacity（GPU 合成，不触发重排），
+   暗模式无影响；参数走 page 上的 --sb-in-* 变量，不散落硬编码。 */
+
+/* 1) 卡片逐张上浮淡入（主菜）：从下方 32rpx 处淡入，按位序 --in-N 错峰 */
+.card--in {
+  opacity: 0;
+  animation: sbCardIn var(--sb-in-dur) var(--sb-in-ease) both;
+}
+.card--in-1 { animation-delay: calc(var(--sb-in-step) * 0); }
+.card--in-2 { animation-delay: calc(var(--sb-in-step) * 1); }
+.card--in-3 { animation-delay: calc(var(--sb-in-step) * 2); }
+.card--in-4 { animation-delay: calc(var(--sb-in-step) * 3); }
+.card--in-5 { animation-delay: calc(var(--sb-in-step) * 4); }
+.card--in-6 { animation-delay: calc(var(--sb-in-step) * 5); }
+@keyframes sbCardIn {
+  from { opacity: 0; transform: translateY(32rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 2) 柱状图逐列「长」上来（点睛）：scaleY 0→1 + transform-origin:bottom，
+   不改高度布局（高度仍是 JS 算的百分比），只做视觉生长。按列 --i 错峰，从左往右铺开。
+   卡片入场需先播完（延迟叠加卡片位序 3 的 --in-step*2），再开始长柱。 */
+.chart-bar-wrap--grow {
+  transform: scaleY(0);
+  transform-origin: bottom;
+  animation: sbBarGrow 0.6s var(--sb-in-ease) both;
+  animation-delay: calc(var(--sb-in-step) * 2 + var(--sb-bar-step) * var(--i));
+}
+@keyframes sbBarGrow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+/* 3a) 火苗（点亮态）：入场回弹 pop → 播完接持续摇曳，让火「活着烧」而非僵住，呼应连续不灭。
+   两条动画叠加：pop 播一次（both 保持终态），flicker 无限循环，delay 排在 pop 之后无缝接上。
+   transform-origin 设在火根，摆动像真火从底部窜。熄灭态火苗不播（死火不动）。 */
+.streak--on .streak-flame {
+  transform-origin: bottom center;
+  animation: sbFlamePop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+             sbFlameFlicker 2.6s ease-in-out infinite;
+  animation-delay: calc(var(--sb-in-step) * 5), /* pop：跟随 personal 卡（位序 6）入场后 */
+                   calc(var(--sb-in-step) * 5 + 0.5s); /* flicker：接在 pop（0.5s）播完之后 */
+}
+@keyframes sbFlamePop {
+  0% { opacity: 0; transform: scale(0.3); }
+  100% { opacity: 1; transform: scale(1); }
+}
+/* 火苗摇曳：非等比 scale（窜动）+ 小幅 rotate（摆动），幅度克制不抽搐 */
+@keyframes sbFlameFlicker {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.06, 0.97) rotate(-2deg); }
+  50% { transform: scale(0.98, 1.05) rotate(1.5deg); }
+  75% { transform: scale(1.04, 0.99) rotate(-1deg); }
+}
+/* 3c) 大天数「余温」辉光呼吸（点亮态）：橙色 text-shadow 明暗循环，像数字还带着火的温度。
+   复用 --sb-fire-rgb 单一火色源，暗色下火色不变、深底上辉光更醒目。 */
+.streak--on .streak-count__num {
+  animation: sbEmberGlow 2.6s ease-in-out infinite;
+  animation-delay: calc(var(--sb-in-step) * 5); /* 与火苗同步，personal 卡入场后 */
+}
+@keyframes sbEmberGlow {
+  0%, 100% { text-shadow: 0 0 8rpx rgba(var(--sb-fire-rgb), 0.25); }
+  50% { text-shadow: 0 0 22rpx rgba(var(--sb-fire-rgb), 0.55); }
+}
+/* 3b) 头部巨号天数：数字单独放大浮现（焦点强调），前后缀随整块淡入。
+   数字延迟略晚于卡片入场，形成「卡片先到、数字后弹」的节奏。 */
+.head-days__num {
+  animation: sbCountPop 0.6s var(--sb-in-ease) both;
+  animation-delay: calc(var(--sb-in-step) * 2);
+}
+@keyframes sbCountPop {
+  0% { opacity: 0; transform: scale(0.7); }
+  70% { transform: scale(1.08); } /* 轻微过冲，再回落，弹性收尾 */
+  100% { opacity: 1; transform: scale(1); }
+}
+/* 副信息随后淡入，垫在数字之后 */
+.head-sub {
+  animation: sbFadeUp 0.5s var(--sb-in-ease) both;
+  animation-delay: calc(var(--sb-in-step) * 3);
+}
+@keyframes sbFadeUp {
+  from { opacity: 0; transform: translateY(8rpx); }
+  to { opacity: 1; transform: translateY(0); }
 }

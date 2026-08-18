@@ -613,6 +613,16 @@ function daysTogether(board, nowMs, tzOffsetMin) {
   return gap < 0 ? 1 : gap + 1;
 }
 
+/**
+ * 建板日的本地 dayIndex（头部副信息「X 起」用，与 daysTogether 同源 board.createTime，
+ * 页面用 dayIndexToMD 还原成 M/D，避免页面二次反推产生 off-by-one）。createTime 非法返回 null。
+ */
+function boardSinceDay(board, tzOffsetMin) {
+  const created = toMillis(board && board.createTime);
+  if (Number.isNaN(created)) return null;
+  return localDayIndex(created, tzOffsetMin);
+}
+
 /** 单条 progress 事件的「推进话数」：max(0, ep-prevEp)。弃番/纠错回退不计负，不倒扣。 */
 function progressGain(e) {
   if (!e || e.type !== EVENT_TYPE.PROGRESS) return 0;
@@ -653,11 +663,16 @@ function momentumOf(recent, previous, band) {
   return diff > 0 ? 'up' : 'down';
 }
 
-/** 收集「有人真推进过（gain>0）」的本地日集合（board 维度合并：任一人推进即算这天有追）。 */
-function activeDaySet(events, tzOffsetMin) {
+/**
+ * 收集「有人真推进过（gain>0）」的本地日集合。
+ * 不传 actorOpenid：board 维度合并（任一人推进即算这天有追）；
+ * 传 actorOpenid：只统计该人推进的日（供个人版 streak，与板级同源不漂移）。
+ */
+function activeDaySet(events, tzOffsetMin, actorOpenid) {
   const days = new Set();
   (events || []).forEach((e) => {
     if (progressGain(e) <= 0) return;
+    if (actorOpenid && e.actor !== actorOpenid) return;
     const t = toMillis(e.createTime);
     if (Number.isNaN(t)) return;
     days.add(localDayIndex(t, tzOffsetMin));
@@ -666,12 +681,11 @@ function activeDaySet(events, tzOffsetMin) {
 }
 
 /**
- * 🔥 当前 streak 详情：{ days, startDay }。
- * 最近追番日须落在「今天或宽限天内」才算存活，从那天往回数连续段；startDay = 连续段的第一天（供副标题「X 起连着追」）。
- * Duolingo 式，grace/nowMs/tzOffsetMin 由外部传（纯函数不读时钟）。无有效 streak 返回 { days:0, startDay:null }。
+ * 从「有追的本地日集合」数出当前存活的连续段：{ days, startDay }。
+ * 最近追番日须落在「今天或宽限天内」才算存活，从那天往回数连续段；startDay = 连续段第一天。
+ * 板级 / 个人版 streak 共用此核心，喂不同 daySet 即可，保证两者口径一致。
  */
-function currentStreakInfo(events, nowMs, tzOffsetMin, graceDays) {
-  const days = activeDaySet(events, tzOffsetMin);
+function streakFromDaySet(days, nowMs, tzOffsetMin, graceDays) {
   if (!days.size || typeof nowMs !== 'number') return { days: 0, startDay: null };
   const today = localDayIndex(nowMs, tzOffsetMin);
   const grace = typeof graceDays === 'number' ? graceDays : 0;
@@ -689,9 +703,30 @@ function currentStreakInfo(events, nowMs, tzOffsetMin, graceDays) {
   return { days: streak, startDay: cur + 1 }; // cur 停在断裂前一天，+1 即连续段首日
 }
 
+/**
+ * 🔥 当前 streak 详情（board 维度）：{ days, startDay }。
+ * Duolingo 式，grace/nowMs/tzOffsetMin 由外部传（纯函数不读时钟）。无有效 streak 返回 { days:0, startDay:null }。
+ */
+function currentStreakInfo(events, nowMs, tzOffsetMin, graceDays) {
+  return streakFromDaySet(activeDaySet(events, tzOffsetMin), nowMs, tzOffsetMin, graceDays);
+}
+
 /** 🔥 当前 streak 天数（薄封装，兼容既有调用/测试）。 */
 function currentStreakDays(events, nowMs, tzOffsetMin, graceDays) {
   return currentStreakInfo(events, nowMs, tzOffsetMin, graceDays).days;
+}
+
+/**
+ * 🔥 我个人的当前 streak：{ days, startDay, todayDone }。
+ * 只统计我 actor 的推进日（区别于板级的任一人）；口径与 currentStreakInfo 完全一致（同源 streakFromDaySet）。
+ * todayDone：我今天是否已推进过——供 UI 区分「今天已续上」vs「宽限内待续，火要灭了」两种紧迫态。
+ */
+function myStreakInfo(events, myOpenid, nowMs, tzOffsetMin, graceDays) {
+  const days = activeDaySet(events, tzOffsetMin, myOpenid);
+  const info = streakFromDaySet(days, nowMs, tzOffsetMin, graceDays);
+  const todayDone =
+    typeof nowMs === 'number' && days.has(localDayIndex(nowMs, tzOffsetMin));
+  return { days: info.days, startDay: info.startDay, todayDone };
 }
 
 /**
@@ -957,7 +992,7 @@ function doneTogetherItems(items, myOpenid, peerOpenid, limit) {
 function dailyProgressSeries(events, myOpenid, peerOpenid, nowMs, tzOffsetMin, maxDays) {
   if (typeof nowMs !== 'number') return { bars: [], max: 0 };
   const today = localDayIndex(nowMs, tzOffsetMin);
-  const perDay = new Map(); // dayIndex → { me, peer }
+  const perDay = new Map(); // dayIndex → { me, peer, items:Set<itemId> }
   let firstDay = Infinity;
   (events || []).forEach((e) => {
     if (!e || e.type !== EVENT_TYPE.PROGRESS) return;
@@ -970,25 +1005,126 @@ function dailyProgressSeries(events, myOpenid, peerOpenid, nowMs, tzOffsetMin, m
     if (day < firstDay) firstDay = day;
     let cell = perDay.get(day);
     if (!cell) {
-      cell = { me: 0, peer: 0 };
+      cell = { me: 0, peer: 0, items: new Set() };
       perDay.set(day, cell);
     }
+    if (e.itemId) cell.items.add(e.itemId); // 当天推进过的不同番（去重），供「几部番」统计
     if (e.actor === myOpenid) cell.me += gain;
     else if (peerOpenid && e.actor === peerOpenid) cell.peer += gain;
   });
   if (firstDay === Infinity) return { bars: [], max: 0 };
 
+  // maxDays>0：旧「近 N 天滚动窗口」行为（兼容既有调用/测试）。
+  // maxDays 省略/≤0：返回首记录日→今天的全量每日，供 buildWeeklyChart 在前端按周切片。
   const cap = typeof maxDays === 'number' && maxDays > 0 ? maxDays : today - firstDay + 1;
   const from = Math.max(firstDay, today - cap + 1); // 窗口起点：不早于首记录日
   const bars = [];
   let max = 0;
   for (let d = from; d <= today; d++) {
-    const cell = perDay.get(d) || { me: 0, peer: 0 };
+    const cell = perDay.get(d) || { me: 0, peer: 0, items: null };
     const total = cell.me + cell.peer;
     if (total > max) max = total;
-    bars.push({ dayIndex: d, me: cell.me, peer: cell.peer, total });
+    bars.push({
+      dayIndex: d,
+      me: cell.me,
+      peer: cell.peer,
+      total,
+      animeCount: cell.items ? cell.items.size : 0, // 当天推进过的不同番数
+    });
   }
   return { bars, max };
+}
+
+/**
+ * 每日数据按「自然周」分桶（周一→周日固定 7 格），供报告页横滑翻周展示。
+ * 输入 daily.bars（dailyProgressSeries 全量输出，dayIndex 连续、含中间零柱）。
+ * 每周：7 个 slot（周一…周日）；本周只到今天（未到的 day 标 future，不画柱）；
+ * 每周自算 max（轻的周也看得清）；汇总当周番剧数（跨天去重）与话数。
+ * 返回 { weeks:[{ startDayIndex, slots:[{dayIndex,me,peer,total,animeCount,isFuture,weekday,isWeekend}],
+ *         max, animeCount, meEp, peerEp, totalEp, isCurrent }], currentIndex }。空数据 → { weeks:[], currentIndex:-1 }。
+ * currentIndex 指向「今天所在周」，页面默认停在此周。
+ */
+function buildWeeklyChart(daily, allEvents, nowMs, tzOffsetMin, weekStart) {
+  const empty = { weeks: [], currentIndex: -1 };
+  if (typeof nowMs !== 'number') return empty;
+  const bars = (daily && daily.bars) || [];
+  if (!bars.length) return empty;
+  const ws = typeof weekStart === 'number' ? weekStart : 1; // 1=周一
+  const today = localDayIndex(nowMs, tzOffsetMin);
+
+  // 某 dayIndex 所在周的周首 dayIndex（把 weekday 归一到 [0..6] 相对 weekStart 的偏移）
+  const weekStartOf = (dayIndex) => {
+    const wd = dayIndexToWeekday(dayIndex, tzOffsetMin); // 0=周日…6=周六
+    const offset = (wd - ws + 7) % 7;
+    return dayIndex - offset;
+  };
+
+  // 全量事件按 (周首, itemId) 记录，供每周番剧去重计数（跨天，不能用逐日 animeCount 相加）
+  const weekItems = new Map(); // weekStartDayIndex → Set<itemId>
+  (allEvents || []).forEach((e) => {
+    if (progressGain(e) <= 0 || !e.itemId) return;
+    const t = toMillis(e.createTime);
+    if (Number.isNaN(t)) return;
+    const day = localDayIndex(t, tzOffsetMin);
+    if (day > today) return;
+    const wk = weekStartOf(day);
+    let set = weekItems.get(wk);
+    if (!set) {
+      set = new Set();
+      weekItems.set(wk, set);
+    }
+    set.add(e.itemId);
+  });
+
+  const perDay = new Map(); // dayIndex → bar
+  bars.forEach((b) => perDay.set(b.dayIndex, b));
+
+  const firstWeek = weekStartOf(bars[0].dayIndex);
+  const currentWeek = weekStartOf(today);
+  const weeks = [];
+  let currentIndex = -1;
+  // 从首记录周连续铺到本周（中间空周保留，避免横滑跳格）
+  for (let wk = firstWeek; wk <= currentWeek; wk += 7) {
+    const slots = [];
+    let max = 0;
+    let meEp = 0; // 当周我方推进话数合计（图例「我 N」用）
+    let peerEp = 0; // 当周对方推进话数合计（图例「TA N」用）
+    for (let i = 0; i < 7; i++) {
+      const dayIndex = wk + i;
+      const isFuture = dayIndex > today;
+      const bar = perDay.get(dayIndex);
+      const me = bar ? bar.me : 0;
+      const peer = bar ? bar.peer : 0;
+      const total = me + peer;
+      if (total > max) max = total;
+      meEp += me;
+      peerEp += peer;
+      const weekday = dayIndexToWeekday(dayIndex, tzOffsetMin);
+      slots.push({
+        dayIndex,
+        me,
+        peer,
+        total,
+        animeCount: bar ? bar.animeCount : 0,
+        isFuture,
+        weekday,
+        isWeekend: weekday === 0 || weekday === 6,
+      });
+    }
+    const isCurrent = wk === currentWeek;
+    if (isCurrent) currentIndex = weeks.length;
+    weeks.push({
+      startDayIndex: wk,
+      slots,
+      max,
+      animeCount: (weekItems.get(wk) || { size: 0 }).size,
+      meEp,
+      peerEp,
+      totalEp: meEp + peerEp,
+      isCurrent,
+    });
+  }
+  return { weeks, currentIndex };
 }
 
 /**
@@ -1065,10 +1201,13 @@ function buildReportModel(opts) {
 
   // ③ 名场面（副标题挂到具体番/日期，故取富信息版）
   const streak = currentStreakInfo(events, nowMs, tz, REPORT.STREAK_GRACE_DAYS);
+  // ⑤ 个人连续追番（只算我，Duolingo 式打卡钩子）——与板级 streak 同源不漂移
+  const myStreak = myStreakInfo(events, myOpenid, nowMs, tz, REPORT.STREAK_GRACE_DAYS);
   const sync = syncInfo(events, myOpenid, peerOpenid, tz);
   const binge = bingePeak(events, myOpenid, tz);
-  // 每日追番柱状图（双色堆叠，从首个记录日起，稀疏期不硬铺空柱）
-  const dailySeries = dailyProgressSeries(events, myOpenid, peerOpenid, nowMs, tz, REPORT.CHART_DAYS);
+  // 每日追番柱状图：取全量每日（不设上限），再按自然周分桶供页面横滑翻周
+  const dailySeries = dailyProgressSeries(events, myOpenid, peerOpenid, nowMs, tz);
+  const weeklyChart = buildWeeklyChart(dailySeries, events, nowMs, tz, REPORT.WEEK_START);
   // 你俩的本命番（快照，合计集数最高）——「一路追来」的情感锚点
   const hero = mostInvestedItem(items, myOpenid, peerOpenid);
 
@@ -1082,14 +1221,17 @@ function buildReportModel(opts) {
 
   return {
     daysTogether: daysTogether(board, nowMs, tz),
+    sinceDay: boardSinceDay(board, tz), // 建板日 dayIndex | null（头部副信息「X 起」，页面 dayIndexToMD 还原）
     recent, // { me, peer }
     recentItems, // [{ itemId, name, cover, coverFallback, me, peer, total }]（近窗推得最猛的番）
     momentum, // 'up' | 'flat' | 'down'
     activeLead, // { leaderIsPeer, diff } | null
     streak, // { days, startDay }（startDay 供副标题「X 起连着追」）
+    myStreak, // { days, startDay, todayDone }（个人连续追番，⑤「你自己」块 Duolingo 火苗）
     sync, // { count, lastDay, lastItemId, lastItemName }（副标题「最近 X《番》」）
     binge, // { mine, ep, dayIndex, itemName } | null
-    dailySeries, // { bars:[{ dayIndex, me, peer, total }], max }（每日柱状图，bars 空则不显示）
+    dailySeries, // { bars:[{ dayIndex, me, peer, total, animeCount }], max }（全量每日，兼容保留）
+    weeklyChart, // { weeks:[{ startDayIndex, slots, max, animeCount, meEp, peerEp, totalEp, isCurrent }], currentIndex }（按周分桶，页面横滑翻周）
     hero, // { itemId,name,cover,coverFallback, me, peer, total } | null（你俩的本命番）
     cumulative: cumulativeStats(items, myOpenid, peerOpenid, o.commonCount),
     doneItems: doneTogetherItems(items, myOpenid, peerOpenid, REPORT.DONE_STRIP_LIMIT), // { items, total }
@@ -1125,14 +1267,17 @@ module.exports = {
   dayIndexToMD,
   dayIndexToWeekday,
   daysTogether,
+  boardSinceDay,
   windowProgress,
   momentumOf,
   currentStreakDays,
   currentStreakInfo,
+  myStreakInfo,
   syncDays,
   syncInfo,
   bingePeak,
   dailyProgressSeries,
+  buildWeeklyChart,
   mostInvestedItem,
   cumulativeStats,
   recentItemsProgress,

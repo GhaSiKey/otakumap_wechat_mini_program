@@ -278,7 +278,8 @@ const REPORT = {
   DONE_STRIP_LIMIT: 8, // 累计区「一起追完的番」封面色带最多展示部数（溢出计入 +N）
   PERSONAL_STRIP_LIMIT: 6, // 个人小结每个状态（在追/追完/弃番）封面条最多展示部数（溢出计入 +N）
   PERSONAL_RECENT_LIMIT: 4, // 个人小结「我最近推进」番展示条数（我一人近窗推进话数降序 top N）
-  CHART_DAYS: 14, // 每日追番柱状图窗口天数上限（数据不足则从首个有记录日起，不硬铺空柱）
+  CHART_DAYS: 14, // 每日追番柱状图窗口天数上限（旧滚动窗口调用兼容保留；周视图不用此值）
+  WEEK_START: 1, // 周视图周首：1=周一（0=周日）。柱状图固定按此锚点分自然周，横滑翻周
 };
 
 // ── 报告文案（board-report）──
@@ -289,7 +290,13 @@ const REPORT_COPY = {
   ENTRY: '小结', // 板页头入口文案
   ME_DEFAULT: '我', // 我没设昵称时的兜底称呼
   PEER_DEFAULT: 'TA', // 对方没设昵称时的兜底称呼
-  DAYS_TOGETHER: '一起追番第 {n} 天', // ① 头部
+  // ① 头部 hero 卡：巨号数字单独渲染，前后缀 + 副信息全走配置
+  DAYS_TOGETHER_LABEL: '一起追番第', // 巨号数字前缀
+  DAYS_TOGETHER_UNIT: '天', // 巨号数字后缀（小字）
+  DAYS_TOGETHER: '一起追番第 {n} 天', // 整句（兼容保留，页面已改三段式）
+  HEAD_SINCE: '{date} 起 · 一起追了 {anime} 部番', // 副信息（配对态：日期 + 共同追番数）
+  HEAD_SINCE_SOLO: '{date} 起 · 已追 {anime} 部番', // 副信息（筹备态无 peer，不说「一起」）
+  HEAD_SINCE_NO_ANIME: '{date} 起', // 尚未加任何番时只显示起始日，不硬拼「0 部番」
   // ② 变化区：最近推进 + 环比方向 + 谁更活跃（中性叙事，非排名）
   RECENT_TITLE: '这几天你俩推得最猛',
   RECENT_EMPTY: '这几天你俩推得最欢', // 变化区有推进但无法归到具体番时的标题兜底（几乎不触发，防空标题）
@@ -302,12 +309,23 @@ const REPORT_COPY = {
   ACTIVE_LEAD: '{peer} 这阵子多追了 {n} 话', // 谁更活跃（中性，diff>0 时用；相等则不显示）
   RECALL_TITLE: '歇了歇脚', // 空窗召回卡标题
   RECALL: '这阵子都没动静，要不要打开追一集？', // 空窗召回钩子（近窗推进=0 且当前 streak 断）
-  // 每日追番柱状图（双色堆叠：我+TA 每日推进话数）
+  // 每日追番柱状图（双色堆叠：我+TA 每日推进话数）+ 周视图翻周
   CHART_TITLE: '每天追了多少',
   CHART_EMPTY: '还没攒够数据，追几天就有啦', // 无任何有效柱时
   CHART_AXIS_ME: '我',
   CHART_AXIS_PEER: 'TA',
   CHART_UNIT: '话', // 柱顶/图例单位
+  CHART_LEGEND_VALUE: '{name}（{ep}）', // 图例名后附本周各自集数（{name}=我/TA，{ep}=本周话数，圆括号包裹）
+  CHART_WEEK_THIS: '本周', // 周标签：今天所在周
+  CHART_WEEK_LAST: '上周', // 周标签：上一周
+  CHART_WEEK_RANGE: '{from}–{to}', // 更早周：用 M/D–M/D 区间（from/to 页面拼）
+  CHART_WEEK_DATE: '{m}/{d}', // 周区间端点日期格式
+  // 每周汇总行：点明主语 + 范围，消除「部番/话指谁、什么范围」的歧义。
+  // 配对/单人分文案（筹备态无 TA 时不能说「你俩」）。{anime}=当周推进过的不同番数，{ep}=合计话数
+  CHART_WEEK_SUMMARY: '你俩这周追了 {anime} 部番、共 {ep} 话',
+  CHART_WEEK_SUMMARY_SOLO: '你这周追了 {anime} 部番、共 {ep} 话',
+  CHART_WEEK_SUMMARY_EMPTY: '你俩这周还没追番',
+  CHART_WEEK_SUMMARY_EMPTY_SOLO: '你这周还没追番',
   // ③ 名场面（三徽章，show-if-present；副标题落到具体番/日期，不再是干数字）
   HIGHLIGHT_TITLE: '名场面',
   STREAK: {
@@ -355,6 +373,19 @@ const REPORT_COPY = {
   PERSONAL_RECENT_TITLE: '我最近在推', // 个人近窗推进小标题（只算我一人，区别于双人「推得最猛」）
   PERSONAL_RECENT_ROW: '{n} 话', // 番行我方推进话数
   PERSONAL_RECENT_TOTAL: '这几天我推进 {n} 话', // 我近窗推进合计
+  // 🔥 个人连续追番（「你自己」块顶部大火苗，Duolingo 式每日打卡钩子）。四态措辞：
+  // alive_done=今天已续上 / alive_pending=宽限内待续（火要灭了，制造紧迫） / broken=断了 / empty=还没开始
+  MY_STREAK: {
+    ICON: '🔥',
+    DAYS: '连续追番 {n} 天', // 整句（兼容保留；页面已改用 LABEL/数字/UNIT 三段式突出数字）
+    DAYS_LABEL: '连续追番', // 前缀小字
+    DAYS_UNIT: '天', // 后缀小字（超大数字单独渲染，成为视觉焦点）
+    SUB: '{date} 起没断过', // 副标题：streak 起始日
+    ALIVE_DONE: '今天的番追上了，链子稳住 ✓', // 今天已推进
+    ALIVE_PENDING: '火要灭了，今天追一集续上', // 宽限内今天还没追（紧迫钩子）
+    BROKEN: '连续追番断了，今天追一集重新点火', // days=0 但有过行为数据
+    EMPTY: '还没开始连续追番，今天追第一集', // 无行为数据 / 从没追过
+  },
   // 数据起记说明（B 类事件流仅埋点后有）
   FOOTNOTE: '行为数据自 {date} 起记录',
   DATE_MD: '{m}月{d}日', // dayIndex 还原成月日的模板

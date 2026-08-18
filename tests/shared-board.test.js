@@ -656,6 +656,12 @@ eq(
   eq('daysTogether 建板当天=第1天', T.daysTogether(board, bj(2026, 7, 1, 22, 0), TZ), 1);
   eq('daysTogether 第5天', T.daysTogether(board, bj(2026, 7, 5, 9, 0), TZ), 5);
   eq('daysTogether 非法建板→0', T.daysTogether({ createTime: 'x' }, bj(2026, 7, 5, 9, 0), TZ), 0);
+  // ── boardSinceDay：建板日 dayIndex，还原成 M/D 应等于建板日期；非法→null ──
+  // 注意本文件 bj 的月份是 0-indexed（不减 1），故 bj(2026,7,1) 实为 8 月 1 日
+  const sinceMD = T.dayIndexToMD(T.boardSinceDay(board, TZ), TZ);
+  eq('boardSinceDay 还原月', sinceMD.m, 8);
+  eq('boardSinceDay 还原日', sinceMD.d, 1);
+  eq('boardSinceDay 非法建板→null', T.boardSinceDay({ createTime: 'x' }, TZ), null);
 
   // ── windowProgress（progressGain 内部覆盖：回退不计负）──
   const now = bj(2026, 7, 10, 12, 0);
@@ -728,6 +734,20 @@ eq(
   eq('streakInfo 起始日还原', T.dayIndexToMD(si.startDay, TZ), { m: 8, d: 8 });
   eq('streakInfo 无记录 startDay=null', T.currentStreakInfo([], now, TZ, grace).startDay, null);
 
+  // ── myStreakInfo（个人版：只算我 actor，与板级同源不漂移）──
+  // streakEvents：8/8 PEER 追、8/9+8/10 ME 追。板级=3，但我个人只有 8/9、8/10 两天连续 → 2。
+  const ms = T.myStreakInfo(streakEvents, ME, bj(2026, 7, 10, 23, 0), TZ, grace);
+  eq('myStreak 只算我=2（板级为3）', ms.days, 2);
+  eq('myStreak 起始日=8/9', T.dayIndexToMD(ms.startDay, TZ), { m: 8, d: 9 });
+  eq('myStreak 今天已追 todayDone=true', ms.todayDone, true);
+  // now=8/11 06:00：我最近追番在 8/10（昨天），宽限内存活但今天还没追 → todayDone=false（火要灭了态）
+  const msGrace = T.myStreakInfo(streakEvents, ME, bj(2026, 7, 11, 6, 0), TZ, grace);
+  eq('myStreak 宽限内仍存活=2', msGrace.days, 2);
+  eq('myStreak 今天没追 todayDone=false', msGrace.todayDone, false);
+  // 对方视角：PEER 只在 8/8 追过，now=8/10 → 断超宽限 → 0
+  eq('myStreak 对方视角断裂=0', T.myStreakInfo(streakEvents, PEER, bj(2026, 7, 10, 23, 0), TZ, grace).days, 0);
+  eq('myStreak 无记录→0', T.myStreakInfo([], ME, now, TZ, grace).days, 0);
+
   // ── syncInfo（富信息：最近同步日 + 番名）──
   const syncEvents2 = [
     ev(ME, 'i1', 0, 1, bj(2026, 7, 5, 10, 0), { itemName: '药屋' }),
@@ -749,15 +769,46 @@ eq(
     ev(ME, 'i2', 0, 4, bj(2026, 7, 10, 10, 0)), // 8/10 我+4
     ev(ME, 'i2', 6, 2, bj(2026, 7, 10, 12, 0)), // 回退不计负
   ];
-  const chart = T.dailyProgressSeries(chartEvents, ME, PEER, bj(2026, 7, 10, 23, 0), TZ, 14);
+  const chartNow = bj(2026, 7, 10, 23, 0);
+  const chart = T.dailyProgressSeries(chartEvents, ME, PEER, chartNow, TZ, 14);
   eq('chart 从首记录日到今天连续铺满', chart.bars.length, 3); // 8/8,8/9,8/10
   eq('chart 首柱我', chart.bars[0].me, 3);
   eq('chart 首柱TA', chart.bars[0].peer, 2);
+  eq('chart 首柱番剧数（i1 去重）', chart.bars[0].animeCount, 1);
   eq('chart 中间零柱', chart.bars[1].total, 0);
+  eq('chart 中间零柱番剧数=0', chart.bars[1].animeCount, 0);
   eq('chart 末柱我', chart.bars[2].me, 4);
   eq('chart 峰值', chart.max, 5);
-  eq('chart 窗口上限截断', T.dailyProgressSeries(chartEvents, ME, PEER, bj(2026, 7, 10, 23, 0), TZ, 2).bars.length, 2);
+  eq('chart 窗口上限截断', T.dailyProgressSeries(chartEvents, ME, PEER, chartNow, TZ, 2).bars.length, 2);
   eq('chart 无记录→空', T.dailyProgressSeries([], ME, PEER, now, TZ, 14).bars.length, 0);
+  eq('chart 省略上限→全量（首记录日到今天）', T.dailyProgressSeries(chartEvents, ME, PEER, chartNow, TZ).bars.length, 3);
+
+  // ── buildWeeklyChart（按自然周分桶，周一起始）──
+  // chartEvents 跨 8/8(周六)~8/10(周一)：8/3 周含 8/8，8/10 周含 8/10（今天）
+  const dailyFull = T.dailyProgressSeries(chartEvents, ME, PEER, chartNow, TZ);
+  const weekly = T.buildWeeklyChart(dailyFull, chartEvents, chartNow, TZ, 1);
+  eq('weekly 分出两周（8/3 周 + 8/10 周）', weekly.weeks.length, 2);
+  eq('weekly currentIndex 指向今天所在周', weekly.currentIndex, 1);
+  eq('weekly 每周固定 7 格', weekly.weeks[0].slots.length, 7);
+  eq('weekly 首周起始=周一 8/3', T.dayIndexToMD(weekly.weeks[0].startDayIndex, TZ), { m: 8, d: 3 });
+  eq('weekly 首周峰值=5（8/8 那天）', weekly.weeks[0].max, 5);
+  eq('weekly 首周番剧数=1（i1）', weekly.weeks[0].animeCount, 1);
+  eq('weekly 首周话数合计=5', weekly.weeks[0].totalEp, 5);
+  eq('weekly 首周我=3（8/8 我+3）', weekly.weeks[0].meEp, 3);
+  eq('weekly 首周TA=2（8/8 TA+2）', weekly.weeks[0].peerEp, 2);
+  eq('weekly 当前周我=4（8/10 我+4）', weekly.weeks[1].meEp, 4);
+  eq('weekly 当前周TA=0', weekly.weeks[1].peerEp, 0);
+  eq('weekly 首周非当前周', weekly.weeks[0].isCurrent, false);
+  // 首周 8/8 是周六（下标 5），total=5
+  eq('weekly 首周周六格 total=5', weekly.weeks[0].slots[5].total, 5);
+  eq('weekly 首周内无未来日（都在今天前）', weekly.weeks[0].slots.filter((s) => s.isFuture).length, 0);
+  // 当前周 8/10（周一，下标 0）total=4，其余 8/11~8/16 是未来
+  eq('weekly 当前周周一格 total=4', weekly.weeks[1].slots[0].total, 4);
+  eq('weekly 当前周未来日=6（周二到周日）', weekly.weeks[1].slots.filter((s) => s.isFuture).length, 6);
+  eq('weekly 当前周 isCurrent', weekly.weeks[1].isCurrent, true);
+  eq('weekly 当前周番剧数=1（i2）', weekly.weeks[1].animeCount, 1);
+  eq('weekly 无数据→空', T.buildWeeklyChart({ bars: [] }, [], chartNow, TZ, 1).weeks.length, 0);
+  eq('weekly 无数据 currentIndex=-1', T.buildWeeklyChart({ bars: [] }, [], chartNow, TZ, 1).currentIndex, -1);
 
   // ── mostInvestedItem（合计集数最高的本命番）──
   const heroItems = [
@@ -868,7 +919,10 @@ eq(
   // ── buildReportModel 组装 + 空窗 + 无行为数据 ──
   const full = T.buildReportModel({ board, items: cItems, events: streakEvents, myOpenid: ME, nowMs: bj(2026, 7, 10, 23, 0), commonCount: 1 });
   eq('report 天数', full.daysTogether, 10);
+  eq('report 含 sinceDay（建板日 dayIndex）', full.sinceDay, T.boardSinceDay(board, TZ));
   eq('report streak', full.streak.days, 3);
+  eq('report myStreak 个人版=2（区别板级3）', full.myStreak.days, 2);
+  eq('report myStreak 含 todayDone', 'todayDone' in full.myStreak, true);
   eq('report 有行为数据', full.hasBehaviorData, true);
   eq('report 累计追完', full.cumulative.done, 1);
   eq('report 含 recentItems 数组', Array.isArray(full.recentItems), true);
@@ -877,6 +931,7 @@ eq(
   eq('report streak 富信息(含startDay)', typeof full.streak.days === 'number' && 'startDay' in full.streak, true);
   eq('report sync 富信息(含lastDay)', typeof full.sync.count === 'number' && 'lastDay' in full.sync, true);
   eq('report 含 dailySeries 结构', Array.isArray(full.dailySeries.bars) && typeof full.dailySeries.max === 'number', true);
+  eq('report 含 weeklyChart 结构', Array.isArray(full.weeklyChart.weeks) && typeof full.weeklyChart.currentIndex === 'number', true);
   eq('report hero 取本命(cItems合计最高=a)', full.hero.itemId, 'a');
   // 无任何事件 → 只有快照，行为块隐藏
   const bare = T.buildReportModel({ board, items: cItems, events: [], myOpenid: ME, nowMs: now, commonCount: 1 });

@@ -2,18 +2,23 @@
 
   <block wx:if="{{!loading && view}}">
 
-    <!-- ① 头部卡：双人身份色 + 一起追番第 N 天 -->
-    <view class="card head">
+    <!-- ① 头部 hero 卡：整卡蓝→紫渐变底 + 双人身份圆点 + 巨号天数 + 副信息 -->
+    <view class="card card--in card--in-1 head">
       <view class="head-dots">
         <view class="dot identity--me">{{view.meName[0]}}</view>
         <view wx:if="{{view.hasPeer}}" class="dot-link"></view>
         <view wx:if="{{view.hasPeer}}" class="dot identity--peer">{{view.peerName[0]}}</view>
       </view>
-      <view class="head-days">{{view.daysText}}</view>
+      <view class="head-days">
+        <text class="head-days__label">{{view.head.label}}</text>
+        <text class="head-days__num">{{view.head.days}}</text>
+        <text class="head-days__unit">{{view.head.unit}}</text>
+      </view>
+      <view wx:if="{{view.head.sub}}" class="head-sub">{{view.head.sub}}</view>
     </view>
 
     <!-- ② 变化区（MAIN，仅 hasBehaviorData && !emptyWindow）：推得最猛的番清单，每行封面+番名+双人集数 -->
-    <view wx:if="{{view.showChange}}" class="card change">
+    <view wx:if="{{view.showChange}}" class="card card--in card--in-2 change">
       <view class="sec-title">{{view.change.title}}</view>
       <view class="ri-list">
         <view class="ri-row" wx:for="{{view.change.items}}" wx:key="itemId">
@@ -45,42 +50,59 @@
     </view>
 
     <!-- ② 空窗召回卡（emptyWindow：有行为数据基础但近期歇了） -->
-    <view wx:if="{{view.showRecall}}" class="card recall">
+    <view wx:if="{{view.showRecall}}" class="card card--in card--in-2 recall">
       <view class="recall-title">{{view.recallTitle}}</view>
       <view class="recall-text">{{view.recallText}}</view>
     </view>
 
     <!-- 每日追番柱状图（双色堆叠：我蓝/TA紫），仅在活跃叙事下出现（歇脚态由召回卡承接，不铺空柱） -->
-    <view wx:if="{{view.showChange}}" class="card chart">
-      <view class="sec-title">{{view.chartTitle}}</view>
-      <block wx:if="{{view.chart.hasData}}">
-        <view class="chart-plot">
-          <view class="chart-col" wx:for="{{view.chart.bars}}" wx:key="dayIndex">
-            <view class="chart-bar-wrap">
-              <!-- 堆叠柱：我在下、TA 在上；高度按占峰值百分比。总为 0 时留一条极浅基线示意「这天没追」 -->
-              <view wx:if="{{item.total === 0}}" class="chart-bar-zero"></view>
-              <block wx:else>
-                <view wx:if="{{item.hasPeer && item.peerPct}}" class="chart-seg chart-seg--peer chart-seg--top" style="height:{{item.peerPct}}%"></view>
-                <view wx:if="{{item.mePct}}" class="chart-seg chart-seg--me {{item.hasPeer && item.peerPct ? '' : 'chart-seg--top'}}" style="height:{{item.mePct}}%"></view>
-              </block>
-            </view>
-            <view class="chart-axis {{item.isWeekend ? 'chart-axis--weekend' : ''}}">
-              <text class="chart-axis__wd">{{item.weekday}}</text>
-              <text class="chart-axis__day">{{item.day}}</text>
-            </view>
-          </view>
+    <view wx:if="{{view.showChange}}" class="card card--in card--in-3 chart">
+      <!-- 标题行：左标题 + 右上角翻周（‹ 周标签 ›），按钮到边界置灰不可点 -->
+      <view class="chart-head">
+        <view class="sec-title chart-head__title">{{view.chartTitle}}</view>
+        <view wx:if="{{view.chart.hasData}}" class="week-nav">
+          <view class="week-nav__btn {{view.chart.weeks[chartWeekIndex].canPrev ? '' : 'week-nav__btn--off'}}" data-dir="-1" bindtap="onWeekStep">‹</view>
+          <text class="week-nav__label">{{view.chart.weeks[chartWeekIndex].label}}</text>
+          <view class="week-nav__btn {{view.chart.weeks[chartWeekIndex].canNext ? '' : 'week-nav__btn--off'}}" data-dir="1" bindtap="onWeekStep">›</view>
         </view>
-        <!-- 图例：我/TA 双色 -->
+      </view>
+      <block wx:if="{{view.chart.hasData}}">
+        <!-- 横滑翻周：一周一屏，周一→周日固定 7 格；current 与标题栏翻周共享 chartWeekIndex -->
+        <swiper class="week-swiper" current="{{chartWeekIndex}}" bindchange="onWeekChange" circular="{{false}}">
+          <swiper-item wx:for="{{view.chart.weeks}}" wx:for-item="wk" wx:key="label" class="week-swiper__item">
+            <!-- 当周汇总：几部番 · 几话（番剧数量落点） -->
+            <view class="week-summary">{{wk.summary}}</view>
+            <view class="chart-plot">
+              <view class="chart-col" wx:for="{{wk.slots}}" wx:for-item="slot" wx:key="weekday">
+                <!-- 柱子从底部「长」上来，按列 index 错峰递延（--i 供 animation-delay） -->
+                <view class="chart-bar-wrap chart-bar-wrap--grow" style="--i:{{index}}">
+                  <!-- 未来日（本周还没到）：不画柱、不留基线，纯占位保持 7 格对齐 -->
+                  <block wx:if="{{!slot.isFuture}}">
+                    <view wx:if="{{slot.total === 0}}" class="chart-bar-zero"></view>
+                    <block wx:else>
+                      <view wx:if="{{slot.hasPeer && slot.peerPct}}" class="chart-seg chart-seg--peer chart-seg--top" style="height:{{slot.peerPct}}%"></view>
+                      <view wx:if="{{slot.mePct}}" class="chart-seg chart-seg--me {{slot.hasPeer && slot.peerPct ? '' : 'chart-seg--top'}}" style="height:{{slot.mePct}}%"></view>
+                    </block>
+                  </block>
+                </view>
+                <view class="chart-axis {{slot.isWeekend ? 'chart-axis--weekend' : ''}} {{slot.isFuture ? 'chart-axis--future' : ''}}">
+                  <text class="chart-axis__wd">{{slot.weekday}}</text>
+                </view>
+              </view>
+            </view>
+          </swiper-item>
+        </swiper>
+        <!-- 图例：我/TA 双色 + 当前周各自集数（随翻周更新，补堆叠柱读不出分段值的缺陷） -->
         <view class="chart-legend">
-          <view class="chart-lg"><view class="chart-lg__dot identity--me"></view><text>{{view.chartAxisMe}}</text></view>
-          <view wx:if="{{view.hasPeer}}" class="chart-lg"><view class="chart-lg__dot identity--peer"></view><text>{{view.chartAxisPeer}}</text></view>
+          <view class="chart-lg"><view class="chart-lg__dot identity--me"></view><text>{{view.chart.weeks[chartWeekIndex].legendMe}}</text></view>
+          <view wx:if="{{view.hasPeer}}" class="chart-lg"><view class="chart-lg__dot identity--peer"></view><text>{{view.chart.weeks[chartWeekIndex].legendPeer}}</text></view>
         </view>
       </block>
       <view wx:else class="chart-empty">{{view.chartEmpty}}</view>
     </view>
 
     <!-- ③ 名场面（三徽章横排，整区仅在有徽章时显示） -->
-    <view wx:if="{{view.badges.length}}" class="card highlight">
+    <view wx:if="{{view.badges.length}}" class="card card--in card--in-4 highlight">
       <view class="sec-title">{{view.highlightTitle}}</view>
       <view class="badges">
         <view class="badge" wx:for="{{view.badges}}" wx:key="key">
@@ -93,7 +115,7 @@
     </view>
 
     <!-- ④ 累计（本命番 Hero + 三统计格 + 一起追完的番封面色带，任何板都有） -->
-    <view class="card cumulative">
+    <view class="card card--in card--in-5 cumulative">
       <view class="sec-title">{{view.cumulativeTitle}}</view>
       <!-- 本命番 Hero：合计集数最高，情感锚点。仅在有本命番（total>0）时显示 -->
       <view wx:if="{{view.hero}}" class="hero">
@@ -141,8 +163,23 @@
     </view>
 
     <!-- ⑤ 个人小结（底部弱化）：我最近在推 + 足迹大数字 + 三状态封面组 -->
-    <view class="card personal">
+    <view class="card card--in card--in-6 personal">
       <view class="sec-title sec-title--weak">{{view.personalTitle}}</view>
+      <!-- 🔥 个人连续追番火苗（Duolingo 式打卡）：active 时大数字点亮，urgent(宽限内待续)加脉冲强调；断/空态灰显引导 -->
+      <view class="streak {{view.myStreak.active ? 'streak--on' : 'streak--off'}} {{view.myStreak.urgent ? 'streak--urgent' : ''}}">
+        <view class="streak-flame">{{view.myStreak.icon}}</view>
+        <view class="streak-main">
+          <!-- 左侧文字块：标签 + 起始日 + 状态提示（数字抽到右侧，不再撑高首行行高） -->
+          <view wx:if="{{view.myStreak.active}}" class="streak-label">{{view.myStreak.daysLabel}}</view>
+          <view wx:if="{{view.myStreak.active && view.myStreak.sub}}" class="streak-sub">{{view.myStreak.sub}}</view>
+          <view class="streak-hint">{{view.myStreak.hint}}</view>
+        </view>
+        <!-- 右侧超大天数：独占空白区做视觉锚点，与左侧文字解耦，主次分明 -->
+        <view wx:if="{{view.myStreak.active}}" class="streak-count">
+          <text class="streak-count__num">{{view.myStreak.days}}</text>
+          <text class="streak-count__unit">{{view.myStreak.daysUnit}}</text>
+        </view>
+      </view>
       <!-- 我最近在推：近窗只算我一人的推进（有行为数据且非空窗时显示） -->
       <view wx:if="{{view.showChange && view.myRecent.hasData}}" class="my-recent">
         <view class="my-recent__title">{{view.myRecentTitle}}</view>
