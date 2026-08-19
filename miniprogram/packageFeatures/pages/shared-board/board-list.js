@@ -2,11 +2,17 @@
 //
 // 允许一人加入多个板（PRD §5.4）。onShow 拉列表（打开即最新，MVP 不做 watch）。
 const api = require('../../utils/shared-board/cloud-api');
-const { pickCoverColor, sanitizeAvatar } = require('../../utils/shared-board/transform');
-const { BOARD_STATUS } = require('../../utils/shared-board/config');
+const { pickCoverColor, sanitizeAvatar, relativeTime } = require('../../utils/shared-board/transform');
+const { BOARD_STATUS, BOARD_LIST_COPY } = require('../../utils/shared-board/config');
+
+// 占位符插值：{key} → vars[key]。回调式 replace，避免番名含 $&/$1 被当特殊模式（与 board-report/history 同一约定）
+function fillTemplate(tpl, vars) {
+  return String(tpl).replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? String(vars[k]) : m));
+}
 
 Page({
   data: {
+    copy: BOARD_LIST_COPY, // 静态文案（空态/建板弹层）走配置，wxml 直接取
     loading: true,
     boards: [],       // 视图模型列表
     myOpenid: '',
@@ -70,22 +76,51 @@ Page({
     this.setData({ [`avatarErr.${boardId}`]: true });
   },
 
-  // 单个板卡片视图模型
+  // 单个板卡片视图模型（P1 统一大卡：双人同轴头像 + 封面墙 + 番数 + 活跃时间）
   _toVM(board, myOpenid) {
     const members = board.members || [];
+    const me = members.find((m) => m && m.openid === myOpenid) || null;
     const peer = members.find((m) => m && m.openid && m.openid !== myOpenid) || null;
     const archived = board.status === BOARD_STATUS.ARCHIVED;
     const paired = members.length >= 2;
+    const peerName = peer ? peer.nickname || BOARD_LIST_COPY.PEER_DEFAULT : '';
+
+    // 封面墙：前 N 部番名生成首字色块（封面基本为空色块，有 https 图才用图；cloud:// 净化掉）。
+    // 溢出（itemCount 超过预览条数）计入 +N 角标。
+    const preview = board.previewItems || [];
+    const itemCount = board.itemCount || 0;
+    const covers = preview.map((it) => ({
+      cover: sanitizeAvatar(it.cover),
+      fallback: pickCoverColor(it.name || ''),
+    }));
+    const moreCount = itemCount > covers.length ? itemCount - covers.length : 0;
+
+    // 活跃/等待文案：配对态显示「和TA · X前一起追」；筹备态未配对显示「等 TA 点开链接」，
+    // 已配对但走单人叙事的边界几乎不存在（配对即双人），故只按 paired 分两支。
+    const activeTime = relativeTime(board.updateTime, Date.now());
+    let subline;
+    if (!paired) {
+      subline = BOARD_LIST_COPY.WAITING_PEER;
+    } else {
+      subline = fillTemplate(BOARD_LIST_COPY.ACTIVE_WITH_PEER, { peer: peerName, time: activeTime });
+    }
+
     return {
       boardId: board._id,
       name: board.name,
-      itemCount: board.itemCount || 0,
+      itemCount,
+      itemCountText: fillTemplate(BOARD_LIST_COPY.ITEM_COUNT, { n: itemCount }),
       archived,
       paired,
-      peerName: peer ? peer.nickname || '对方' : '',
+      // 双人同轴头像：我方（左）恒有，对方（右）配对后有、未配对为虚位
+      meFallback: pickCoverColor((me && me.nickname) || BOARD_LIST_COPY.PEER_DEFAULT),
+      meAvatar: me ? sanitizeAvatar(me.avatar) : '',
+      peerName,
       peerAvatar: peer ? sanitizeAvatar(peer.avatar) : '', // cloud:// 净化为空→走首字母，不发失败请求刷 500
-      peerFallback: peer ? pickCoverColor(peer.nickname || '对方') : null,
-      waitingHint: paired ? '' : '等 TA 点开链接',
+      peerFallback: peer ? pickCoverColor(peerName) : null,
+      covers,
+      moreText: moreCount > 0 ? fillTemplate(BOARD_LIST_COPY.COVERS_MORE, { n: moreCount }) : '',
+      subline,
       hasUnread: !!board.hasUnread,
     };
   },

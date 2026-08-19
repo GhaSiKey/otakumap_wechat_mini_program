@@ -131,6 +131,10 @@ const VIEW = {
   // BLUR_GAP 已删（2026-07-23 砍防剧透）：原用于「领先幅度模糊档」，进度信息现全透明
 };
 
+// 板列表页封面墙的预览条数在云函数侧权威定义（cloudfunctions/_shared-board/constants.js
+// 的 BOARD_PREVIEW_COVERS，供 listMyBoards 的 .limit() 用）。前端只渲染云函数已截断的
+// previewItems，自己不再持有该阈值，避免两处副本漂移。
+
 // ── 分区（UI 规格 §P2，顺序即展示顺序，不硬编码）──
 const SECTION = {
   TOGETHER: 'together', // 一起追
@@ -395,6 +399,24 @@ const REPORT_COPY = {
   NOT_MEMBER: '无权查看',
 };
 
+// ── 板列表卡文案（board-list，P1 统一大卡）──
+// 列表卡措辞集中此处，{n}/{peer}/{time} 由页面 fillTemplate 插值，不硬编码进 wxml/js。
+const BOARD_LIST_COPY = {
+  ITEM_COUNT: '{n} 部番', // 番数摘要
+  COVERS_MORE: '+{n}', // 封面墙溢出角标
+  ACTIVE_WITH_PEER: '和{peer} · {time}一起追', // 配对态：关系 + 相对活跃时间
+  WAITING_PEER: '等 TA 点开链接', // 筹备态提示（对方未加入，替代活跃时间行）
+  PEER_DEFAULT: '对方', // 对方没设昵称时的兜底称呼
+  GHOST: '?', // 对方未加入的虚位头像占位符
+  ARCHIVED_PREFIX: '📁 ', // 归档板名前缀
+  EMPTY_TITLE: '还没有共享的番单', // 空态主文案
+  EMPTY_SUB: '和 TA 开一个，一起追番吧', // 空态副文案
+  EMPTY_CTA: '建第一个板', // 空态按钮
+  CREATE_TITLE: '新建共享番单', // 建板弹层标题
+  CREATE_PLACEHOLDER: '给这个板起个名（可留空）', // 建板输入占位
+  CREATE_CTA: '建板', // 建板按钮
+};
+
 // ── 首字色块调色板（封面为空时占位）──
 // JS 侧取不到 WXSS 的 --td-* 变量，故从 TDesign 品牌色阶人工派生并集中于此，
 // 属「配置层集中管理」而非「散落硬编码」。真按变量取色需 wx.getComputedStyle，MVP 不做。
@@ -433,6 +455,7 @@ module.exports = {
   ERR,
   JOIN_ERR_MESSAGES,
   VIEW,
+  BOARD_LIST_COPY,
   SECTION,
   SECTION_ORDER,
   SECTION_TITLES,

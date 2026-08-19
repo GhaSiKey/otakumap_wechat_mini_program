@@ -61,24 +61,28 @@
 
 允许一人加入多个板（PRD §5.4），这是必需的一层。
 
+**统一大卡（2026-08-18 重构）：** 一般人只有 1 个板，旧「紧凑列表行」在单板场景留大片空白。改为**统一大卡**——单板不显空、多板堆叠自然，一套结构应对所有数量。每张卡三段纵向：① 头部行（双人同轴头像 + 板名 + 未读红点）② 封面墙（前 N 部番首字色块铺满整宽）③ 底部信息行（番数 · 活跃/等待 + 进入箭头）。
+
 ```
 ┌────────────────────────────────┐
 │  共享追番板                          │ ← 系统导航栏（非 custom）
 ├────────────────────────────────┤
 │  ┌────────────────────────────┐   │
-│  │ 🔴 我俩的番单                │   │ ← 板卡片（未读红点在左上）
-│  │ ┌──┐┌──┐   12 部番           │   │
-│  │ │头││头│   3 部能一起聊       │   │ ← 双头像 avatar-group + 摘要
-│  │ └──┘└──┘   小王 · 2 天前活跃  │   │
+│  │ (头)(头)  我俩的番单     🔴   │   │ ← ① 双人同轴头像（重叠）+ 板名 + 未读点(右)
+│  │ ┌────┐┌────┐┌────┐┌────┐   │   │
+│  │ │ 芙 ││ 药 ││ 葬 ││ +5 │   │   │ ← ② 封面墙：前 4 部首字色块 + 溢出「+N」
+│  │ └────┘└────┘└────┘└────┘   │   │
+│  │ 12 部番 · 和小王 · 2天前一起追 ›│   │ ← ③ 番数 · 活跃行 + 箭头
 │  └────────────────────────────┘   │
 │  ┌────────────────────────────┐   │
-│  │ 和阿宅的补番坑               │   │ ← 无红点
-│  │ ┌──┐┌··┐   5 部番            │   │ ← 右头像虚线=对方未加入
-│  │ │头││? │   等 TA 点开链接     │   │
-│  │ └──┘└··┘                    │   │
+│  │ (头)(?)  和阿宅的补番坑        │   │ ← 右头像虚线圈=对方未加入
+│  │ ┌────┐┌────┐               │   │
+│  │ │ 凡 ││ 咒 │               │   │
+│  │ └────┘└────┘               │   │
+│  │ 5 部番 · 等 TA 点开链接      ›│   │ ← 未配对：等待文案染我方身份色
 │  └────────────────────────────┘   │
 │  ┌────────────────────────────┐   │
-│  │ 📁 和前任的番单（已归档）     │   │ ← 归档态，整卡降调
+│  │ (头)(头) 📁 和前任的番单       │   │ ← 归档态，整卡降调（去阴影 + 半透明）
 │  └────────────────────────────┘   │
 │                          ╭─────╮  │
 │                          │  +  │  │ ← t-fab 建板入口
@@ -86,22 +90,36 @@
 └────────────────────────────────┘
 ```
 
-**空态（一个板都没有）：** `t-empty` +「还没有共享的番单，和 TA 开一个，一起追番吧」+ `t-button`「建第一个板」。
+**空态（一个板都没有）：** `t-empty` +「还没有共享的番单，和 TA 开一个，一起追番吧」+ `t-button`「建第一个板」。文案走 `BOARD_LIST_COPY`（EMPTY_TITLE/EMPTY_SUB/EMPTY_CTA）。
 
 元素与组件映射：
 
 | 元素 | 组件 / 自绘 | CSS 变量 |
 |------|-----------|---------|
 | 页面底 | `page` | `--td-bg-color-page` |
-| 板卡片容器 | 自绘 `view.board-card` | 底 `--td-bg-color-container`；圆角 `--td-radius-large`；阴影 `--td-shadow-1`；内距 `--td-spacer-2` |
-| 双头像 | `t-avatar-group` + 两 `t-avatar`(small, 轻叠) | 边框 `--td-bg-color-container` 描边分隔 |
-| 对方未加入虚位头像 | 自绘 `view.avatar-ghost`（虚线圆 + `?`） | 边框/文字 `--td-text-color-placeholder` |
-| 板名 | `text.board-name` | `--td-text-color-primary`；`--td-font-size-title-medium`；`font-weight:600` |
-| 番数/摘要 | `text.board-meta` | `--td-text-color-secondary`；`--td-font-size-body-small` |
-| 「N 部能一起聊」 | `text.board-common` | `--td-brand-color`（核心价值提示，品牌色强调） |
-| 未读红点 | `t-badge dot` | `--td-error-color`（红点=通用未读语义，非落后惩罚，允许用红） |
-| 归档卡 | `view.board-card--archived` | `--td-text-color-placeholder` + 去阴影 + 📁 前缀 |
+| 板卡片容器 | 自绘 `view.board-card`（三段纵向 flex-column） | 底 `--td-bg-color-container`；圆角 `--td-radius-large`；阴影 `--td-shadow-1`；内距 `--td-spacer-2` |
+| 双人同轴头像 | 自绘 `view.dual-avatar`（两枚重叠 -12rpx，右压左） | 白描边 `--td-bg-color-container` 勾出重叠边界（暗模式自动取容器色） |
+| 头像/首字兜底 | `image.dual-avatar__img` / `view.dual-avatar__fallback` | 兜底底色走 `pickCoverColor`（COVER_PALETTE 深色档扛白字）；`cloud://` 经 `sanitizeAvatar` 净化→走首字，不发失败请求 |
+| 对方未加入虚位头像 | 自绘 `view.dual-avatar__ghost`（虚线圆 + `?`） | 边框/文字 `--td-text-color-placeholder` |
+| 板名 | `text.board-name`（单行省略） | `--td-text-color-primary`；`--td-font-size-title-medium`；`font-weight:600` |
+| 封面墙格 | `image.cover-cell` / `view.cover-cell--ph`（等宽 flex:1，高 120rpx） | 首字底色 `pickCoverColor`；圆角 `--td-radius-default` |
+| 封面溢出角标 | 自绘 `view.cover-more`（与封面等宽「+N」灰格） | 底 `--td-bg-color-component`；文字 `--td-text-color-secondary` |
+| 番数 | `text.foot-count` | `--td-text-color-primary`；`font-weight:600` |
+| 活跃/等待文案 | `text.foot-sub` / `.foot-sub--waiting` | 配对：`--td-text-color-secondary`；未配对等待：`--sb-color-me`（我方身份色，暗示「就差 TA」） |
+| 进入箭头 | `text.foot-arrow`（›） | `--td-text-color-placeholder` |
+| 未读红点 | 自绘 `view.unread-dot`（板名右侧） | `--td-error-color`（红点=通用未读语义，非落后惩罚，允许用红） |
+| 归档卡 | `view.board-card--archived` | 去阴影 + `opacity:0.6` + 📁 前缀（ARCHIVED_PREFIX） |
 | 建板 FAB | `t-fab`(icon add) | `--td-brand-color` |
+
+**封面墙数据来源：** `listMyBoards` 云函数按 `cloudfunctions/_shared-board/constants.js` 的 `BOARD_PREVIEW_COVERS`（=4）做 `.limit()` 取番名 + 封面（`previewItems`），并单独 `count()` 拿准确总数 `itemCount`；前端只渲染已截断的 `previewItems`，溢出（itemCount − 预览数）计入「+N」。番剧数据源被墙、封面基本为空，故封面墙实为**首字色块墙**（`pickCoverColor` 取番名首字 + 哈希配色，双方一致零成本）。
+
+**封面墙排序 = 最近活跃优先（2026-08-18）：** 预览查询按 `item.updateTime` 降序取（不是 `createTime`）。`item.updateTime` 在 `addItem`（加番）和 `updateProgress`（+1/改状态）时都会 bump，故封面墙呈现「你俩最近在追/推进的番」，随互动实时变化，与卡片底部「X 前一起追」同一活跃叙事。旧的 `createTime asc` 永远取最早 4 部、永不变化，已废弃。
+
+**封面格定宽不变形：** `.cover-cell` 用 `flex:1 1 0 + max-width:120rpx`——番少时均分值超上限则封顶、左对齐留白（不拉伸变形）；番满（≤4 格 + 「+N」）均分值低于上限则自然铺满。免精算屏宽、免按格数切 class。「+N」角标同样定宽，避免独吞留白拉成宽条。
+
+**身份色变量定义在 `page` 根**（非 `.page`）：`--sb-color-me`/`--sb-color-peer` + RGB 分量 `--sb-me-rgb`/`--sb-peer-rgb`，与 `shared-board`/`board-report` 同源，弹层外也能继承。
+
+**决策留档：** 本轮方向为「B 统一大卡」，数据范围「只封面墙」——**不在列表页显示「N 部能一起聊」**（commonCount 需读全量 items，ROI 低，且更适合放 P2 门面里做仪式感）。旧线框的 avatar-group + 「3 部能一起聊」右置摘要已作废。
 
 交互：点板卡 `navigateTo` 进 P2 带 `boardId`；归档板可点进（只读）；整页下拉刷新重拉板列表；**无显眼删除入口**（退出/解散是 P2 内低调二级操作，PRD §5.4）。
 

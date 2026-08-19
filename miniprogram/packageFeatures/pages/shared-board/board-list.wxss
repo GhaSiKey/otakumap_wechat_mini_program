@@ -6,6 +6,12 @@ view, text {
 
 page {
   background-color: var(--td-bg-color-page, #f5f5f5);
+  /* 身份色（与 shared-board / board-report 同源）：我=品牌蓝，TA=紫。
+     RGB 分量供 rgba() 做半透明底，亮/暗模式自动透出容器色 */
+  --sb-color-me: var(--td-brand-color, #0052d9);
+  --sb-color-peer: #834ec2;
+  --sb-me-rgb: 0, 82, 217;
+  --sb-peer-rgb: 131, 78, 194;
 }
 
 .page {
@@ -66,14 +72,34 @@ page {
   gap: var(--td-spacer, 16rpx);
 }
 
+/* 统一大卡：三段纵向（头部行 / 封面墙 / 底部信息行）。
+   单板不显空、多板堆叠自然，一套结构应对所有数量 */
 .board-card {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   padding: var(--td-spacer-2, 32rpx);
   background-color: var(--td-bg-color-container, #ffffff);
   border-radius: var(--td-radius-large, 18rpx);
   box-shadow: var(--td-shadow-1, 0 1px 10px rgba(0, 0, 0, 0.05));
+  /* 点按下沉靠 transition 承接 hover-class；只动 transform（GPU 合成，不触发重排） */
+  transition: transform 0.12s ease-out;
+}
+
+/* 点按下沉：微信原生 hover-class 触发，松手自动回弹（纯手感反馈，零逻辑） */
+.board-card--pressed {
+  transform: scale(0.98);
+}
+
+/* 未读整卡微光：有限 3 次呼吸后停。hub 页每次 onShow 重建 → 每次进来脉冲几下提示
+   「这板有新动静」，然后安静，不做成持续循环（耗电 + 廉价感）。
+   用身份色 --sb-me-rgb 做 box-shadow 辉光，亮/暗模式自动透出容器色。 */
+.board-card--unread {
+  animation: sbCardGlow 2.6s ease-in-out 3;
+}
+
+@keyframes sbCardGlow {
+  0%, 100% { box-shadow: var(--td-shadow-1, 0 1px 10px rgba(0, 0, 0, 0.05)); }
+  50% { box-shadow: 0 0 0 2rpx rgba(var(--sb-me-rgb), 0.5), 0 4rpx 24rpx rgba(var(--sb-me-rgb), 0.28); }
 }
 
 .board-card--archived {
@@ -81,18 +107,28 @@ page {
   opacity: 0.6;
 }
 
-.board-card__main {
-  flex: 1;
-  min-width: 0;
+/* ① 头部行：双人头像 + 板名 + 未读点 */
+.board-card__head {
+  display: flex;
+  align-items: center;
 }
 
 .board-name {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
+  margin-left: var(--td-spacer, 16rpx);
   font-size: var(--td-font-size-title-medium, 32rpx);
   font-weight: 600;
   color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
-  margin-bottom: 8rpx;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.archived-tag {
+  color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
 }
 
 .unread-dot {
@@ -100,56 +136,145 @@ page {
   height: 16rpx;
   border-radius: 50%;
   background: var(--td-error-color, #e34d59);
-  margin-right: 12rpx;
+  margin-left: 12rpx;
+  flex-shrink: 0;
+  /* 红点呼吸：明灭 3 下后停（与整卡微光同一「进来提醒、随即安静」节奏）。
+     transform-origin center 让缩放不推挤板名。 */
+  transform-origin: center;
+  animation: sbDotBreathe 1.2s ease-in-out 3;
+}
+
+@keyframes sbDotBreathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.65; }
+}
+
+/* ==================== 双人同轴头像 ==================== */
+/* 两枚头像重叠 12rpx，右侧对方压左侧我方，视觉上"两个人在一起" */
+.dual-avatar {
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
 }
 
-.archived-tag {
-  color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
-}
-
-.board-meta {
-  font-size: var(--td-font-size-body-small, 24rpx);
-  color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
-}
-
-.waiting-hint {
-  color: var(--td-brand-color, #0052d9);
-}
-
-/* ==================== 头像 / 虚位 ==================== */
-.board-card__avatar {
-  flex-shrink: 0;
-  margin-left: var(--td-spacer, 16rpx);
-}
-
-.avatar-img {
+.dual-avatar__img,
+.dual-avatar__fallback,
+.dual-avatar__ghost {
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
+  /* 白描边把两枚头像的重叠边界勾出来，暗模式用容器色 */
+  border: 4rpx solid var(--td-bg-color-container, #ffffff);
+  box-sizing: border-box;
 }
 
-.avatar-fallback {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
+.dual-avatar__img--peer,
+.dual-avatar__fallback--peer,
+.dual-avatar__ghost {
+  margin-left: -12rpx;
+}
+
+.dual-avatar__fallback {
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
   font-size: 28rpx;
+  font-weight: 600;
 }
 
-.avatar-ghost {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  border: 2rpx dashed var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
+.dual-avatar__ghost {
+  border: 3rpx dashed var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
   color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 28rpx;
+  background: var(--td-bg-color-container, #ffffff);
+}
+
+/* ② 封面墙：一行首字色块，最近活跃的番在前（云函数按 item.updateTime desc 取）。
+   格子定宽不变形——番少时封顶留白左对齐，番满时均分铺满：
+   flex:1 想撑满，但 max-width 封顶为正方；格少（如 2 部）均分值超上限 → 停在上限、
+   容器默认左对齐、右侧留白；格满（最多 4 格 + 「+N」=5 格）均分值低于上限 → 自然铺满。
+   免精算屏宽、免按格数切 class。 */
+.cover-wall {
+  display: flex;
+  gap: 12rpx;
+  margin-top: var(--td-spacer, 16rpx);
+}
+
+.cover-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 120rpx;
+  height: 120rpx;
+  border-radius: var(--td-radius-default, 12rpx);
+  overflow: hidden;
+}
+
+.cover-cell--ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 40rpx;
+  font-weight: 600;
+}
+
+/* 溢出角标：与封面等宽的"+N"格，弱化成灰底（同 .cover-cell 定宽，避免独吞留白拉成宽条） */
+.cover-more {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 120rpx;
+  height: 120rpx;
+  border-radius: var(--td-radius-default, 12rpx);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--td-font-size-body-medium, 28rpx);
+  font-weight: 600;
+  color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
+  background: var(--td-bg-color-component, rgba(0, 0, 0, 0.05));
+}
+
+/* ③ 底部信息行：番数 · 活跃/等待 + 箭头 */
+.board-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--td-spacer, 16rpx);
+}
+
+.foot-info {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--td-font-size-body-small, 24rpx);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.foot-count {
+  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
+  font-weight: 600;
+}
+
+.foot-sub {
+  color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
+}
+
+/* 未配对：等待文案染我方身份色，提示"就差 TA 了" */
+.foot-sub--waiting {
+  color: var(--sb-color-me, #0052d9);
+}
+
+.foot-arrow {
+  flex-shrink: 0;
+  margin-left: var(--td-spacer, 16rpx);
+  font-size: 40rpx;
+  line-height: 1;
+  color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
 }
 
 /* 建板弹层外壳走 ./sheet.wxss，无需专属样式 */

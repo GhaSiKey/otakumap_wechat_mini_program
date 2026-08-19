@@ -94,6 +94,8 @@
 
       <view
         class="item-card {{it.itemId === syncItemId ? 'item-card--sync' : ''}}"
+        hover-class="item-card--pressed"
+        hover-stay-time="80"
         wx:for="{{sec.items}}"
         wx:key="itemId"
         wx:for-item="it"

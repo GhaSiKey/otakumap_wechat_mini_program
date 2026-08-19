@@ -38,6 +38,10 @@ const ITEM_NAME_MAX = 60;
 
 const ITEM_SHARED_FIELDS = ['name', 'totalEp', 'airStatus', 'cover', 'airDay'];
 
+// 板列表卡封面墙取番数上限（与前端 config.BOARD_LIST.PREVIEW_COVERS 同值）。
+// 逐板取前 N 部番名做首字色块墙；纯展示阈值，不参与漂移守卫结构比对。
+const BOARD_PREVIEW_COVERS = 4;
+
 const ERR = {
   OK: 'OK',
   UNAUTHENTICATED: 'ERR_UNAUTHENTICATED',
@@ -72,5 +76,6 @@ module.exports = {
   BOARD_NAME_MAX,
   ITEM_NAME_MAX,
   ITEM_SHARED_FIELDS,
+  BOARD_PREVIEW_COVERS,
   ERR,
 };

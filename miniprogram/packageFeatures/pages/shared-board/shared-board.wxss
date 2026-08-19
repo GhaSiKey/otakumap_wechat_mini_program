@@ -384,6 +384,14 @@ page {
   padding: 24rpx;
   overflow: hidden; /* 保住卡片圆角 */
   margin-bottom: var(--td-spacer, 16rpx);
+  /* 点按下沉靠 transition 承接 hover-class；只动 transform（GPU 合成，与 board-list 同款手感） */
+  transition: transform 0.12s ease-out;
+}
+
+/* 点按下沉：微信原生 hover-class 触发，松手自动回弹。sync 追平态用 box-shadow 辉光、
+   不占 transform，故与此 scale 无冲突（可叠加：追平卡按下时既有绿光又能下沉）。 */
+.item-card--pressed {
+  transform: scale(0.98);
 }
 
 /* ===== 左侧封面区：内嵌悬浮竖版海报，固定 3:4 比例，四角全圆 =====
