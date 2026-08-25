@@ -341,6 +341,9 @@ const ERR = { OK:'OK', UNAUTHENTICATED:'ERR_UNAUTHENTICATED', INTERNAL:'ERR_INTE
 // 视图层阈值（transform 用，UI §8）
 const VIEW = { AXIS_LEAD_ANCHOR: 75, OVERLAP_PCT: 3, BREAK_GAP: 12 }; // BLUR_GAP 已删（2026-07-23 砍防剧透）
 // 分区（UI §P2，不硬编码顺序）
+// ⚠️ 本段为阶段二设计稿。分区规则已于 2026-08-19 演进为 5 分区、只看「我」的状态
+//    （PAUSED/DROPPED 拆开，sectionOf 改单参查 STATUS_TO_SECTION 表）。
+//    以现行 config.js/transform.js + 本文档 shared-board-ui.md §P2 为准。
 const SECTION = { TOGETHER:'together', NOT_STARTED:'not_started', PAUSED:'paused', DONE:'done' };
 const SECTION_ORDER = [SECTION.TOGETHER, SECTION.NOT_STARTED, SECTION.PAUSED, SECTION.DONE];
 // 首字色块调色板（从 TDesign 品牌色阶派生，JS 侧取不到 --td-* 变量，故集中配置）

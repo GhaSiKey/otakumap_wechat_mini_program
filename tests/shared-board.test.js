@@ -257,14 +257,19 @@ eq('空值 → 空', T.sanitizeAvatar(''), '');
 eq('null → 空', T.sanitizeAvatar(null), '');
 
 // ============================================================
-// sectionOf：分区判定
+// sectionOf：分区判定（单参，只看「我」的状态，查 STATUS_TO_SECTION 表；5 分区）
 // ============================================================
-eq('两人 watching → TOGETHER', T.sectionOf('watching', 'watching'), C.SECTION.TOGETHER);
-eq('一人 want 一人无进度 → NOT_STARTED', T.sectionOf('want', null), C.SECTION.NOT_STARTED);
-eq('一方 dropped → PAUSED', T.sectionOf('watching', 'dropped'), C.SECTION.PAUSED);
-eq('一方 paused → PAUSED', T.sectionOf('paused', 'watching'), C.SECTION.PAUSED);
-eq('两人 done → DONE', T.sectionOf('done', 'done'), C.SECTION.DONE);
-eq('一人 done 一人 watching → TOGETHER', T.sectionOf('done', 'watching'), C.SECTION.TOGETHER);
+eq('watching → TOGETHER', T.sectionOf('watching'), C.SECTION.TOGETHER);
+eq('caught_up → TOGETHER', T.sectionOf('caught_up'), C.SECTION.TOGETHER);
+eq('want → NOT_STARTED', T.sectionOf('want'), C.SECTION.NOT_STARTED);
+eq('null（还没翻牌）→ NOT_STARTED', T.sectionOf(null), C.SECTION.NOT_STARTED);
+eq('未知状态 → NOT_STARTED', T.sectionOf('???'), C.SECTION.NOT_STARTED);
+eq('done → DONE', T.sectionOf('done'), C.SECTION.DONE);
+eq('paused → PAUSED（独立区）', T.sectionOf('paused'), C.SECTION.PAUSED);
+eq('dropped → DROPPED（独立区，不再并入 PAUSED）', T.sectionOf('dropped'), C.SECTION.DROPPED);
+// 关键新语义：只看我的状态，TA 的状态不绑架整番分区
+eq('我 watching、TA 暂缓 → 仍 TOGETHER（不被拽进暂缓）', T.sectionOf('watching'), C.SECTION.TOGETHER);
+eq('我 done、TA 还在追 → DONE（我追完了）', T.sectionOf('done'), C.SECTION.DONE);
 
 // ============================================================
 // groupItems：分组、软删除过滤、组内排序、分区顺序
@@ -274,7 +279,9 @@ const items = [
   item({ _id: 'b', name: '先加但序号大', sortOrder: { me: 300 }, progress: { me: { ep: 1, status: 'watching' }, pe: { ep: 1, status: 'watching' } } }),
   item({ _id: 'c', name: '排最前', sortOrder: { me: 100 }, progress: { me: { ep: 5, status: 'watching' }, pe: { ep: 5, status: 'watching' } } }),
   item({ _id: 'd', name: '想看的', progress: { me: { ep: 0, status: 'want' } } }),
-  item({ _id: 'e', name: '都看完', progress: { me: { ep: 12, status: 'done' }, pe: { ep: 12, status: 'done' } } }),
+  item({ _id: 'e', name: '看完了', progress: { me: { ep: 12, status: 'done' }, pe: { ep: 12, status: 'done' } } }),
+  item({ _id: 'g', name: '暂缓的', progress: { me: { ep: 4, status: 'paused' }, pe: { ep: 6, status: 'watching' } } }),
+  item({ _id: 'h', name: '下车的', progress: { me: { ep: 2, status: 'dropped' }, pe: { ep: 8, status: 'watching' } } }),
   item({ _id: 'f', name: '被移出', deleted: true, deletedBy: 'me', progress: { me: { ep: 1, status: 'watching' } } }),
 ];
 const groups = T.groupItems(items, 'me', 'pe');
@@ -282,10 +289,20 @@ const groups = T.groupItems(items, 'me', 'pe');
 // 软删除过滤：被移出的 f 不出现在任何组
 const allIds = groups.reduce((acc, g) => acc.concat(g.items.map((v) => v.itemId)), []);
 eq('软删除项被过滤', allIds.includes('f'), false);
-eq('未删项全部在列', allIds.sort(), ['a', 'b', 'c', 'd', 'e']);
+eq('未删项全部在列', allIds.sort(), ['a', 'b', 'c', 'd', 'e', 'g', 'h']);
 
-// 分区顺序：TOGETHER 在 NOT_STARTED 在 DONE 之前
-eq('分区顺序遵循 SECTION_ORDER', groups.map((g) => g.sectionKey), [C.SECTION.TOGETHER, C.SECTION.NOT_STARTED, C.SECTION.DONE]);
+// 分区顺序：TOGETHER → NOT_STARTED → DONE → PAUSED → DROPPED（新 5 分区）
+eq('分区顺序遵循 SECTION_ORDER', groups.map((g) => g.sectionKey), [
+  C.SECTION.TOGETHER,
+  C.SECTION.NOT_STARTED,
+  C.SECTION.DONE,
+  C.SECTION.PAUSED,
+  C.SECTION.DROPPED,
+]);
+
+// 暂缓/下车按「我的状态」独立分区，不因 TA 在追而并入 TOGETHER
+eq('我暂缓的番落 PAUSED', groups.find((g) => g.sectionKey === C.SECTION.PAUSED).items.map((v) => v.itemId), ['g']);
+eq('我下车的番落 DROPPED', groups.find((g) => g.sectionKey === C.SECTION.DROPPED).items.map((v) => v.itemId), ['h']);
 
 // 组内按 sortOrder[me] 升序：TOGETHER 组应是 c(100) < a(200) < b(300)
 const togetherGroup = groups.find((g) => g.sectionKey === C.SECTION.TOGETHER);

@@ -137,12 +137,31 @@ const VIEW = {
 
 // ── 分区（UI 规格 §P2，顺序即展示顺序，不硬编码）──
 const SECTION = {
-  TOGETHER: 'together', // 一起追
-  NOT_STARTED: 'not_started', // 还没开追
-  PAUSED: 'paused', // 暂缓 / 下车了
-  DONE: 'done', // 一起追完了
+  TOGETHER: 'together', // 一起追（我在追 / 追平待更）
+  NOT_STARTED: 'not_started', // 还没开追（我想看，或还没翻牌）
+  DONE: 'done', // 追完了
+  PAUSED: 'paused', // 暂缓（先放放，随时回来）
+  DROPPED: 'dropped', // 下车了（退坑）—— 与 PAUSED 拆开，语义强度不同
 };
-const SECTION_ORDER = [SECTION.TOGETHER, SECTION.NOT_STARTED, SECTION.PAUSED, SECTION.DONE];
+// 展示顺序：活跃置顶 → 待看 → 追完高光 → 消极状态（暂缓/下车）沉底
+const SECTION_ORDER = [
+  SECTION.TOGETHER,
+  SECTION.NOT_STARTED,
+  SECTION.DONE,
+  SECTION.PAUSED,
+  SECTION.DROPPED,
+];
+
+// 分区归类只看「我」的状态（TA 的状态只在卡片内双游标/标签体现，不绑架整番分区）。
+// 一对一映射，集中查表不在 sectionOf 里堆 if；未命中 / 我还没翻牌(null) → 还没开追。
+const STATUS_TO_SECTION = {
+  watching: SECTION.TOGETHER,
+  caught_up: SECTION.TOGETHER,
+  want: SECTION.NOT_STARTED,
+  done: SECTION.DONE,
+  paused: SECTION.PAUSED,
+  dropped: SECTION.DROPPED,
+};
 
 // 「N 部能一起聊」共同话题带文案（门面核心卖点，配对态 commonCount>0 才显示）。
 // 数字由前端插，前后缀集中配置不硬编码进 wxml。
@@ -156,16 +175,20 @@ const COMMON_TALK = {
 const SECTION_TITLES = {
   [SECTION.TOGETHER]: '一起追',
   [SECTION.NOT_STARTED]: '还没开追',
-  [SECTION.PAUSED]: '暂缓 / 下车了',
-  [SECTION.DONE]: '一起追完了 🎉',
+  // DONE 去「一起」：分区只看我的状态，「我追完、TA 还在追」也落此区，
+  // 说「一起追完了」名不副实。双人同步追完的高光交给追平动效（sbSyncGlow），不靠标题硬撑。
+  [SECTION.DONE]: '追完了 🎉',
+  [SECTION.PAUSED]: '暂缓',
+  [SECTION.DROPPED]: '下车了',
 };
 
 // 筹备态（单人，对方未加入）分区标题：去关系词，中性化（会议决策 §5.5）
 const SECTION_TITLES_SOLO = {
   [SECTION.TOGETHER]: '在追',
   [SECTION.NOT_STARTED]: '想看',
-  [SECTION.PAUSED]: '暂缓 / 弃番',
   [SECTION.DONE]: '看完了',
+  [SECTION.PAUSED]: '暂缓',
+  [SECTION.DROPPED]: '弃番',
 };
 
 // 进度状态中文标签
@@ -458,6 +481,7 @@ module.exports = {
   BOARD_LIST_COPY,
   SECTION,
   SECTION_ORDER,
+  STATUS_TO_SECTION,
   SECTION_TITLES,
   SECTION_TITLES_SOLO,
   COMMON_TALK,

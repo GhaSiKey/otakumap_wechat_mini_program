@@ -17,6 +17,7 @@ const {
   BOARD_STATUS,
   SECTION,
   SECTION_ORDER,
+  STATUS_TO_SECTION,
   SECTION_TITLES,
   SECTION_TITLES_SOLO,
   COVER_PALETTE,
@@ -224,20 +225,13 @@ function buildProgressPair(item, myOpenid, peerOpenid) {
 // ── 分区与视图模型（UI 规格 §P2）──
 
 /**
- * 判定一个番归入哪个分区。
- *   两人都 done → DONE
- *   任一 paused/dropped（且非都 done）→ PAUSED
- *   至少一人 watching/caught_up → TOGETHER
- *   否则（want / 无进度）→ NOT_STARTED
+ * 判定一个番归入哪个分区——只看「我」的状态，查 STATUS_TO_SECTION 表。
+ * TA 的状态不参与分区（只在卡片内双游标/标签体现），故不再绑架整番归类：
+ * 「我在追、TA 暂缓」仍落 TOGETHER，不会被拽进暂缓区。
+ * 我还没翻牌(null) 或状态未知 → 还没开追。
  */
-function sectionOf(mineStatus, peerStatus) {
-  const statuses = [mineStatus, peerStatus].filter(Boolean);
-  const both = statuses.length === 2;
-
-  if (both && statuses.every((s) => s === 'done')) return SECTION.DONE;
-  if (statuses.some((s) => s === 'paused' || s === 'dropped')) return SECTION.PAUSED;
-  if (statuses.some((s) => s === 'watching' || s === 'caught_up')) return SECTION.TOGETHER;
-  return SECTION.NOT_STARTED;
+function sectionOf(mineStatus) {
+  return STATUS_TO_SECTION[mineStatus] || SECTION.NOT_STARTED;
 }
 
 /** 单番视图模型：番元信息 + 进度对比 + 封面兜底 + 分区归属。 */
@@ -265,7 +259,7 @@ function buildItemViewModel(item, myOpenid, peerOpenid) {
     sourceId: Number.isInteger(item.sourceId) && item.sourceId > 0 ? item.sourceId : null,
     pair,
     sortValue: (item.sortOrder && item.sortOrder[myOpenid]) || item.createTime || 0,
-    sectionKey: sectionOf(pair.mine.status, pair.peer ? pair.peer.status : null),
+    sectionKey: sectionOf(pair.mine.status),
   };
 }
 
