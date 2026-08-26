@@ -57,16 +57,37 @@
     bindtap="onTapCommonTalk"
   >
     <text class="common-talk__icon">{{commonTalk.ICON}}</text>
-    <text class="common-talk__text">又多一部能一起聊，共 {{vm.commonCount}} 部</text>
+    <text class="common-talk__text">{{commonTalk.PREFIX}}{{vm.commonCount}}{{commonTalk.SUFFIX}}</text>
     <text class="common-talk__arrow">›</text>
   </view>
 
-  <!-- ============ 追番小结入口（常驻横条，风格同信息条；下钻到 board-report 报告页）============ -->
-  <!-- 用中性色（非 TA 紫），避免与「TA 更新了」混淆。归档态也可看小结，不设 phase 限制。 -->
-  <view class="report-entry" hover-class="report-entry--hover" bindtap="onReportTap">
-    <text class="report-entry__icon">📊</text>
-    <text class="report-entry__text">{{reportCopy.TITLE}}</text>
-    <text class="report-entry__arrow">›</text>
+  <!-- ============ 顶部工具胶囊（报告入口 + 视图切换）============ -->
+  <!-- 左侧小结常驻；右侧仅在有番时出现。两项共用触控尺寸，但用不同底色区分「下钻」与「切换」。 -->
+  <view class="board-tools">
+    <view
+      class="board-tool board-tool--report"
+      hover-class="board-tool--pressed"
+      hover-stay-time="{{itemViewInteraction.HOVER_STAY_MS}}"
+      aria-role="button"
+      aria-label="{{reportCopy.TITLE}}"
+      bindtap="onReportTap"
+    >
+      <t-icon name="{{reportCopy.ENTRY_ICON}}" size="{{itemViewInteraction.ICON_SIZE}}" aria-hidden="true" />
+      <text>{{reportCopy.TITLE}}</text>
+    </view>
+
+    <view
+      wx:if="{{vm.sections.length > 0}}"
+      class="board-tool board-tool--view"
+      hover-class="board-tool--pressed"
+      hover-stay-time="{{itemViewInteraction.HOVER_STAY_MS}}"
+      aria-role="button"
+      aria-label="{{itemViewSwitch[itemView].ariaLabel}}"
+      bindtap="onToggleItemView"
+    >
+      <t-icon name="{{itemViewSwitch[itemView].icon}}" size="{{itemViewInteraction.ICON_SIZE}}" aria-hidden="true" />
+      <text>{{itemViewSwitch[itemView].label}}</text>
+    </view>
   </view>
 
   <!-- ============ 筹备态邀请横幅（单人，紧凑不挡番单）============ -->
@@ -81,7 +102,7 @@
   <!-- ============ 归档态提示 ============ -->
   <t-notice-bar wx:if="{{vm.phase === 'archived'}}" theme="warning" content="这个板已归档，只能查看" />
 
-  <!-- ============ 番单（分区 + 同轴集数轴）============ -->
+  <!-- ============ 番单（分区 + 列表/海报双视图）============ -->
   <!-- 筹备态也显示番单（能加番、追进度）；双人 UI 靠 it.pair.hasPeer 天然隐藏 -->
   <block>
     <!-- 番单空：引导加番 -->
@@ -90,12 +111,16 @@
     </view>
 
     <view class="section" id="section-{{sec.sectionKey}}" wx:for="{{vm.sections}}" wx:key="sectionKey" wx:for-item="sec">
-      <view class="section-title">{{sec.title}}</view>
+      <view class="section-title">
+        <text>{{sec.title}}</text>
+        <text class="section-title__count">{{sec.items.length}}{{itemPosterCopy.SECTION_COUNT_UNIT}}</text>
+      </view>
 
+      <view wx:if="{{itemView === itemViewEnum.LIST}}" class="item-list item-view-content">
       <view
         class="item-card {{it.itemId === syncItemId ? 'item-card--sync' : ''}}"
         hover-class="item-card--pressed"
-        hover-stay-time="80"
+        hover-stay-time="{{itemViewInteraction.HOVER_STAY_MS}}"
         wx:for="{{sec.items}}"
         wx:key="itemId"
         wx:for-item="it"
@@ -127,7 +152,7 @@
             <!-- 放送元信息：「放送中 · 12集 · 周六更新」一句灰字，更新日已并入 subtitle 同权重呈现 -->
             <text wx:if="{{it.subtitle}}" class="item-sub">{{it.subtitle}}</text>
           </view>
-          <t-tag wx:if="{{statusLabels[it.pair.mine.status]}}" size="small" variant="light" theme="{{statusTagTheme[it.pair.mine.status] || 'default'}}">{{statusLabels[it.pair.mine.status]}}</t-tag>
+          <t-tag wx:if="{{statusLabels[it.pair.mine.status]}}" size="small" variant="light" theme="{{statusTagTheme[it.pair.mine.status] || statusTagThemeDefault}}">{{statusLabels[it.pair.mine.status]}}</t-tag>
         </view>
 
         <!-- 同轴集数轴 -->
@@ -154,9 +179,9 @@
               <view class="cursor-dot {{it.pair.peerDropped ? 'cursor-dot--dropped' : 'identity--peer'}}">TA</view>
             </view>
           </block>
-          <!-- 有分母：末端「终点桩」标出闭区间终点（有底），与无分母的右端渐隐互斥 -->
+          <!-- 有分母显示末端「终点桩」（闭区间有底）；无分母显示右端渐隐（不知道还有多长）。
+               两个条件分支必须紧邻，中间不能夹注释，否则部分基础库会报 FLOW_DEPTH。 -->
           <view wx:if="{{it.pair.hasTotalEp}}" class="axis-goal"></view>
-          <!-- 无分母右端渐隐（不知道还有多长） -->
           <view wx:else class="axis-fade"></view>
         </view>
 
@@ -184,6 +209,41 @@
           catchtap="onExceedHintTap"
           data-item-id="{{it.itemId}}"
         >{{totalEpCopy.EXCEED_HINT}}</view>
+        </view>
+      </view>
+      </view>
+      <view wx:else class="poster-grid item-view-content">
+        <view
+          class="poster-card {{it.itemId === syncItemId ? 'item-card--sync' : ''}}"
+          hover-class="poster-card--pressed"
+          hover-stay-time="{{itemViewInteraction.HOVER_STAY_MS}}"
+          wx:for="{{sec.items}}"
+          wx:key="itemId"
+          wx:for-item="it"
+          data-item-id="{{it.itemId}}"
+          bindtap="onItemTap"
+        >
+          <view class="poster-card__media">
+            <view class="poster-card__ratio"></view>
+            <image
+              wx:if="{{it.cover && !coverErrorIds[it.itemId]}}"
+              class="poster-card__cover"
+              src="{{it.cover}}"
+              mode="aspectFill"
+              lazy-load
+              data-item-id="{{it.itemId}}"
+              binderror="onItemCoverError"
+            />
+            <view wx:else class="poster-card__fallback" style="background:{{it.coverFallback.color}}">{{it.coverFallback.char}}</view>
+          </view>
+          <view class="poster-card__progress">
+            <text class="poster-card__progress-me">{{itemPosterCopy.ME_EP_PREFIX}}{{it.pair.mine.ep}}</text>
+            <block wx:if="{{vm.peer}}">
+              <text wx:if="{{it.pair.hasPeer}}" class="poster-card__progress-peer">{{itemPosterCopy.PEER_EP_PREFIX}}{{it.pair.peer.ep}}</text>
+              <text wx:else class="poster-card__progress-peer poster-card__progress--muted">{{itemPosterCopy.PEER_UNSET}}</text>
+            </block>
+          </view>
+          <text class="poster-card__name">{{it.name}}</text>
         </view>
       </view>
     </view>
@@ -296,9 +356,8 @@
         <text class="detail-sub__arrow">›</text>
       </view>
     </block>
-
-    <!-- 改名编辑区：标题 + 带边框输入框 + 说明 + 底部按钮行，垂直堆叠 -->
     <view wx:else class="name-edit-panel">
+      <!-- 改名编辑区：标题 + 带边框输入框 + 说明 + 底部按钮行，垂直堆叠 -->
       <view class="name-edit-panel__title">改番名</view>
       <input
         class="name-edit-input"

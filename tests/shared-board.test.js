@@ -40,6 +40,23 @@ function item(overrides) {
 eq('EP_ROLL_MAX 为正整数', Number.isInteger(C.EP_ROLL_MAX) && C.EP_ROLL_MAX > 0, true);
 eq('EP_ROLL_MAX 不超无分母展示上限', C.EP_ROLL_MAX <= C.EP_PICKER_MAX_UNKNOWN, true);
 
+// ── P2 列表 / 海报双视图配置契约 ──
+eq('ITEM_VIEW 两种模式值唯一', new Set(Object.values(C.ITEM_VIEW)).size, 2);
+eq('视图偏好 Storage key 保持 sb_ 域前缀', C.STORAGE_KEY.ITEM_VIEW_PREFIX.startsWith('sb_'), true);
+eq('列表按钮目标为海报视图', C.ITEM_VIEW_SWITCH[C.ITEM_VIEW.LIST].next, C.ITEM_VIEW.POSTER);
+eq('海报按钮目标为列表视图', C.ITEM_VIEW_SWITCH[C.ITEM_VIEW.POSTER].next, C.ITEM_VIEW.LIST);
+eq('两种切换态都有图标/文案/ARIA', Object.values(C.ITEM_VIEW_SWITCH).every((v) => v.icon && v.label && v.ariaLabel), true);
+eq('切换按钮文案明确表达视图', Object.values(C.ITEM_VIEW_SWITCH).every((v) => v.label.includes('视图')), true);
+eq('海报关系进度 copy 完整', ['ME_EP_PREFIX', 'PEER_EP_PREFIX', 'PEER_UNSET', 'SECTION_COUNT_UNIT'].every((k) => C.ITEM_POSTER_COPY[k]), true);
+eq('非法视图回退列表', C.normalizeItemView('legacy-grid'), C.ITEM_VIEW.LIST);
+eq('空视图回退列表', C.normalizeItemView(null), C.ITEM_VIEW.LIST);
+eq('合法列表原样保留', C.normalizeItemView(C.ITEM_VIEW.LIST), C.ITEM_VIEW.LIST);
+eq('合法海报视图原样保留', C.normalizeItemView(C.ITEM_VIEW.POSTER), C.ITEM_VIEW.POSTER);
+eq('点按反馈时长为正数', C.ITEM_VIEW_INTERACTION.HOVER_STAY_MS > 0, true);
+eq('顶部工具图标尺寸已配置', Boolean(C.ITEM_VIEW_INTERACTION.ICON_SIZE), true);
+eq('追番小结入口图标已配置', Boolean(C.REPORT_COPY.ENTRY_ICON), true);
+eq('共同话题提醒文案由配置完整提供', Boolean(C.COMMON_TALK.PREFIX && C.COMMON_TALK.SUFFIX), true);
+
 // ============================================================
 // clampEp：集数归一
 // ============================================================

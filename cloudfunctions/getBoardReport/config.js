@@ -23,6 +23,9 @@ const COLLECTION = {
 // 用 Storage 而非 globalData：后者杀进程即失效，最慢的冷启动反而命中不到。
 const STORAGE_KEY = {
   MY_OPENID: 'sb_my_openid',
+  // P2 番单视图偏好按板存：最终 key = 此前缀 + boardId。
+  // 只影响本机当前用户，不写共享数据、不替 TA 改浏览习惯。
+  ITEM_VIEW_PREFIX: 'sb_item_view_',
 };
 
 // ── 板改动事件类型（历史页 + 周报数据源）──
@@ -135,6 +138,47 @@ const VIEW = {
 // 的 BOARD_PREVIEW_COVERS，供 listMyBoards 的 .limit() 用）。前端只渲染云函数已截断的
 // previewItems，自己不再持有该阈值，避免两处副本漂移。
 
+// ── P2 番单视图（完整列表 / 高密度海报墙）──
+// 按钮展示的是「点击后的目标视图」，故每个模式都配置 next，页面不散落反向判断。
+const ITEM_VIEW = {
+  LIST: 'list',
+  POSTER: 'poster',
+};
+
+const ITEM_VIEW_INTERACTION = {
+  HOVER_STAY_MS: 80, // 点按反馈保持时长，列表卡/海报卡/切换按钮统一手感
+  ICON_SIZE: '32rpx', // 顶部工具胶囊图标尺寸，报告入口与视图切换共用
+};
+
+const ITEM_VIEW_SWITCH = {
+  [ITEM_VIEW.LIST]: {
+    next: ITEM_VIEW.POSTER,
+    icon: 'grid-view',
+    label: '海报视图',
+    ariaLabel: '切换到海报视图',
+  },
+  [ITEM_VIEW.POSTER]: {
+    next: ITEM_VIEW.LIST,
+    icon: 'view-list',
+    label: '列表视图',
+    ariaLabel: '切换到列表视图',
+  },
+};
+
+// 海报卡只保留快速识别所需信息：番名和双端关系进度。
+// E 作为集数短标记，完整「第 N 话」仍保留在列表和详情中。
+const ITEM_POSTER_COPY = {
+  ME_EP_PREFIX: '我 E',
+  PEER_EP_PREFIX: 'TA E',
+  PEER_UNSET: 'TA 未翻牌',
+  SECTION_COUNT_UNIT: '部',
+};
+
+// Storage 可能残留旧值或被手动改写；只接受当前枚举，其余一律回到完整列表。
+function normalizeItemView(value) {
+  return value === ITEM_VIEW.POSTER ? ITEM_VIEW.POSTER : ITEM_VIEW.LIST;
+}
+
 // ── 分区（UI 规格 §P2，顺序即展示顺序，不硬编码）──
 const SECTION = {
   TOGETHER: 'together', // 一起追（我在追 / 追平待更）
@@ -167,8 +211,8 @@ const STATUS_TO_SECTION = {
 // 数字由前端插，前后缀集中配置不硬编码进 wxml。
 const COMMON_TALK = {
   ICON: '💬',
-  PREFIX: '', // 数字前缀（如需「有」等前置词放这）
-  SUFFIX: ' 部能一起聊', // 数字后缀
+  PREFIX: '又多一部能一起聊，共 ',
+  SUFFIX: ' 部',
 };
 
 // 分区标题文案（配对态：含关系词，UI 层展示，集中配置不硬编码进 wxml）
@@ -203,8 +247,9 @@ const STATUS_LABELS = {
 
 // 状态标签色（TDesign t-tag theme）：按语义区分冷暖，不再全蓝一个色。
 // primary 蓝=进行中主态；success 绿=完成；warning=暂停；default 灰=淡化（想看/弃番不强调）
+const STATUS_TAG_THEME_DEFAULT = 'default';
 const STATUS_TAG_THEME = {
-  want: 'default', // 想看：还没开始，弱化
+  want: STATUS_TAG_THEME_DEFAULT, // 想看：还没开始，弱化
   watching: 'primary', // 在追：进行中主态
   caught_up: 'primary', // 追平待更：也是进行中
   paused: 'warning', // 暂缓：黄，提示中断
@@ -314,7 +359,7 @@ const REPORT = {
 // {me}/{peer}/{n}/{date}/{name} 由页面插值（复用 fillTemplate），不硬编码进 wxml。
 const REPORT_COPY = {
   TITLE: '追番小结',
-  ENTRY: '小结', // 板页头入口文案
+  ENTRY_ICON: 'chart-bar', // P2 顶部工具胶囊图标（与视图切换共用 t-icon 视觉语言）
   ME_DEFAULT: '我', // 我没设昵称时的兜底称呼
   PEER_DEFAULT: 'TA', // 对方没设昵称时的兜底称呼
   // ① 头部 hero 卡：巨号数字单独渲染，前后缀 + 副信息全走配置
@@ -478,6 +523,11 @@ module.exports = {
   ERR,
   JOIN_ERR_MESSAGES,
   VIEW,
+  ITEM_VIEW,
+  ITEM_VIEW_INTERACTION,
+  ITEM_VIEW_SWITCH,
+  ITEM_POSTER_COPY,
+  normalizeItemView,
   BOARD_LIST_COPY,
   SECTION,
   SECTION_ORDER,
@@ -487,6 +537,7 @@ module.exports = {
   COMMON_TALK,
   STATUS_LABELS,
   STATUS_TAG_THEME,
+  STATUS_TAG_THEME_DEFAULT,
   COVER_PALETTE,
   MEMBER_COLORS,
   AIR_STATUS_LABELS,

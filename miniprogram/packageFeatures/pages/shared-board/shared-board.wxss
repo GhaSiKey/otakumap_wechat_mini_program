@@ -15,6 +15,35 @@ page {
   --sb-color-me: #0052d9; /* 我=品牌蓝 */
   --sb-color-peer: #834ec2; /* TA=紫（非成功绿，绿留给追平/看完奖章） */
   --sb-peer-tint: rgba(131, 78, 194, 0.1); /* 「TA 更新了」信息条底色：紫身份色淡化，与绿色共同话题带区分 */
+  /* 列表/海报双视图规则集中在功能根变量，避免三列数、海报比例和动效节奏散落成魔法值。 */
+  --sb-item-view-press-duration: 0.12s;
+  --sb-item-view-enter-duration: 0.2s;
+  --sb-board-tool-height: 88rpx;
+  --sb-board-tool-margin-top: var(--td-spacer-1, 24rpx);
+  --sb-board-tool-gap: var(--td-spacer, 16rpx);
+  --sb-board-tool-inner-gap: 8rpx;
+  --sb-board-tool-horizontal-padding: var(--td-spacer-1, 24rpx);
+  --sb-board-tool-pressed-scale: 0.96;
+  --sb-pill-radius: var(--td-radius-round, 999rpx);
+  --sb-section-title-gap: 12rpx;
+  --sb-section-count-font-size: var(--td-font-size-body-extra-small, 20rpx);
+  --sb-item-view-enter-offset: 8rpx;
+  --sb-poster-columns: 3;
+  --sb-poster-ratio-padding: 133.3333%; /* 3:4 海报的高/宽；比例盒兼容普通 WebView 与旧基础库 */
+  --sb-poster-pressed-scale: 0.97;
+  --sb-poster-row-gap: 28rpx;
+  --sb-poster-column-gap: 16rpx;
+  --sb-poster-fallback-font-size: 64rpx;
+  --sb-poster-fallback-text-color: var(--td-text-color-anti, #ffffff);
+  --sb-poster-progress-height: 40rpx;
+  --sb-poster-progress-margin-top: 10rpx;
+  --sb-poster-progress-horizontal-padding: 12rpx;
+  --sb-poster-progress-gap: 8rpx;
+  --sb-poster-progress-line-height: 28rpx;
+  --sb-poster-name-height: 72rpx;
+  --sb-poster-name-margin-top: 8rpx;
+  --sb-poster-name-line-height: 36rpx;
+  --sb-poster-name-lines: 2;
 }
 
 .page {
@@ -96,7 +125,7 @@ page {
 
 .skeleton-axis {
   height: 8rpx;
-  border-radius: 999rpx;
+  border-radius: var(--sb-pill-radius);
   background: var(--td-bg-color-component, #e7e7e7);
   margin: 24rpx 0;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
@@ -130,7 +159,7 @@ page {
   margin: var(--td-spacer, 16rpx) var(--td-spacer-2, 32rpx) 0;
   padding: 14rpx var(--td-spacer-2, 32rpx);
   background: var(--td-brand-color-light, #f2f3ff);
-  border-radius: 999rpx;
+  border-radius: var(--sb-pill-radius);
 }
 
 /* 按需提醒：从顶部滑入淡出（不再常驻，commonCount 变大时才出现） */
@@ -212,37 +241,53 @@ page {
   background: var(--sb-peer-tint-active, rgba(131, 78, 194, 0.18));
 }
 
-/* 追番小结入口：常驻横条，与信息条同结构但走中性色（非身份色），避免抢「TA 更新了」的注意力 */
-.report-entry {
+/* ==================== 顶部工具胶囊（报告入口 + 视图切换） ==================== */
+.board-tools {
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  margin: var(--td-spacer, 16rpx) var(--td-spacer-2, 32rpx) 0;
-  padding: 16rpx var(--td-spacer-2, 32rpx);
-  background: var(--td-bg-color-container, #ffffff);
-  border-radius: 16rpx;
+  justify-content: space-between;
+  gap: var(--sb-board-tool-gap);
+  margin: var(--sb-board-tool-margin-top) var(--td-spacer-2, 32rpx) 0;
 }
 
-.report-entry__icon {
-  font-size: 30rpx;
+.board-tool {
+  min-width: 0;
+  height: var(--sb-board-tool-height);
+  padding: 0 var(--sb-board-tool-horizontal-padding);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sb-board-tool-inner-gap);
+  border-radius: var(--sb-pill-radius);
+  font-size: var(--td-font-size-body-small, 24rpx);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: transform var(--sb-item-view-press-duration) ease-out, background-color var(--sb-item-view-press-duration) ease-out;
+}
+
+/* 两项按内容宽度分居左右；min-width:0 保证极窄屏仍可收缩，不掉到下一行。 */
+.board-tool t-icon {
   flex-shrink: 0;
 }
 
-.report-entry__text {
-  flex: 1;
-  font-size: var(--td-font-size-body-medium, 28rpx);
-  font-weight: 600;
+.board-tool--report {
+  background: var(--td-bg-color-container, #ffffff);
   color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
 }
 
-.report-entry__arrow {
-  font-size: 32rpx;
-  color: var(--td-text-color-placeholder, #bbb);
-  flex-shrink: 0;
+.board-tool--view {
+  background: var(--td-brand-color-light, #f2f3ff);
+  color: var(--td-text-color-brand, #0052d9);
 }
 
-.report-entry--hover {
+.board-tool--pressed {
+  transform: scale(var(--sb-board-tool-pressed-scale));
   background: var(--td-bg-color-component, #e7e7e7);
+}
+
+.board-tool--view.board-tool--pressed {
+  background: var(--td-brand-color-light-active, #d9e1ff);
 }
 
 .member {
@@ -363,9 +408,27 @@ page {
 }
 
 .section-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-section-title-gap);
   font-size: var(--td-font-size-body-small, 24rpx);
   color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
   margin-bottom: var(--td-spacer, 16rpx);
+}
+
+.section-title__count {
+  font-size: var(--sb-section-count-font-size);
+  color: var(--td-text-color-disabled, rgba(0, 0, 0, 0.26));
+}
+
+/* 切换时只让当前渲染分支短促入场；不对每张卡 stagger，长海报墙避免动画洪水。 */
+.item-view-content {
+  animation: sbItemViewIn var(--sb-item-view-enter-duration) ease-out;
+}
+
+@keyframes sbItemViewIn {
+  from { opacity: 0; transform: translateY(var(--sb-item-view-enter-offset)); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ==================== 番剧卡片 ==================== */
@@ -385,7 +448,7 @@ page {
   overflow: hidden; /* 保住卡片圆角 */
   margin-bottom: var(--td-spacer, 16rpx);
   /* 点按下沉靠 transition 承接 hover-class；只动 transform（GPU 合成，与 board-list 同款手感） */
-  transition: transform 0.12s ease-out;
+  transition: transform var(--sb-item-view-press-duration) ease-out;
 }
 
 /* 点按下沉：微信原生 hover-class 触发，松手自动回弹。sync 追平态用 box-shadow 辉光、
@@ -496,7 +559,7 @@ page {
   height: 10rpx;
   transform: translateY(-50%);
   background: var(--td-bg-color-component, #e7e7e7);
-  border-radius: 999rpx;
+  border-radius: var(--sb-pill-radius);
 }
 
 .axis-common {
@@ -506,7 +569,7 @@ page {
   height: 10rpx;
   transform: translateY(-50%);
   background: var(--sb-axis-common, #8eb3f5);
-  border-radius: 999rpx;
+  border-radius: var(--sb-pill-radius);
 }
 
 /* 追平：已走过段染 success 绿，与 ◉ 合并态呼应 */
@@ -520,7 +583,7 @@ page {
   height: 10rpx;
   transform: translateY(-50%);
   background: var(--td-brand-color, #0052d9);
-  border-radius: 999rpx;
+  border-radius: var(--sb-pill-radius);
 }
 
 .axis-cursor {
@@ -629,6 +692,113 @@ page {
   color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
 }
 
+/* ==================== 三列海报墙 ==================== */
+.poster-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--sb-poster-columns), minmax(0, 1fr));
+  gap: var(--sb-poster-row-gap) var(--sb-poster-column-gap);
+}
+
+.poster-card {
+  min-width: 0;
+  position: relative;
+  z-index: 0;
+  transition: transform var(--sb-item-view-press-duration) ease-out;
+}
+
+.poster-card--pressed {
+  transform: scale(var(--sb-poster-pressed-scale));
+}
+
+/* 3:4 比例盒不绑定屏宽或列宽：三列在窄屏/横屏自适应时，海报仍不会被拉伸。
+   不用 aspect-ratio：项目提交基础库仍为 2.20.1、普通 WebView 渲染，padding 占位盒兼容更稳。 */
+.poster-card__media {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--td-radius-large, 18rpx);
+  background: var(--td-bg-color-component, #e7e7e7);
+  box-shadow: var(--td-shadow-1, 0 4rpx 12rpx rgba(0, 0, 0, 0.1));
+}
+
+.poster-card__ratio {
+  width: 100%;
+  padding-top: var(--sb-poster-ratio-padding);
+}
+
+.poster-card__cover,
+.poster-card__fallback {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.poster-card__fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sb-poster-fallback-text-color);
+  font-size: var(--sb-poster-fallback-font-size);
+  font-weight: 600;
+}
+
+/* 双端关系进度：海报与标题之间独立成一行，不覆盖封面也不和标题抢视觉层级。 */
+.poster-card__progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  height: var(--sb-poster-progress-height);
+  margin-top: var(--sb-poster-progress-margin-top);
+  padding: 0 var(--sb-poster-progress-horizontal-padding);
+  gap: var(--sb-poster-progress-gap);
+  overflow: hidden;
+  background: var(--td-bg-color-container, #ffffff);
+  border-radius: var(--sb-pill-radius);
+  font-size: var(--td-font-size-body-extra-small, 20rpx);
+  line-height: var(--sb-poster-progress-line-height);
+  white-space: nowrap;
+}
+
+.poster-card__progress-me,
+.poster-card__progress-peer {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.poster-card__progress-me {
+  color: var(--sb-color-me, #0052d9);
+}
+
+.poster-card__progress-peer {
+  margin-left: auto;
+  color: var(--sb-color-peer, #834ec2);
+  text-align: right;
+}
+
+.poster-card__progress--muted {
+  color: var(--td-text-color-placeholder, rgba(0, 0, 0, 0.4));
+}
+
+.poster-card__name {
+  display: -webkit-box;
+  height: var(--sb-poster-name-height);
+  margin-top: var(--sb-poster-name-margin-top);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--sb-poster-name-lines);
+  color: var(--td-text-color-primary, rgba(0, 0, 0, 0.9));
+  font-size: var(--td-font-size-body-medium, 28rpx);
+  font-weight: 600;
+  line-height: var(--sb-poster-name-line-height);
+  word-break: break-all;
+}
+
 /* ==================== 详情弹层（外壳由 .sheet 提供，此处只补内容样式）==================== */
 /* 番名可点改名（展示态） */
 .detail-name {
@@ -724,7 +894,7 @@ page {
   width: fit-content;
   margin: 8rpx auto var(--td-spacer-2, 32rpx);
   padding: 10rpx 24rpx;
-  border-radius: 999rpx;
+  border-radius: var(--sb-pill-radius);
   background: var(--td-bg-color-secondarycontainer, #f3f3f3);
 }
 
@@ -817,7 +987,7 @@ page {
 .picked-preview__reselect {
   flex: none;
   padding: 10rpx 24rpx;
-  border-radius: 999rpx;
+  border-radius: var(--sb-pill-radius);
   font-size: var(--td-font-size-body-small, 24rpx);
   color: var(--td-brand-color, #0052d9);
   background: var(--td-brand-color-light, #f2f3ff);
@@ -852,7 +1022,7 @@ page {
 
 .air-status-tag {
   padding: 10rpx 24rpx;
-  border-radius: 999rpx;
+  border-radius: var(--sb-pill-radius);
   font-size: var(--td-font-size-body-small, 24rpx);
   color: var(--td-text-color-secondary, rgba(0, 0, 0, 0.6));
   background: var(--td-bg-color-secondarycontainer, #f3f3f3);
@@ -991,6 +1161,36 @@ page {
   55% { transform: scale(1.3) rotate(300deg); }
   75% { transform: scale(0.9) rotate(350deg); }
   100% { transform: scale(1) rotate(360deg); }
+}
+
+/* 尊重系统“减少动态”：保留结果与状态变化，关闭非必要位移、缩放、旋转和无限脉冲。
+   +1 浮字若只停 animation 会永久停在原位，故直接隐藏；集数本身仍立即更新。加载骨架不在本轮范围。 */
+@media (prefers-reduced-motion: reduce) {
+  .common-talk--flash,
+  .peer-update,
+  .ghost-seat,
+  .ghost-breathing,
+  .cursor-dot--merged,
+  .duel-ep.ep-bump,
+  .member-joined,
+  .item-view-content,
+  .board-tool,
+  .item-card,
+  .poster-card,
+  .item-card--sync {
+    animation: none;
+    transition: none;
+  }
+
+  .ep-plus-fly {
+    display: none;
+  }
+
+  .board-tool--pressed,
+  .item-card--pressed,
+  .poster-card--pressed {
+    transform: none;
+  }
 }
 
 /* ==================== 成员条「我」可点设置 ==================== */

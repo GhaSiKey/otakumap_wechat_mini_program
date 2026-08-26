@@ -10,6 +10,7 @@ const T = require('../../utils/shared-board/transform');
 const {
   STATUS_LABELS,
   STATUS_TAG_THEME,
+  STATUS_TAG_THEME_DEFAULT,
   PROGRESS_STATUS,
   EP_ROLL_MAX,
   JOIN_ERR_MESSAGES,
@@ -25,6 +26,12 @@ const {
   AIR_META_WAIT_MS,
   HISTORY_COPY,
   REPORT_COPY,
+  STORAGE_KEY,
+  ITEM_VIEW,
+  ITEM_VIEW_INTERACTION,
+  ITEM_VIEW_SWITCH,
+  ITEM_POSTER_COPY,
+  normalizeItemView,
 } = require('../../utils/shared-board/config');
 // 搜索页交互模式 + 回带事件名（跨包同一 miniprogram 内，直接 require anime-meta 配置层）
 const { SEARCH_MODE, PICK_EVENT } = require('../../utils/anime-meta/config');
@@ -58,6 +65,7 @@ Page({
   data: {
     statusLabels: STATUS_LABELS, // 分区标题已在 transform 内算好（sec.title），此处只留状态标签
     statusTagTheme: STATUS_TAG_THEME, // 状态标签按语义配色（t-tag theme），不再全蓝
+    statusTagThemeDefault: STATUS_TAG_THEME_DEFAULT, // WXML 状态 theme 的配置化兜底
     commonTalk: COMMON_TALK,     // 「N 部能一起聊」文案配置（图标/前后缀），数字在 wxml 用 vm.commonCount 插
     totalEpCopy: TOTAL_EP_COPY,  // 总集数录入相关文案（占位/提示/字段名），集中配置不硬编码进 wxml
     airStatusOptions: AIR_STATUS_OPTIONS, // 番剧信息弹层放送状态可选项（放送中/已完结/未定）
@@ -66,6 +74,11 @@ Page({
     animeBindCopy: ANIME_BIND_COPY, // 关联番剧（搜索区标题/入口/手填分隔/预览提示 + 补绑入口）文案
     historyCopy: HISTORY_COPY, // 改动历史入口文案
     reportCopy: REPORT_COPY, // 追番小结入口文案
+    itemView: ITEM_VIEW.LIST, // 番单默认完整列表；onLoad 按 boardId 恢复本机偏好
+    itemViewEnum: ITEM_VIEW, // WXML 比较使用同一枚举，不散落 list/poster 字面量
+    itemViewInteraction: ITEM_VIEW_INTERACTION, // 切换按钮/两类卡片共用的点按反馈参数
+    itemViewSwitch: ITEM_VIEW_SWITCH, // 当前模式 → 目标模式的按钮图标/文案/无障碍说明
+    itemPosterCopy: ITEM_POSTER_COPY, // 海报卡紧凑进度与分区计数文案
     boardId: '',
     token: '',            // 分享卡片带的配对 token
     myOpenid: '',
@@ -130,7 +143,12 @@ Page({
   async onLoad(query) {
     const boardId = query.boardId || '';
     const token = query.token || '';
-    this.setData({ boardId, token });
+    // 视图偏好属于「本机 × 当前板」：按 boardId 拼 key，非法/旧值统一回退完整列表。
+    // 与 boardId/token 一次 setData，避免页面先闪列表、下一帧再跳海报视图。
+    const storedItemView = boardId
+      ? wx.getStorageSync(STORAGE_KEY.ITEM_VIEW_PREFIX + boardId)
+      : ITEM_VIEW.LIST;
+    this.setData({ boardId, token, itemView: normalizeItemView(storedItemView) });
 
     // getMyOpenid 不被 getBoardDetail/joinBoard 依赖（云端 getWXContext 自取身份），
     // 故可与首屏数据请求并行，砍掉「先串行等 openid」的一个冷启动 RTT。
@@ -177,6 +195,17 @@ Page({
 
   onPullDownRefresh() {
     this._load().then(() => wx.stopPullDownRefresh());
+  },
+
+  // 列表 / 海报一键切换。只换渲染方式，不重算 vm.sections；按钮配置里的 next
+  // 明确表达目标态，避免页面写反向三元判断。偏好按板落本机 Storage，不影响 TA。
+  onToggleItemView() {
+    const current = normalizeItemView(this.data.itemView);
+    const next = ITEM_VIEW_SWITCH[current].next;
+    this.setData({ itemView: next });
+    if (this.data.boardId) {
+      wx.setStorageSync(STORAGE_KEY.ITEM_VIEW_PREFIX + this.data.boardId, next);
+    }
   },
 
   onUnload() {
