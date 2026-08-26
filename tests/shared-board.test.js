@@ -54,6 +54,7 @@ eq('合法列表原样保留', C.normalizeItemView(C.ITEM_VIEW.LIST), C.ITEM_VIE
 eq('合法海报视图原样保留', C.normalizeItemView(C.ITEM_VIEW.POSTER), C.ITEM_VIEW.POSTER);
 eq('点按反馈时长为正数', C.ITEM_VIEW_INTERACTION.HOVER_STAY_MS > 0, true);
 eq('顶部工具图标尺寸已配置', Boolean(C.ITEM_VIEW_INTERACTION.ICON_SIZE), true);
+eq('圆形加番 FAB 图标与无障碍文案完整', Boolean(C.ADD_ITEM_FAB.ICON && C.ADD_ITEM_FAB.ARIA_LABEL), true);
 eq('追番小结入口图标已配置', Boolean(C.REPORT_COPY.ENTRY_ICON), true);
 eq('共同话题提醒文案由配置完整提供', Boolean(C.COMMON_TALK.PREFIX && C.COMMON_TALK.SUFFIX), true);
 

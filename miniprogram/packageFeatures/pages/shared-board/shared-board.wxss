@@ -18,7 +18,7 @@ page {
   /* 列表/海报双视图规则集中在功能根变量，避免三列数、海报比例和动效节奏散落成魔法值。 */
   --sb-item-view-press-duration: 0.12s;
   --sb-item-view-enter-duration: 0.2s;
-  --sb-board-tool-height: 88rpx;
+  --sb-board-tool-height: 72rpx;
   --sb-board-tool-margin-top: var(--td-spacer-1, 24rpx);
   --sb-board-tool-gap: var(--td-spacer, 16rpx);
   --sb-board-tool-inner-gap: 8rpx;

@@ -139,6 +139,11 @@ const VIEW = {
 // previewItems，自己不再持有该阈值，避免两处副本漂移。
 
 // ── P2 番单视图（完整列表 / 高密度海报墙）──
+const ADD_ITEM_FAB = {
+  ICON: 'add',
+  ARIA_LABEL: '加番', // 紧凑圆形 FAB 无可见文字，需保留读屏语义
+};
+
 // 按钮展示的是「点击后的目标视图」，故每个模式都配置 next，页面不散落反向判断。
 const ITEM_VIEW = {
   LIST: 'list',
@@ -523,6 +528,7 @@ module.exports = {
   ERR,
   JOIN_ERR_MESSAGES,
   VIEW,
+  ADD_ITEM_FAB,
   ITEM_VIEW,
   ITEM_VIEW_INTERACTION,
   ITEM_VIEW_SWITCH,

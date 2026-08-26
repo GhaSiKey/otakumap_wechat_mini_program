@@ -248,8 +248,14 @@
       </view>
     </view>
 
-    <!-- 加番 FAB：筹备态和配对态都能加，仅归档态隐藏（t-fab 抛 click 事件） -->
-    <t-fab wx:if="{{vm.phase !== 'archived'}}" icon="add" text="加番" bind:click="onAddTap" />
+    <!-- 加番 FAB：去掉文字后恢复 TDesign 标准圆形，宽度约为旧文字胶囊的一半；
+         aria-label 保留读屏语义。筹备态和配对态都能加，仅归档态隐藏。 -->
+    <t-fab
+      wx:if="{{vm.phase !== 'archived'}}"
+      icon="{{addItemFab.ICON}}"
+      aria-label="{{addItemFab.ARIA_LABEL}}"
+      bind:click="onAddTap"
+    />
     <!-- 历史 FAB：镜像加番按钮到左下角。无 text → circle 小圆钮，不撑满半屏。
          归档态也可查历史，故不设 phase 限制。
          注意：t-fab 模板根 view 硬编码了 right:16px，只传 left 会导致左右双锁 →

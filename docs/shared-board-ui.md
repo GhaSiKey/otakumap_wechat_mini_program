@@ -162,9 +162,9 @@
 │ └────────────────────────────┘   │
 │ 暂缓                               │ ← 我暂缓（先放放，随时回来）
 │ 下车了                             │ ← 我下车（退坑，沉底不羞辱）
-│                          ╭─────╮  │
-│                          │ +番 │  │ ← t-fab 加番
-│                          ╰─────╯  │
+│                             ╭──╮  │
+│                             │＋│  │ ← 圆形 t-fab，宽约为旧文字胶囊一半
+│                             ╰──╯  │
 └────────────────────────────────┘
 ```
 
@@ -209,7 +209,7 @@
 | 成员条 | 自绘 `view.member-bar`（两 avatar + 昵称） | 底 `--td-bg-color-container`；内距 `--td-spacer` |
 | 「又多一部能一起聊」提示 | `view.common-talk` 可点；`commonCount` 增加时短暂出现，首次进入/数量不变不显示 | `--td-brand-color`；点击滚到 TOGETHER，无则兜底 DONE |
 | 分区标题 | `text.section-title`（复用 anime-checklist 风格）+ 数量 | `--td-text-color-placeholder`；`--td-font-size-body-small` |
-| 顶部工具胶囊 | `t-icon` + `text` 的原生胶囊按钮 | 报告入口用 `--td-bg-color-container`；视图切换用 `--td-brand-color-light`；目标态文案走 `ITEM_VIEW_SWITCH` |
+| 顶部工具胶囊 | `t-icon` + `text` 的 72rpx 紧凑原生胶囊按钮 | 报告入口用 `--td-bg-color-container`；视图切换用 `--td-brand-color-light`；目标态文案走 `ITEM_VIEW_SWITCH` |
 | 番卡片 | 自绘 `view.item-card` | 底 `--td-bg-color-container`；圆角 `--td-radius-large`；内距 `--td-spacer-2` |
 | 海报墙 | `view.poster-grid` + 轻量原生海报卡 | 三列 3:4；不叠状态贴纸；分区表达状态 |
 | 海报双端进度 | `view.poster-card__progress` 两端文本 | `--sb-color-me` / `--sb-color-peer`；未翻牌走 placeholder |
@@ -217,7 +217,7 @@
 | 状态标签 | LIST 中的 `t-tag`(variant 随状态) | 见 §6；POSTER 不重复渲染 |
 | 集数轴 | **自绘** | 见 §3 |
 | 差值文案 | `text.item-diff` | `--td-text-color-secondary`；`--td-font-size-body-small` |
-| 加番 FAB | `t-fab` | `--td-brand-color` |
+| 加番 FAB | 圆形 `t-fab`（仅 `add` 图标，`aria-label` 保留「加番」语义） | `--td-brand-color`；直径 96rpx，约为旧文字胶囊宽度的一半 |
 
 交互：点整卡 → P3 弹层；下拉刷新完成后更新当前 VM；远端变更游标走 §4 滑动动画非瞬移；加番 FAB → 底部加番面板（见 P2.5）；「移出番单」位于 P3 详情弹层底部，走软删除且使用弱化文案，不提供列表左滑入口。
 

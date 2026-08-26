@@ -27,6 +27,7 @@ const {
   HISTORY_COPY,
   REPORT_COPY,
   STORAGE_KEY,
+  ADD_ITEM_FAB,
   ITEM_VIEW,
   ITEM_VIEW_INTERACTION,
   ITEM_VIEW_SWITCH,
@@ -74,6 +75,7 @@ Page({
     animeBindCopy: ANIME_BIND_COPY, // 关联番剧（搜索区标题/入口/手填分隔/预览提示 + 补绑入口）文案
     historyCopy: HISTORY_COPY, // 改动历史入口文案
     reportCopy: REPORT_COPY, // 追番小结入口文案
+    addItemFab: ADD_ITEM_FAB, // 右下角圆形加番 FAB 的图标与无障碍文案
     itemView: ITEM_VIEW.LIST, // 番单默认完整列表；onLoad 按 boardId 恢复本机偏好
     itemViewEnum: ITEM_VIEW, // WXML 比较使用同一枚举，不散落 list/poster 字面量
     itemViewInteraction: ITEM_VIEW_INTERACTION, // 切换按钮/两类卡片共用的点按反馈参数
