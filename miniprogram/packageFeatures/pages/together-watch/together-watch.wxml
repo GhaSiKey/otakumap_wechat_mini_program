@@ -1,0 +1,261 @@
+<view class="page">
+  <block wx:if="{{loading}}">
+    <!-- 首次加载：卡片骨架保住版式，不用空白页等待云函数。 -->
+    <view class="skeleton">
+      <view class="skeleton-hero"></view>
+      <view class="skeleton-card" wx:for="{{[1,2,3]}}" wx:key="*this">
+        <view class="skeleton-cover"></view>
+        <view class="skeleton-lines">
+          <view class="skeleton-line skeleton-line--title"></view>
+          <view class="skeleton-line"></view>
+          <view class="skeleton-line skeleton-line--short"></view>
+        </view>
+      </view>
+    </view>
+  </block>
+  <block wx:elif="{{failed}}">
+    <!-- 首次加载失败：明确重试，不把网络失败伪装成空清单。 -->
+    <view class="state state--page">
+      <view class="state__icon">↻</view>
+      <view class="state__title">{{errorText}}</view>
+      <view class="state__hint">检查网络后再试一次</view>
+      <view class="state__action" hover-class="press" bindtap="onRetry">重新加载</view>
+    </view>
+  </block>
+  <block wx:else>
+    <view class="hero">
+      <view class="hero__main">
+        <view class="hero__eyebrow">{{boardName || '共享番单'}}</view>
+        <view class="hero__title">周末一起看</view>
+        <view class="hero__hint">想一起看的番先放这里，清单不会自动清空</view>
+      </view>
+      <view class="hero__side">
+        <view class="hero__count">{{watchItems.length}}</view>
+        <view class="hero__unit">部</view>
+      </view>
+    </view>
+
+    <!-- 后台刷新失败时保留旧内容，并提供显式恢复入口。 -->
+    <view wx:if="{{refreshFailed}}" class="refresh-error" bindtap="onRetry">
+      <text>{{errorText}}</text>
+      <text class="refresh-error__action">重试 ›</text>
+    </view>
+
+    <!-- 功能仅对已配对板开放。 -->
+    <view wx:if="{{mode === 'waiting'}}" class="state state--page">
+      <view class="state__icon">👥</view>
+      <view class="state__title">等 TA 加入后再一起选</view>
+      <view class="state__hint">配对完成后，你俩都能维护这份清单</view>
+    </view>
+
+    <block wx:else>
+      <view wx:if="{{readonly}}" class="readonly-banner">
+        <t-icon name="lock-on" size="30rpx" />
+        <text>这个板已归档，清单只能查看</text>
+      </view>
+
+      <view class="section-head">
+        <view>
+          <view class="section-head__title">准备一起看的番</view>
+          <view class="section-head__sub">看完后可一次同步双方进度</view>
+        </view>
+        <view
+          wx:if="{{!readonly}}"
+          class="add-entry"
+          hover-class="press"
+          aria-role="button"
+          aria-label="从当前番单加入"
+          bindtap="onOpenAdd"
+        >
+          <t-icon name="add" size="30rpx" />
+          <text>加入</text>
+        </view>
+      </view>
+
+      <view wx:if="{{watchItems.length === 0}}" class="state state--empty">
+        <view class="state__icon">🍿</view>
+        <view class="state__title">还没有想一起看的番</view>
+        <view class="state__hint">从当前番单挑一部，周末见面时直接开看</view>
+        <view wx:if="{{!readonly}}" class="state__action" hover-class="press" bindtap="onOpenAdd">加入第一部</view>
+      </view>
+
+      <view wx:else class="watch-list">
+        <view class="watch-card" wx:for="{{watchItems}}" wx:key="itemId">
+          <view class="watch-card__top">
+            <view class="cover">
+              <image
+                wx:if="{{item.cover && !coverErrorIds[item.itemId]}}"
+                class="cover__image"
+                src="{{item.cover}}"
+                mode="aspectFill"
+                lazy-load
+                data-item-id="{{item.itemId}}"
+                binderror="onCoverError"
+              />
+              <view wx:else class="cover__fallback" style="background:{{item.coverFallback.color}}">{{item.coverFallback.char}}</view>
+            </view>
+
+            <view class="watch-card__body">
+              <view class="watch-card__name">{{item.name}}</view>
+              <view wx:if="{{item.subtitle}}" class="watch-card__sub">{{item.subtitle}}</view>
+
+              <view class="progress-pair">
+                <view class="progress-row">
+                  <view class="identity-dot identity-dot--me">我</view>
+                  <text class="progress-row__ep">第 {{item.mineEp}} 话</text>
+                  <text class="progress-row__status">{{item.mineStatus}}</text>
+                </view>
+                <view class="progress-row">
+                  <view class="identity-dot identity-dot--peer">TA</view>
+                  <text class="progress-row__ep">第 {{item.peerEp}} 话</text>
+                  <text class="progress-row__status">{{item.peerStatus}}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+
+          <view wx:if="{{!readonly}}" class="watch-card__actions">
+            <view
+              class="card-action card-action--quiet {{mutating || advancing ? 'is-disabled' : ''}}"
+              hover-class="press"
+              data-item-id="{{item.itemId}}"
+              catchtap="onRemoveItem"
+            >
+              {{mutating && busyItemId === item.itemId ? '处理中…' : '移出清单'}}
+            </view>
+            <view
+              class="card-action card-action--primary {{mutating || advancing ? 'is-disabled' : ''}}"
+              hover-class="press"
+              data-item-id="{{item.itemId}}"
+              catchtap="onAdvanceTap"
+            >一起看</view>
+          </view>
+          <view wx:else class="watch-card__readonly">只读</view>
+        </view>
+      </view>
+    </block>
+  </block>
+</view>
+
+<!-- 从当前板所有未删除番中加入；active 项不会再出现在候选列表。 -->
+<t-popup
+  visible="{{showAdd}}"
+  placement="bottom"
+  close-on-overlay-click="{{!mutating}}"
+  bind:visible-change="onAddVisibleChange"
+>
+  <view class="sheet add-sheet">
+    <view class="sheet__handle"></view>
+    <view class="sheet__head">
+      <view>
+        <view class="sheet__title">加入一起看清单</view>
+        <view class="sheet__sub">从当前共享番单选择</view>
+      </view>
+      <view class="sheet__count">{{candidates.length}} 部可选</view>
+    </view>
+
+    <scroll-view wx:if="{{candidates.length}}" class="candidate-list" scroll-y enhanced show-scrollbar="{{false}}">
+      <view class="candidate" wx:for="{{candidates}}" wx:key="itemId">
+        <view class="candidate__cover">
+          <image
+            wx:if="{{item.cover && !coverErrorIds[item.itemId]}}"
+            class="candidate__image"
+            src="{{item.cover}}"
+            mode="aspectFill"
+            lazy-load
+            data-item-id="{{item.itemId}}"
+            binderror="onCoverError"
+          />
+          <view wx:else class="candidate__fallback" style="background:{{item.coverFallback.color}}">{{item.coverFallback.char}}</view>
+        </view>
+        <view class="candidate__main">
+          <view class="candidate__name">{{item.name}}</view>
+          <view class="candidate__progress">我 {{item.mineEp}} · TA {{item.peerEp}} 话</view>
+        </view>
+        <view
+          class="candidate__action {{mutating ? 'is-disabled' : ''}}"
+          hover-class="press"
+          data-item-id="{{item.itemId}}"
+          bindtap="onAddItem"
+        >{{mutating && busyItemId === item.itemId ? '加入中…' : '加入'}}</view>
+      </view>
+    </scroll-view>
+
+    <view wx:else class="sheet-empty">
+      <view class="sheet-empty__icon">✓</view>
+      <view class="sheet-empty__title">没有更多可加入的番</view>
+      <view class="sheet-empty__hint">板里的番都已经在清单中，或当前番单还是空的</view>
+    </view>
+  </view>
+</t-popup>
+
+<!-- 共同目标确认：目标 = max(双方当前集数) + n；总集数存在时按末集截断。 -->
+<t-popup
+  visible="{{showAdvance}}"
+  placement="bottom"
+  close-on-overlay-click="{{!advancing}}"
+  bind:visible-change="onAdvanceVisibleChange"
+>
+  <view class="sheet advance-sheet" wx:if="{{advanceItem}}">
+    <view class="sheet__handle"></view>
+    <view class="advance-head">
+      <view class="advance-head__eyebrow">一起看</view>
+      <view class="advance-head__title">{{advanceItem.name}}</view>
+      <view class="advance-head__hint">从你俩当前更靠前的一话继续算</view>
+    </view>
+
+    <view class="delta-title">这次看几话？</view>
+    <view class="delta-options">
+      <view
+        class="delta-chip {{selectedDelta === item ? 'is-active' : ''}} {{advancing ? 'is-disabled' : ''}}"
+        wx:for="{{presetDeltas}}"
+        wx:key="*this"
+        data-delta="{{item}}"
+        bindtap="onSelectDelta"
+      >+{{item}}</view>
+      <view class="delta-custom {{selectedDelta === 'custom' ? 'is-active' : ''}} {{advancing ? 'is-disabled' : ''}}">
+        <text>+</text>
+        <input
+          class="delta-custom__input"
+          type="number"
+          value="{{customDelta}}"
+          placeholder="自定义"
+          maxlength="4"
+          disabled="{{advancing}}"
+          bindfocus="onCustomDeltaFocus"
+          bindinput="onCustomDeltaInput"
+        />
+      </view>
+    </view>
+
+    <view wx:if="{{advancePreview}}" class="advance-preview">
+      <view class="advance-preview__target">
+        <text>共同目标</text>
+        <text class="advance-preview__target-ep">第 {{advancePreview.targetEp}} 话</text>
+      </view>
+      <view class="advance-preview__row">
+        <view class="identity-dot identity-dot--me">我</view>
+        <text class="advance-preview__path">{{advancePreview.mineBefore}} → {{advancePreview.mineAfter}}</text>
+        <text class="advance-preview__delta">{{advancePreview.mineDeltaText}}</text>
+      </view>
+      <view class="advance-preview__row">
+        <view class="identity-dot identity-dot--peer">TA</view>
+        <text class="advance-preview__path">{{advancePreview.peerBefore}} → {{advancePreview.peerAfter}}</text>
+        <text class="advance-preview__delta">{{advancePreview.peerDeltaText}}</text>
+      </view>
+      <view wx:if="{{advancePreview.clamped}}" class="advance-preview__note">已按总集数停在最后一话</view>
+      <view wx:if="{{!advancePreview.canAdvance}}" class="advance-preview__note advance-preview__note--warn">你俩都已经到最后一话</view>
+    </view>
+    <view wx:else class="advance-preview advance-preview--invalid">输入 1–9999 之间的集数</view>
+
+    <t-button
+      theme="primary"
+      size="large"
+      block
+      loading="{{advancing}}"
+      disabled="{{!advancePreview || !advancePreview.canAdvance}}"
+      bindtap="onConfirmAdvance"
+    >同步到第 {{advancePreview ? advancePreview.targetEp : '—'}} 话</t-button>
+    <view class="advance-footnote">提交成功后，这部番仍会留在清单</view>
+  </view>
+</t-popup>

@@ -64,8 +64,16 @@
 
       <!-- ② 封面墙：前 N 部番首字色块 + 溢出角标（无番时不渲染，保持卡片紧凑） -->
       <view wx:if="{{item.covers.length}}" class="cover-wall">
-        <block wx:for="{{item.covers}}" wx:for-item="cv" wx:key="index">
-          <image wx:if="{{cv.cover}}" class="cover-cell" src="{{cv.cover}}" mode="aspectFill" />
+        <block wx:for="{{item.covers}}" wx:for-item="cv" wx:key="coverKey">
+          <image
+            wx:if="{{cv.cover && !coverErr[cv.coverKey]}}"
+            class="cover-cell"
+            src="{{cv.cover}}"
+            mode="aspectFill"
+            lazy-load
+            data-cover-key="{{cv.coverKey}}"
+            binderror="onCoverError"
+          />
           <view wx:else class="cover-cell cover-cell--ph" style="background:{{cv.fallback.color}}">{{cv.fallback.char}}</view>
         </block>
         <view wx:if="{{item.moreText}}" class="cover-more">{{item.moreText}}</view>

@@ -573,6 +573,21 @@ eq(
   'item_remove'
 );
 
+(() => {
+  const described = T.describeEvent(ev({
+    type: C.EVENT_TYPE.TOGETHER_ADVANCE,
+    payload: {
+      targetEp: 7,
+      changes: [
+        { openid: 'me', prevEp: 5, ep: 7 },
+        { openid: 'ta', prevEp: 6, ep: 7 },
+      ],
+    },
+  }), 'me');
+  eq('describeEvent 一起待看使用合并动作', described.actionKey, C.EVENT_TYPE.TOGETHER_ADVANCE);
+  eq('describeEvent 一起待看带目标集数', described.vars.to, 7);
+})();
+
 // item_edit：改名分流 item_rename（带 from），非改名走 item_edit
 (() => {
   const renamed = T.describeEvent(
@@ -713,6 +728,26 @@ eq(
   const prev = T.windowProgress(winEvents, ME, PEER, now - 14 * DAY, now - 7 * DAY);
   eq('windowProgress 前窗我+6', prev.me, 6);
   eq('windowProgress 前窗TA+2', prev.peer, 2);
+
+  // 一起待看只写一条关系事件，但 changes 必须分别计入两人的报告数据。
+  const togetherEvent = {
+    type: C.EVENT_TYPE.TOGETHER_ADVANCE,
+    actor: ME,
+    itemId: 'i1',
+    itemName: '一起看的番',
+    createTime: bj(2026, 7, 9, 21, 0),
+    payload: {
+      targetEp: 7,
+      changes: [
+        { openid: ME, prevEp: 5, ep: 7 },
+        { openid: PEER, prevEp: 6, ep: 7 },
+      ],
+    },
+  };
+  const togetherWindow = T.windowProgress([togetherEvent], ME, PEER, now - 7 * DAY, now);
+  eq('一起待看合并事件分别计入我方增量', togetherWindow.me, 2);
+  eq('一起待看合并事件分别计入TA增量', togetherWindow.peer, 1);
+  eq('一起待看合并事件当天即神同步', T.syncDays([togetherEvent], ME, PEER, TZ), 1);
 
   // ── momentumOf 方向（稳定带=1）──
   const band = C.REPORT.MOMENTUM_STABLE_BAND;
@@ -1011,14 +1046,272 @@ eq('漂移守卫 ERR 一致', S.ERR, C.ERR);
 })();
 
 // ============================================================
+// shared-board 页面：详情中图回填 + 重选竞态
+// ============================================================
+async function testDetailCoverBackfill() {
+  const pagePath = require.resolve('../miniprogram/packageFeatures/pages/shared-board/shared-board');
+  const animeApi = require('../miniprogram/packageFeatures/utils/anime-meta/cloud-api');
+  const sharedApi = require('../miniprogram/packageFeatures/utils/shared-board/cloud-api');
+  const originalPage = global.Page;
+  const originalWx = global.wx;
+  const originalGetAnimeDetail = animeApi.getAnimeDetail;
+  const originalUpgradeBoardCovers = animeApi.upgradeBoardCovers;
+  const originalInvoke = sharedApi.invoke;
+  const originalAddItem = sharedApi.addItem;
+  const originalMarkViewed = sharedApi.markViewed;
+  const originalUpdateProgress = sharedApi.updateProgress;
+  let pageDefinition;
+  let navigatedUrl = '';
+
+  try {
+    global.Page = (definition) => {
+      pageDefinition = definition;
+    };
+    global.wx = {
+      showToast() {},
+      setNavigationBarTitle() {},
+      navigateTo({ url }) { navigatedUrl = url; },
+    };
+    delete require.cache[pagePath];
+    require(pagePath);
+
+    const makePage = () => {
+      const page = Object.assign({}, pageDefinition);
+      page.data = Object.assign({}, pageDefinition.data);
+      page.setData = (patch) => Object.assign(page.data, patch);
+      return page;
+    };
+
+    const entryPage = makePage();
+    entryPage.data.boardId = 'entry-board';
+    entryPage.data.vm = { phase: 'paired', peer: { openid: 'peer' } };
+    entryPage.onTogetherWatchTap();
+    eq(
+      '一起待看入口进入独立页并携带 boardId',
+      navigatedUrl,
+      '/packageFeatures/pages/together-watch/together-watch?boardId=entry-board'
+    );
+    navigatedUrl = '';
+    entryPage.data.vm = { phase: 'waiting' };
+    entryPage.onTogetherWatchTap();
+    eq('未配对时一起待看入口不可进入', navigatedUrl, '');
+    entryPage.data.vm = { phase: 'archived', peer: { openid: 'peer' } };
+    entryPage.onTogetherWatchTap();
+    eq(
+      '归档双人板仍可进入一起待看只读页',
+      navigatedUrl,
+      '/packageFeatures/pages/together-watch/together-watch?boardId=entry-board'
+    );
+
+    // 成功详情应以 medium 覆盖 small，同时保留原有放送元信息补拉行为。
+    animeApi.getAnimeDetail = async () => ({
+      ok: true,
+      data: { bangumi: { cover: 'https://img/medium.jpg', airDay: 5, isOnAir: true } },
+    });
+    const successPage = makePage();
+    successPage._pickedMeta = { sourceId: 101, cover: 'https://img/small.jpg' };
+    successPage.data.newItemCover = 'https://img/small.jpg';
+    successPage.data.newItemCoverError = true;
+    await successPage._fetchAirMeta(101);
+    eq('详情中图覆盖待提交 small 封面', successPage._pickedMeta.cover, 'https://img/medium.jpg');
+    eq('详情中图同步更新加番预览', successPage.data.newItemCover, 'https://img/medium.jpg');
+    eq('详情中图清除旧封面失败态', successPage.data.newItemCoverError, false);
+    eq('详情补拉仍写入 airDay', successPage._pickedMeta.airDay, 5);
+    eq('详情补拉仍写入 isOnAir', successPage._pickedMeta.isOnAir, true);
+
+    // 即使重选的是同一 sourceId，旧请求也不能靠相同 id 穿透并覆盖新一轮选择。
+    let resolveOldDetail;
+    animeApi.getAnimeDetail = () => new Promise((resolve) => {
+      resolveOldDetail = resolve;
+    });
+    const racePage = makePage();
+    racePage._pickedMeta = { sourceId: 202, cover: 'https://img/old-small.jpg' };
+    racePage.data.newItemCover = 'https://img/old-small.jpg';
+    const oldRequest = racePage._fetchAirMeta(202);
+    const reselectedMeta = { sourceId: 202, cover: 'https://img/new-small.jpg' };
+    racePage._pickedMeta = reselectedMeta;
+    racePage.data.newItemCover = reselectedMeta.cover;
+    resolveOldDetail({
+      ok: true,
+      data: { bangumi: { cover: 'https://img/stale-medium.jpg', airDay: 2, isOnAir: false } },
+    });
+    await oldRequest;
+    eq('同 sourceId 重选后旧详情不覆盖 meta', racePage._pickedMeta, reselectedMeta);
+    eq('同 sourceId 重选后旧详情不覆盖预览', racePage.data.newItemCover, 'https://img/new-small.jpg');
+
+    // 存量 small 在首屏后后台升级；返回映射直接合并 VM，不二次 _load，也不给同页面重复打请求。
+    const storedSmall = 'https://assets.anixplayer.net/image/poster/small/14360-34a7dad806748262214bfb81852bd57c.jpg';
+    const detailMedium = 'https://assets.anixplayer.net/image/poster/medium/14360-c7351ec616e97746a8f34ddaa3525aea.jpg';
+    let upgradeCalls = 0;
+    animeApi.upgradeBoardCovers = async () => {
+      upgradeCalls++;
+      return { ok: true, data: { updates: [{ itemId: 'cover-item', cover: detailMedium }] } };
+    };
+    const upgradePage = makePage();
+    const upgradeBoard = {
+      _id: 'cover-board',
+      name: '高清封面测试板',
+      status: 'full',
+      members: [{ openid: 'me', nickname: '我' }, { openid: 'peer', nickname: 'TA' }],
+    };
+    const upgradeItem = item({
+      _id: 'cover-item',
+      sourceId: 14360,
+      cover: storedSmall,
+      progress: { me: { ep: 1, status: 'watching' } },
+    });
+    upgradePage.data.boardId = upgradeBoard._id;
+    upgradePage.data.myOpenid = 'me';
+    upgradePage.data.coverErrorIds = { 'cover-item': true };
+    upgradePage._rawBoard = upgradeBoard;
+    upgradePage._rawItems = [upgradeItem];
+    await upgradePage._maybeUpgradeStoredCovers([upgradeItem]);
+    const upgradedVmItem = upgradePage.data.vm.sections[0].items[0];
+    eq('存量升级合并 medium 到原始数据', upgradePage._rawItems[0].cover, detailMedium);
+    eq('存量升级同步重建卡片 VM', upgradedVmItem.cover, detailMedium);
+    eq('存量升级清除旧 URL 的失败态', upgradePage.data.coverErrorIds['cover-item'], undefined);
+    upgradePage._maybeUpgradeStoredCovers(upgradePage._rawItems);
+    eq('同一页面实例只发一次存量升级请求', upgradeCalls, 1);
+
+    const manualPage = makePage();
+    manualPage.data.boardId = upgradeBoard._id;
+    manualPage._maybeUpgradeStoredCovers([{ _id: 'manual-item', sourceId: 14360, cover: '' }]);
+    eq('空封面不误触发仅针对 small 的升级请求', upgradeCalls, 1);
+
+    // 点击添加后应立刻上锁：等待详情期间连点、重选和遮罩关闭都不能产生第二条提交协程。
+    let resolveSubmitWait;
+    let addCalls = 0;
+    const submitPage = makePage();
+    const submitMeta = { sourceId: 303, cover: 'https://img/small-submit.jpg' };
+    submitPage.data.boardId = 'submit-board';
+    submitPage.data.showAdd = true;
+    submitPage.data.newItemName = '等待中图的番';
+    submitPage.data.newItemTotalEp = '12';
+    submitPage._pickedMeta = submitMeta;
+    submitPage._airMetaWait = new Promise((resolve) => { resolveSubmitWait = resolve; });
+    submitPage._load = () => {};
+    sharedApi.addItem = async () => {
+      addCalls++;
+      return { ok: true };
+    };
+    const firstSubmit = submitPage.onConfirmAdd();
+    eq('等待详情前立即进入 adding 锁', submitPage.data.adding, true);
+    await submitPage.onConfirmAdd();
+    eq('等待详情期间连点不会发第二次 addItem', addCalls, 0);
+    submitPage.onReselectAnime();
+    eq('提交锁期间重选不会替换捕获的番', submitPage._pickedMeta, submitMeta);
+    submitPage.onAddVisibleChange({ detail: { visible: false } });
+    eq('提交锁期间遮罩关闭不会关闭弹层', submitPage.data.showAdd, true);
+    submitPage.onItemNameInput({ detail: { value: '等待时改名' } });
+    submitPage.onAddTotalEpInc();
+    eq('提交锁期间番名输入被冻结', submitPage.data.newItemName, '等待中图的番');
+    eq('提交锁期间集数输入被冻结', submitPage.data.newItemTotalEp, '12');
+    resolveSubmitWait();
+    await firstSubmit;
+    eq('详情等待结束只提交一次', addCalls, 1);
+    eq('提交完成释放 adding 锁', submitPage.data.adding, false);
+
+    // medium 可能由另一成员/另一请求写入；普通下拉重载也要按 URL 变化清旧坏图状态。
+    sharedApi.markViewed = async () => ({ ok: true });
+    const reloadPage = makePage();
+    const oldCoverItem = item({
+      _id: 'external-cover-item',
+      sourceId: 14360,
+      cover: storedSmall,
+      progress: { me: { ep: 1, status: 'watching' } },
+    });
+    const newCoverItem = Object.assign({}, oldCoverItem, { cover: detailMedium });
+    reloadPage.data.boardId = upgradeBoard._id;
+    reloadPage.data.myOpenid = 'me';
+    reloadPage.data.coverErrorIds = { 'external-cover-item': true };
+    reloadPage._rawBoard = upgradeBoard;
+    reloadPage._rawItems = [oldCoverItem];
+    reloadPage._settledPeerUpdates = true;
+    await reloadPage._load({ ok: true, data: { board: upgradeBoard, items: [newCoverItem] } });
+    eq('普通重载检测 URL 变化并清旧坏图状态', reloadPage.data.coverErrorIds['external-cover-item'], undefined);
+
+    // 两次 _load 并发时只允许最后发起的一次落地，旧 small 响应晚到不能覆盖 medium。
+    const loadResolvers = [];
+    sharedApi.invoke = () => new Promise((resolve) => loadResolvers.push(resolve));
+    const loadRacePage = makePage();
+    loadRacePage.data.boardId = upgradeBoard._id;
+    loadRacePage.data.myOpenid = 'me';
+    loadRacePage._settledPeerUpdates = true;
+    const oldLoad = loadRacePage._load();
+    const newLoad = loadRacePage._load();
+    loadResolvers[1]({ ok: true, data: { board: upgradeBoard, items: [newCoverItem] } });
+    await newLoad;
+    loadResolvers[0]({ ok: true, data: { board: upgradeBoard, items: [oldCoverItem] } });
+    await oldLoad;
+    eq('旧详情响应晚到不会把 medium 覆盖回 small', loadRacePage._rawItems[0].cover, detailMedium);
+
+    // 进度请求期间 _load 会替换 raw 对象；下一次连点必须沿用首个回包的新 rev，不能从旧对象读 rev=0。
+    const progressPage = makePage();
+    progressPage.data.myOpenid = 'me';
+    progressPage.data.vm = { peer: null };
+    progressPage.data.detailItem = { itemId: 'progress-item' };
+    const progressRaw = item({
+      _id: 'progress-item',
+      totalEp: 12,
+      progress: { me: { ep: 0, status: 'want', rev: 0 } },
+    });
+    progressPage._rawItems = [progressRaw];
+    progressPage._load = () => Promise.resolve();
+    const progressCalls = [];
+    const progressResolvers = [];
+    sharedApi.updateProgress = (...args) => {
+      progressCalls.push(args);
+      return new Promise((resolve) => progressResolvers.push(resolve));
+    };
+    progressPage._commitProgress('progress-item', 1, 'watching');
+    // 模拟请求在途时详情刷新整份替换 _rawItems，然后用户又点到 E2。
+    progressPage._rawItems = [item({
+      _id: 'progress-item',
+      totalEp: 12,
+      progress: { me: { ep: 0, status: 'want', rev: 0 } },
+    })];
+    progressPage._commitProgress('progress-item', 2, 'watching');
+    eq('同 item 在途时第二次点击先折叠不并发', progressCalls.length, 1);
+    progressResolvers[0]({ ok: true, data: { mine: { ep: 1, status: 'watching', rev: 1 } } });
+    await Promise.resolve();
+    await Promise.resolve();
+    eq('raw 被替换后仍继续发送最新目标', progressCalls.length, 2);
+    eq('第二次提交使用首个回包的新 revision', progressCalls[1][3], 1);
+    progressResolvers[1]({ ok: true, data: { mine: { ep: 2, status: 'watching', rev: 2 } } });
+    await Promise.resolve();
+    await Promise.resolve();
+  } finally {
+    animeApi.getAnimeDetail = originalGetAnimeDetail;
+    animeApi.upgradeBoardCovers = originalUpgradeBoardCovers;
+    sharedApi.invoke = originalInvoke;
+    sharedApi.addItem = originalAddItem;
+    sharedApi.markViewed = originalMarkViewed;
+    sharedApi.updateProgress = originalUpdateProgress;
+    delete require.cache[pagePath];
+    if (originalPage === undefined) delete global.Page;
+    else global.Page = originalPage;
+    if (originalWx === undefined) delete global.wx;
+    else global.wx = originalWx;
+  }
+}
+
+// ============================================================
 // 汇总输出
 // ============================================================
-console.log('\n共享追番板 transform 模块测试');
-console.log('─'.repeat(40));
-if (failures.length) {
-  console.log(failures.join('\n'));
-  console.log('─'.repeat(40));
-}
-console.log(`通过 ${pass} / 失败 ${fail}`);
-process.exit(fail ? 1 : 0);
+(async () => {
+  try {
+    await testDetailCoverBackfill();
+  } catch (e) {
+    fail++;
+    failures.push(`  ❌ 页面详情封面回填测试异常\n     ${e && e.stack ? e.stack : e}`);
+  }
 
+  console.log('\n共享追番板 transform / page 测试');
+  console.log('─'.repeat(40));
+  if (failures.length) {
+    console.log(failures.join('\n'));
+    console.log('─'.repeat(40));
+  }
+  console.log(`通过 ${pass} / 失败 ${fail}`);
+  process.exitCode = fail ? 1 : 0;
+})();

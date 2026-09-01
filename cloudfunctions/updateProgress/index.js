@@ -1,12 +1,13 @@
 // 云函数：updateProgress —— 更新自己的进度
 //
 // 关键：只定位写 progress.<自己OPENID> 子键，物理上碰不到对方进度（私有性）。
-// ep 收「绝对集数」而非自增：前端算好目标集数再传，重复提交幂等、重试安全。
-// 服务端 clamp 后回传权威值，供前端乐观 UI 对账。
+// ep 收绝对集数；新客户端携带 expectedRev 做乐观锁，旧客户端走兼容路径。
+// 事务内重读 item/board 后才写，防止个人旧请求覆盖「一起待看」刚完成的双人推进，
+// 也防新客户端连点乱序导致集数倒退。
 
 const cloud = require('wx-server-sdk');
+const crypto = require('crypto');
 const C = require('./constants');
-const { appendEvent } = require('./event-log');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
@@ -26,59 +27,90 @@ exports.main = async (event) => {
     const { OPENID } = cloud.getWXContext();
     if (!OPENID) return fail(C.ERR.UNAUTHENTICATED);
 
-    const { itemId, ep, status } = event || {};
+    const { itemId, ep, status, expectedRev } = event || {};
     if (!itemId) return fail(C.ERR.INVALID_PARAM);
     if (!C.PROGRESS_STATUS.includes(status)) return fail(C.ERR.INVALID_STATUS);
+    // 兼容已发布的旧小程序包：旧端没有 expectedRev，仍按事务内最新快照执行；
+    // 新端携带 revision 时启用 CAS，避免旧请求覆盖共同推进或连点乱序。
+    const hasExpectedRev = expectedRev !== undefined && expectedRev !== null;
+    if (hasExpectedRev && (!Number.isInteger(expectedRev) || expectedRev < 0)) {
+      return fail(C.ERR.INVALID_PARAM);
+    }
 
-    const doc = (await db.collection(C.COLLECTION.ITEM).doc(itemId).get().catch(() => null)) || null;
-    const item = doc && doc.data;
-    if (!item || item.deleted) return fail(C.ERR.ITEM_NOT_FOUND);
-    // 成员校验查 board（权威），不依赖 item.memberOpenids 是否已回填最新——
-    // 否则配对前建板方加的番，新成员会被误判 NOT_MEMBER
-    const boardDoc = (await db.collection(C.COLLECTION.BOARD).doc(item.boardId).get().catch(() => null)) || null;
-    const board = boardDoc && boardDoc.data;
-    if (!board || !(board.memberOpenids || []).includes(OPENID)) return fail(C.ERR.NOT_MEMBER);
+    let committed = null;
+    // 事务冲突会重跑 callback；事件 id 必须在 callback 外生成，保证只落一条。
+    const eventId = `progress_${crypto.randomBytes(20).toString('hex')}`;
+    await db.runTransaction(async (transaction) => {
+      const doc = await transaction.collection(C.COLLECTION.ITEM).doc(itemId).get().catch(() => null);
+      const item = doc && doc.data;
+      if (!item || item.deleted) {
+        committed = { failure: fail(C.ERR.ITEM_NOT_FOUND) };
+        return;
+      }
 
-    const epFinal = clampEp(ep, item.totalEp);
-    if (epFinal === null) return fail(C.ERR.INVALID_EP);
+      // 成员校验查 board（权威），不依赖 item.memberOpenids 是否已回填最新。
+      const boardDoc = await transaction.collection(C.COLLECTION.BOARD).doc(item.boardId).get().catch(() => null);
+      const board = boardDoc && boardDoc.data;
+      if (!board || !(board.memberOpenids || []).includes(OPENID)) {
+        committed = { failure: fail(C.ERR.NOT_MEMBER) };
+        return;
+      }
 
-    // 记录旧值（用于历史事件的 prev；只在真变化时记，避免幂等重提刷屏）
-    const prev = (item.progress && item.progress[OPENID]) || {};
-    const prevEp = typeof prev.ep === 'number' ? prev.ep : 0;
-    const prevStatus = prev.status || null;
+      const epFinal = clampEp(ep, item.totalEp);
+      if (epFinal === null) {
+        committed = { failure: fail(C.ERR.INVALID_EP) };
+        return;
+      }
+      const prev = (item.progress && item.progress[OPENID]) || {};
+      const prevEp = typeof prev.ep === 'number' ? prev.ep : 0;
+      const prevStatus = prev.status || null;
+      const prevRev = Number.isInteger(prev.rev) && prev.rev >= 0 ? prev.rev : 0;
+      if (hasExpectedRev && expectedRev !== prevRev) {
+        committed = { failure: fail(C.ERR.CONFLICT) };
+        return;
+      }
 
-    const now = db.serverDate();
-    await db
-      .collection(C.COLLECTION.ITEM)
-      .doc(itemId)
-      .update({
+      // 无变化提交保持真正幂等：不 bump revision、板时间或历史。
+      if (epFinal === prevEp && status === prevStatus) {
+        committed = { item, board, changed: false, prevEp, prevStatus, epFinal, rev: prevRev };
+        return;
+      }
+
+      const now = db.serverDate();
+      const rev = prevRev + 1;
+      await transaction.collection(C.COLLECTION.ITEM).doc(itemId).update({
         data: {
           [`progress.${OPENID}.ep`]: epFinal,
           [`progress.${OPENID}.status`]: status,
+          [`progress.${OPENID}.rev`]: rev,
           [`progress.${OPENID}.updateTime`]: now,
           updateTime: now,
         },
       });
-
-    // bump 所属板的 updateTime：P1 板列表红点判定 hasUnread = board.updateTime > 我的 lastViewedAt。
-    // 改进度是最高频事件，不 bump 则对方追番时我在板列表看不到未读红点（红点形同虚设）。
-    await db.collection(C.COLLECTION.BOARD).doc(item.boardId).update({ data: { updateTime: now } });
-
-    // 历史事件：仅在 ep 或 status 真变化时记（幂等重提交、无变更的提交不记，避免刷屏）
-    if (epFinal !== prevEp || status !== prevStatus) {
-      await appendEvent(db, C, {
-        boardId: item.boardId,
-        memberOpenids: board.memberOpenids,
-        actor: OPENID,
-        type: C.EVENT_TYPE.PROGRESS,
-        itemId,
-        itemName: item.name || '',
-        payload: { prevEp, ep: epFinal, prevStatus, status },
+      // 同一事务 bump 板时间，避免 item 已写、板未写的半成功状态。
+      await transaction.collection(C.COLLECTION.BOARD).doc(item.boardId).update({ data: { updateTime: now } });
+      // 进度、板时间与历史是一个原子结果：任何一步失败都整体回滚，报告不会永久漏记。
+      await transaction.collection(C.COLLECTION.EVENT).doc(eventId).set({
+        data: {
+          boardId: item.boardId,
+          memberOpenids: Array.isArray(board.memberOpenids) ? board.memberOpenids : [],
+          actor: OPENID,
+          type: C.EVENT_TYPE.PROGRESS,
+          itemId,
+          itemName: item.name || '',
+          payload: { prevEp, ep: epFinal, prevStatus, status },
+          createTime: now,
+        },
       });
-    }
+      committed = { item, board, changed: true, prevEp, prevStatus, epFinal, rev };
+    });
+
+    if (committed && committed.failure) return committed.failure;
+
+    const { epFinal, rev } = committed;
 
     // 回传服务端裁决后的权威值，供前端对账（被 clamp 时前端 snap 到此值）
-    return ok({ itemId, mine: { ep: epFinal, status } });
+    return ok({ itemId, mine: { ep: epFinal, status, rev } });
   } catch (e) {
     return fail(C.ERR.INTERNAL, String((e && e.message) || e));
   }

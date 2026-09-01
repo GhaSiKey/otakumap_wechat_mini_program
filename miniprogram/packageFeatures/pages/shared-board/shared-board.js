@@ -35,8 +35,13 @@ const {
   normalizeItemView,
 } = require('../../utils/shared-board/config');
 // 搜索页交互模式 + 回带事件名（跨包同一 miniprogram 内，直接 require anime-meta 配置层）
-const { SEARCH_MODE, PICK_EVENT } = require('../../utils/anime-meta/config');
-// 番剧详情云调用：加番选中后补拉 airDay/isOnAir（搜索结果无此二字段，只详情接口给）
+const {
+  SEARCH_MODE,
+  PICK_EVENT,
+  preferDetailCover,
+  isSearchThumbnailCover,
+} = require('../../utils/anime-meta/config');
+// 番剧详情云调用：加番选中后用详情 medium 封面替换搜索 small，并补拉 airDay/isOnAir。
 const animeApi = require('../../utils/anime-meta/cloud-api');
 
 const ANIME_SEARCH_URL = '/packageFeatures/pages/anime-search/anime-search';
@@ -143,6 +148,7 @@ Page({
   },
 
   async onLoad(query) {
+    this._unloaded = false;
     const boardId = query.boardId || '';
     const token = query.token || '';
     // 视图偏好属于「本机 × 当前板」：按 boardId 拼 key，非法/旧值统一回退完整列表。
@@ -211,6 +217,7 @@ Page({
   },
 
   onUnload() {
+    this._unloaded = true;
     // 防页面销毁后 setData
     if (this._epBumpTimer) clearTimeout(this._epBumpTimer);
     if (this._commonTalkTimer) clearTimeout(this._commonTalkTimer);
@@ -221,13 +228,38 @@ Page({
   //            onShow / 下拉 / +1 对账等复访不传，照常请求最新。
   async _load(preloaded) {
     const { boardId, myOpenid } = this.data;
+    const loadSeq = (this._loadSeq || 0) + 1;
+    this._loadSeq = loadSeq;
     const res = preloaded || (await api.invoke('getBoardDetail', { boardId }));
+    // onShow/下拉/写后对账可能并发拉详情；只允许最后发起的一次落地，避免旧 small 快照
+    // 晚到后覆盖新 medium/进度。页面已销毁或 boardId 已变化时同样不再 setData/markViewed。
+    if (this._unloaded || this._loadSeq !== loadSeq || this.data.boardId !== boardId) return;
     if (!res.ok) {
       this.setData({ loading: false });
       wx.showToast({ title: '加载失败', icon: 'none' });
       return;
     }
     const { board, items } = res.data;
+    // progress revision 独立于 raw 对象保存：_load 会整份替换 _rawItems，若只把请求回包的
+    // rev 写回旧对象，连续点击的下一次提交会误拿旧 rev。先吸收本次权威 rev，再把仍待提交的
+    // 乐观目标覆盖到展示副本上（不改 revision），保证刷新与连点交错时 UI/协议都连续。
+    this._progressRevByItem = this._progressRevByItem || {};
+    items.forEach((item) => {
+      if (!item || !item._id) return;
+      item.progress = item.progress || {};
+      const mine = item.progress[myOpenid] || {};
+      const serverRev = Number.isInteger(mine.rev) && mine.rev >= 0 ? mine.rev : 0;
+      const knownRev = this._progressRevByItem[item._id] || 0;
+      this._progressRevByItem[item._id] = Math.max(knownRev, serverRev);
+      const desired = this._progressDesired && this._progressDesired[item._id];
+      if (desired) {
+        item.progress[myOpenid] = Object.assign({}, mine, {
+          ep: desired.ep,
+          status: desired.status,
+          rev: this._progressRevByItem[item._id],
+        });
+      }
+    });
     const vm = T.buildBoardViewModel(board, items, myOpenid);
     // 检测「对方刚加入」：本次从 waiting 变 paired（上一次还没配对，这次有对方了）
     const wasWaiting = this.data.vm && this.data.vm.phase === 'waiting';
@@ -238,12 +270,29 @@ Page({
     const curPeerUrl = (vm.peer && vm.peer.avatar) || '';
     const peerUrlChanged = curPeerUrl !== prevPeerUrl;
     this._lastPeerAvatarUrl = curPeerUrl;
+    // 封面错误态按 itemId 记忆以避免坏链反复闪烁；但 URL 真的变了（例如另一端已把
+    // small 升级为 medium）必须清掉旧标记，让新 URL 获得一次加载机会。
+    const prevCoverByItemId = {};
+    (this._rawItems || []).forEach((item) => {
+      if (item && item._id) prevCoverByItemId[item._id] = item.cover || '';
+    });
+    const coverErrorIds = Object.assign({}, this.data.coverErrorIds);
+    let coverErrorChanged = false;
+    items.forEach((item) => {
+      if (!item || !item._id || !coverErrorIds[item._id]) return;
+      if (Object.prototype.hasOwnProperty.call(prevCoverByItemId, item._id)
+        && prevCoverByItemId[item._id] !== (item.cover || '')) {
+        delete coverErrorIds[item._id];
+        coverErrorChanged = true;
+      }
+    });
     // 原始 board/items 存实例属性（wxml 不消费）——乐观对账靠 this._rawItems 的对象引用
     // 累积（_commitProgress 直接改 raw.progress[myOpenid]），此处每次 _load 用最新权威值整份替换。
     this._rawBoard = board;
     this._rawItems = items;
     const patch = { vm, loading: false };
     if (peerUrlChanged) patch.peerAvatarError = false; // 对方头像换了新 URL，给一次加载机会
+    if (coverErrorChanged) patch.coverErrorIds = coverErrorIds;
     // 详情弹层打开时用最新数据重建 detailItem，否则改了总集数/放送状态/进度后弹层仍显示旧值。
     // pair 也从同一份权威 raw 重算，与 _commitProgress 的乐观对账一致，不冲突。
     if (this.data.detailItem) {
@@ -274,6 +323,107 @@ Page({
     // 记录本人查看时间，清未读红点（不阻塞渲染，失败无妨）。
     // 放在 buildPeerUpdates 之后：本次信息条已用旧 viewed 算完，此处写新值只影响下次进板。
     api.markViewed(this.data.boardId);
+    // 首屏先用现有数据立即可交互；若发现历史 small 封面，再后台限量补拉详情 medium。
+    // 每个页面实例只尝试一次，不阻塞 loading，也不因失败反复打上游。
+    this._maybeUpgradeStoredCovers(items);
+  },
+
+  _maybeUpgradeStoredCovers(items) {
+    if (this._coverUpgradeAttempted) return;
+    const upgradeCandidates = (items || []).filter(
+      (item) => item && Number.isInteger(item.sourceId) && item.sourceId > 0
+        && isSearchThumbnailCover(item.cover)
+    );
+    const boardId = this.data.boardId;
+    if (!upgradeCandidates.length) {
+      this._coverUpgradeAttempted = true;
+      console.log('[shared-board][cover-upgrade] 无需升级', {
+        boardId,
+        totalItems: (items || []).length,
+      });
+      return;
+    }
+
+    this._coverUpgradeAttempted = true;
+    console.log('[shared-board][cover-upgrade] 检测到存量 small，开始后台升级', {
+      boardId,
+      detectedSmall: upgradeCandidates.length,
+    });
+    return animeApi.upgradeBoardCovers(boardId).then((r) => {
+      if (this._unloaded || this.data.boardId !== boardId) return;
+      if (!r || !r.ok) {
+        if (r && r.code === 'ERR_FUNCTION_TIMEOUT') {
+          console.warn('[shared-board][cover-upgrade] animeMeta 云函数执行超时，请把超时时间调整为 40 秒', {
+            boardId,
+            currentTimeoutSeconds: r.timeoutSeconds || 3,
+            action: '云开发 → 云函数 → animeMeta → 函数配置（或高级设置）→ 超时时间：40 秒',
+            rawMessage: r.msg,
+          });
+          return;
+        }
+        console.warn('[shared-board][cover-upgrade] 升级请求失败，保留原 small', {
+          boardId,
+          code: r && r.code,
+          message: r && r.msg,
+        });
+        return;
+      }
+      const progress = r.data || {};
+      if (progress.throttled) {
+        console.log('[shared-board][cover-upgrade] 同板处于 60 秒冷却期，本次未重复请求', {
+          boardId,
+          detectedSmall: upgradeCandidates.length,
+        });
+        return;
+      }
+      const updates = Array.isArray(progress.updates) ? progress.updates : [];
+      const checked = Number.isInteger(progress.checked) ? progress.checked : updates.length;
+      const upgraded = Number.isInteger(progress.upgraded) ? progress.upgraded : updates.length;
+      const remaining = Number.isInteger(progress.remaining)
+        ? progress.remaining
+        : Math.max(0, upgradeCandidates.length - upgraded);
+      console.log('[shared-board][cover-upgrade] 本轮完成', {
+        boardId,
+        checked,
+        upgraded,
+        skipped: progress.skipped || 0,
+        failed: progress.failed || 0,
+        remaining,
+        hasMore: typeof progress.hasMore === 'boolean' ? progress.hasMore : remaining > 0,
+      });
+      if (!updates.length) return;
+
+      const coverByItemId = {};
+      updates.forEach((entry) => {
+        if (entry && entry.itemId && entry.cover) coverByItemId[entry.itemId] = entry.cover;
+      });
+      const currentItems = this._rawItems || [];
+      let changed = false;
+      const nextItems = currentItems.map((item) => {
+        const cover = item && coverByItemId[item._id];
+        if (!cover || cover === item.cover) return item;
+        changed = true;
+        return Object.assign({}, item, { cover });
+      });
+      if (!changed || !this._rawBoard) return;
+
+      this._rawItems = nextItems;
+      const vm = T.buildBoardViewModel(this._rawBoard, nextItems, this.data.myOpenid);
+      const coverErrorIds = Object.assign({}, this.data.coverErrorIds);
+      Object.keys(coverByItemId).forEach((itemId) => delete coverErrorIds[itemId]);
+      const patch = { vm, coverErrorIds };
+      if (this.data.detailItem) {
+        const raw = nextItems.find((item) => item._id === this.data.detailItem.itemId);
+        if (raw) patch.detailItem = T.buildItemViewModel(raw, this.data.myOpenid, vm.peer ? vm.peer.openid : null);
+      }
+      this.setData(patch);
+    }).catch((e) => {
+      // 维护任务必须完全静默：低版本基础库或云能力异常时保留原 small，不影响板页主流程。
+      console.warn('[shared-board][cover-upgrade] 调用异常，保留原 small', {
+        boardId,
+        message: String((e && e.message) || e),
+      });
+    });
   },
 
   // 「N 部能一起聊」按需提醒：commonCount 变大才弹横条，3.5s 后自动收起。
@@ -537,6 +687,7 @@ Page({
 
   // ==================== 加番 ====================
   onAddTap() {
+    if (this.data.adding) return;
     this._pickedMeta = null; // 新一轮加番，清掉上次搜番剧带出的暂存封面/sourceId
     this._airMetaWait = null; // 同步清补拉 promise，避免本轮等到上一轮的旧回包
     this.setData({
@@ -552,6 +703,7 @@ Page({
   // 加番弹层「搜番剧」：跳搜索页 pick 模式，选中后回带填入番名/总集数（封面在提交时随 addItem 一起存）。
   // 用 EventChannel 单层回写：navigateTo 打开搜索页，搜索页选中 emit PICK_EVENT，此处 on 接收。
   onAddSearchTap() {
+    if (this.data.adding) return;
     wx.navigateTo({
       url: `${ANIME_SEARCH_URL}?mode=${SEARCH_MODE.PICK}`,
       events: {
@@ -563,10 +715,11 @@ Page({
   // 加番场景收到选中番剧：回填番名 + 总集数，并暂存封面/sourceId 待提交时随 addItem 存。
   // 不直接 addItem——让用户回到弹层还能改名/改集数再确认，选中只是「带出」不是「提交」。
   _onPickedForAdd(picked) {
-    if (!picked) return;
+    if (!picked || this.data.adding) return;
     const cover = picked.cover || '';
     const sourceId = Number.isInteger(picked.sourceId) && picked.sourceId > 0 ? picked.sourceId : null;
-    // 先存搜索结果已有的字段（cover/sourceId）；airDay/isOnAir 由下方补调详情异步补入。
+    // 先存搜索结果已有的字段（small cover/sourceId）；详情回来后优先换 medium cover，
+    // 并异步补入 airDay/isOnAir。
     this._pickedMeta = { cover, sourceId };
     const name = picked.name || this.data.newItemName;
     this.setData({
@@ -577,34 +730,42 @@ Page({
       newItemCoverError: false, // 新封面给一次加载机会
       newItemFallback: T.pickCoverColor(name), // 无封面/加载失败时的首字色块兜底
     });
-    // 补拉放送信息：搜索接口不给 airDay/isOnAir，只详情接口给（见 animeMeta 云函数）。
+    // 补拉详情：搜索接口只有 small cover 且不给 airDay/isOnAir；详情提供 medium cover 和放送信息。
     // 异步进行，不阻塞选中回填；失败仅 toast 提示、不影响加番（用户已确认的降级策略）。
     // 存下这次补拉的 promise：用户可能在详情回来前就点确认，onConfirmAdd 提交前 await 它
     // （带超时），确保放送信息尽量赶上落库，避免竞态导致 airStatus/airDay 双缺失。
     this._airMetaWait = sourceId ? this._fetchAirMeta(sourceId) : null;
   },
 
-  // 按 sourceId 补拉详情，取 airDay/isOnAir 存入 _pickedMeta，供提交时随 addItem 落库。
-  // 加番弹层可能在 detail 返回前就被重选/关闭，故回来时校验 sourceId 仍是当前选中的那部，
-  // 避免慢回包把上一部的放送信息串到新选的番上。
+  // 按 sourceId 补拉详情，优先采用详情返回的中图封面，并取 airDay/isOnAir 存入
+  // _pickedMeta，供提交时随 addItem 落库。捕获本次选中对象并在回包后校验对象身份：
+  // 只比 sourceId 挡不住「重选了同一部番」的旧请求，旧回包仍可能覆盖新一轮预览。
   async _fetchAirMeta(sourceId) {
+    const pickedMeta = this._pickedMeta;
     const r = await animeApi.getAnimeDetail(sourceId);
-    // 弹层已重选/关闭（_pickedMeta 变了或清了）→ 丢弃这次回包，不串档
-    if (!this._pickedMeta || this._pickedMeta.sourceId !== sourceId) return;
+    // 弹层已重选/关闭（_pickedMeta 被替换或清空）→ 丢弃这次回包，不串档。
+    // 对象身份校验同时覆盖 sourceId 相同的重复选择。
+    if (this._unloaded || !pickedMeta || this._pickedMeta !== pickedMeta || pickedMeta.sourceId !== sourceId) return;
     if (!r || !r.ok || !r.data || !r.data.bangumi) {
       wx.showToast({ title: ANIME_BIND_COPY.META_FAIL, icon: 'none' });
       return;
     }
     const b = r.data.bangumi;
-    if (Number.isInteger(b.airDay)) this._pickedMeta.airDay = b.airDay;
-    if (typeof b.isOnAir === 'boolean') this._pickedMeta.isOnAir = b.isOnAir;
+    const bestCover = preferDetailCover(pickedMeta.cover, b.cover);
+    if (bestCover && bestCover !== pickedMeta.cover) {
+      pickedMeta.cover = bestCover;
+      // 搜索结果先展示 small；详情回来后无缝切到 medium，并清掉 small 的失败态给新 URL 一次加载机会。
+      this.setData({ newItemCover: bestCover, newItemCoverError: false });
+    }
+    if (Number.isInteger(b.airDay)) pickedMeta.airDay = b.airDay;
+    if (typeof b.isOnAir === 'boolean') pickedMeta.isOnAir = b.isOnAir;
   },
 
   // 提交前等补拉详情就绪：race「补拉 promise」与「AIR_META_WAIT_MS 超时」。
-  // 补拉先回 → 放送信息已写回 _pickedMeta，带上落库；超时先到 → 照旧加番（降级）。
-  // _fetchAirMeta 内部已 catch 失败并 toast，故这里对其结果 catch 兜底即可，不重复提示。
-  _waitAirMeta() {
-    const wait = this._airMetaWait;
+  // 补拉先回 → medium 封面/放送信息已写回 _pickedMeta，带上落库；超时先到 → 用 small 加番（降级）。
+  // 业务失败信封由 _fetchAirMeta toast；网络层 Promise reject 在这里静默兜底，不重复提示。
+  _waitAirMeta(waitPromise) {
+    const wait = waitPromise || this._airMetaWait;
     if (!wait) return Promise.resolve();
     const timeout = new Promise((resolve) => setTimeout(resolve, AIR_META_WAIT_MS));
     return Promise.race([wait.catch(() => {}), timeout]);
@@ -617,6 +778,7 @@ Page({
 
   // 已选中后「重选」：清预览与暂存，回到搜索入口态，再次跳搜索页
   onReselectAnime() {
+    if (this.data.adding) return;
     this._pickedMeta = null;
     this._airMetaWait = null; // 重选清补拉 promise，旧回包因 sourceId 不匹配也会被丢弃
     this.setData({ newItemPicked: false, newItemCover: '', newItemCoverError: false });
@@ -624,24 +786,32 @@ Page({
   },
 
   onAddVisibleChange(e) {
-    this.setData({ showAdd: e.detail.visible });
+    const visible = !!(e && e.detail && e.detail.visible);
+    // 点击“添加”后最多会等详情 3 秒；等待/提交期间保持弹层与选中对象稳定，
+    // 防止遮罩关闭或重选让后台提交协程拿到另一轮数据。
+    if (this.data.adding && !visible) return;
+    this.setData({ showAdd: visible });
   },
 
   onItemNameInput(e) {
+    if (this.data.adding) return;
     this.setData({ newItemName: e.detail.value });
   },
 
   // 总集数步进器：input 直接改（保留字符串，空=不填），±按钮在当前值基础上增减。
   // 边界钳制统一走 _stepTotalEp，不散落魔法数字。
   onAddTotalEpInput(e) {
+    if (this.data.adding) return;
     this.setData({ newItemTotalEp: this._sanitizeTotalEpInput(e.detail.value) });
   },
 
   onAddTotalEpInc() {
+    if (this.data.adding) return;
     this.setData({ newItemTotalEp: String(this._stepTotalEp(this.data.newItemTotalEp, +1)) });
   },
 
   onAddTotalEpDec() {
+    if (this.data.adding) return;
     const cur = this.data.newItemTotalEp;
     if (!cur) return; // 空态减无意义（下限即 1，不从空跳到 0）
     this.setData({ newItemTotalEp: String(this._stepTotalEp(cur, -1)) });
@@ -667,33 +837,44 @@ Page({
       wx.showToast({ title: '输入番剧名称', icon: 'none' });
       return;
     }
-    // 放送信息补拉可能还在路上（用户选完番很快点确认）。提交前最多等 AIR_META_WAIT_MS，
-    // 等到就带上 airDay/isOnAir 落库，超时则照旧加（降级策略）。_fetchAirMeta 已把结果
-    // 写回 _pickedMeta，这里只等它「跑完/超时」，不关心返回值。
-    if (this._airMetaWait) await this._waitAirMeta();
-    // 总集数选填：归一为合法整数或 null（空/非法/越界都落 null，与云函数同规则）
-    const totalEp = T.normalizeTotalEp(this.data.newItemTotalEp);
-    // 从「搜番剧」带出的封面/sourceId（若有）随本次 addItem 一并存；手打加番时为空不带
-    const meta = this._pickedMeta || {};
-    const extra = {};
-    if (totalEp != null) extra.totalEp = totalEp;
-    if (meta.cover) extra.cover = meta.cover;
-    if (meta.sourceId) extra.sourceId = meta.sourceId;
-    // 放送信息（补调详情拉到才有）：airDay 落库供更新日角标，isOnAir 供云函数校准 airStatus
-    if (Number.isInteger(meta.airDay)) extra.airDay = meta.airDay;
-    if (typeof meta.isOnAir === 'boolean') extra.isOnAir = meta.isOnAir;
+    // 在任何 await 之前上锁并捕获本次选择：按钮连点、遮罩关闭、重选都不能启动第二条提交协程。
+    const pickedMeta = this._pickedMeta;
+    const detailWait = this._airMetaWait;
+    const totalEpInput = this.data.newItemTotalEp;
+    const boardId = this.data.boardId;
     this.setData({ adding: true });
-    const r = await api.addItem(this.data.boardId, name, extra);
-    this.setData({ adding: false });
-    if (!r.ok) {
-      const msg = r.code === 'ERR_DUPLICATE_ITEM' ? '这部番已经在单里啦' : '添加失败';
-      wx.showToast({ title: msg, icon: 'none' });
-      return;
+    try {
+      // 详情补拉可能还在路上（用户选完番很快点确认）。提交前最多等 AIR_META_WAIT_MS；
+      // 命中就把 medium/放送信息写进捕获的 pickedMeta，超时则沿用 small 降级。
+      if (detailWait) await this._waitAirMeta(detailWait);
+      if (this._unloaded) return;
+
+      // 总集数和选中对象都以点击“添加”的瞬间为准，等待期间的迟到 UI 事件不会串进本次提交。
+      const totalEp = T.normalizeTotalEp(totalEpInput);
+      const meta = pickedMeta || {};
+      const extra = {};
+      if (totalEp != null) extra.totalEp = totalEp;
+      if (meta.cover) extra.cover = meta.cover;
+      if (meta.sourceId) extra.sourceId = meta.sourceId;
+      if (Number.isInteger(meta.airDay)) extra.airDay = meta.airDay;
+      if (typeof meta.isOnAir === 'boolean') extra.isOnAir = meta.isOnAir;
+
+      const r = await api.addItem(boardId, name, extra);
+      if (this._unloaded) return;
+      if (!r.ok) {
+        const msg = r.code === 'ERR_DUPLICATE_ITEM' ? '这部番已经在单里啦' : '添加失败';
+        wx.showToast({ title: msg, icon: 'none' });
+        return;
+      }
+      this._pickedMeta = null; // 用完即清，避免下次手打加番误带上一次的封面
+      this._airMetaWait = null; // 补拉 promise 已消费，清掉不留给下一轮
+      this.setData({ showAdd: false, newItemCover: '', newItemPicked: false, newItemCoverError: false });
+      this._load(); // 重新拉取，卡片出现
+    } catch (e) {
+      if (!this._unloaded) wx.showToast({ title: '添加失败', icon: 'none' });
+    } finally {
+      if (!this._unloaded) this.setData({ adding: false });
     }
-    this._pickedMeta = null; // 用完即清，避免下次手打加番误带上一次的封面
-    this._airMetaWait = null; // 补拉 promise 已消费，清掉不留给下一轮
-    this.setData({ showAdd: false, newItemCover: '', newItemPicked: false, newItemCoverError: false });
-    this._load(); // 重新拉取，卡片出现
   },
 
   // ==================== 进度编辑（P3 弹层）====================
@@ -730,6 +911,13 @@ Page({
   onReportTap() {
     if (!this.data.boardId) return;
     wx.navigateTo({ url: `/packageFeatures/pages/board-report/board-report?boardId=${this.data.boardId}` });
+  },
+
+  // 进持久「一起看」清单；已归档的双人板也保留入口，由子页切为只读。
+  onTogetherWatchTap() {
+    const vm = this.data.vm;
+    if (!this.data.boardId || !vm || !vm.peer || !['paired', 'archived'].includes(vm.phase)) return;
+    wx.navigateTo({ url: `/packageFeatures/pages/together-watch/together-watch?boardId=${this.data.boardId}` });
   },
 
   // +1：本地即时累加（连点基于最新本地态，五连点=+5），_commitProgress 内部乐观更新 + 异步对账
@@ -875,7 +1063,12 @@ Page({
     // 失败不靠本地快照回滚，直接 _load 拉服务端权威值对账，故这里不存快照。
     const optimisticEp = T.clampEp(ep, raw.totalEp);
     raw.progress = raw.progress || {};
-    raw.progress[myOpenid] = { ep: optimisticEp != null ? optimisticEp : ep, status };
+    const previousMine = raw.progress[myOpenid] || {};
+    const optimisticMine = Object.assign({}, previousMine, {
+      ep: optimisticEp != null ? optimisticEp : ep,
+      status,
+    });
+    raw.progress[myOpenid] = optimisticMine;
     const optimisticPair = T.buildProgressPair(raw, myOpenid, peerOpenid);
     this.setData({ 'detailItem.pair': optimisticPair });
     // 追平里程碑在乐观态即时庆祝（本地防重放），手感更跟手
@@ -883,26 +1076,86 @@ Page({
       this._celebrateSync(itemId);
     }
 
-    // ③ 请求序号：只让「最新一次」提交的回包写权威对账，旧回包丢弃（防连点乱序覆盖）
+    // ② 同一 item 的网络写串行并折叠到最新目标。连续 +1 仍立即乐观上屏，但服务端必须
+    // 先确认 rev=N 才发 rev=N+1，杜绝旧请求晚到覆盖共同推进或把 E7 写回 E6。
     this._commitSeq = (this._commitSeq || 0) + 1;
-    const seq = this._commitSeq;
-    this._commitLatest = this._commitLatest || {};
-    this._commitLatest[itemId] = seq;
+    this._progressDesired = this._progressDesired || {};
+    this._progressDesired[itemId] = {
+      ep: optimisticMine.ep,
+      status,
+      seq: this._commitSeq,
+    };
+    this._flushProgress(itemId);
+  },
 
-    api.updateProgress(itemId, ep, status).then((r) => {
-      const isStale = this._commitLatest[itemId] !== seq; // 期间又点了，丢弃本次回包
-      if (isStale) return; // 旧回包，最新态已更靠前，交给最新那次收尾，不回写
-      if (!r.ok) {
-        // 失败：不用本地快照回滚（连点场景快照是中间乐观态，回滚会漂移）。
-        // 直接 _load 从服务端拉权威值对账，是唯一诚实且能自愈的还原。
-        wx.showToast({ title: '更新失败，已还原', icon: 'none' });
+  _flushProgress(itemId) {
+    this._progressInFlight = this._progressInFlight || {};
+    if (this._progressInFlight[itemId]) return;
+    const desired = this._progressDesired && this._progressDesired[itemId];
+    const raw = (this._rawItems || []).find((it) => it._id === itemId);
+    if (!desired || !raw) return;
+
+    const myOpenid = this.data.myOpenid;
+    const mine = (raw.progress && raw.progress[myOpenid]) || {};
+    const rawRev = Number.isInteger(mine.rev) && mine.rev >= 0 ? mine.rev : 0;
+    this._progressRevByItem = this._progressRevByItem || {};
+    const expectedRev = Math.max(this._progressRevByItem[itemId] || 0, rawRev);
+    this._progressRevByItem[itemId] = expectedRev;
+    this._progressInFlight[itemId] = true;
+
+    api.updateProgress(itemId, desired.ep, desired.status, expectedRev).then((r) => {
+      if (this._unloaded) return;
+      this._progressInFlight[itemId] = false;
+      const latest = this._progressDesired && this._progressDesired[itemId];
+      if (!r || !r.ok || !r.data || !r.data.mine) {
+        delete this._progressDesired[itemId];
+        const conflict = r && r.code === 'ERR_CONFLICT';
+        wx.showToast({ title: conflict ? '进度已变化，请重试' : '更新失败，已还原', icon: 'none' });
         this._load();
         return;
       }
-      // 用服务端权威值对账（clamp 修正等），再重拉列表同步分区/commonCount
-      raw.progress[myOpenid] = { ep: r.data.mine.ep, status: r.data.mine.status };
-      const authoritativePair = T.buildProgressPair(raw, myOpenid, peerOpenid);
-      this.setData({ 'detailItem.pair': authoritativePair });
+
+      const authoritativeMine = r.data.mine;
+      const authoritativeRev = Number.isInteger(authoritativeMine.rev) ? authoritativeMine.rev : expectedRev;
+      const knownRev = this._progressRevByItem[itemId] || 0;
+      // 请求期间 _load/共同推进已带回更高 rev：当前回包已经过时，绝不能拿旧绝对值覆盖。
+      if (knownRev > authoritativeRev) {
+        delete this._progressDesired[itemId];
+        wx.showToast({ title: '进度已变化，请重试', icon: 'none' });
+        this._load();
+        return;
+      }
+      this._progressRevByItem[itemId] = authoritativeRev;
+      // 按 itemId 合并到当前 raw；不要使用请求发起时捕获的 raw，它可能已被 _load 替换。
+      const currentRaw = (this._rawItems || []).find((it) => it._id === itemId);
+      if (!currentRaw) {
+        delete this._progressDesired[itemId];
+        this._load();
+        return;
+      }
+      currentRaw.progress = currentRaw.progress || {};
+      currentRaw.progress[myOpenid] = authoritativeMine;
+      if (latest && latest.seq !== desired.seq) {
+        // 等待期间又有操作：保留最新乐观值，拿刚返回的新 rev 继续发下一次。
+        currentRaw.progress[myOpenid] = Object.assign({}, authoritativeMine, {
+          ep: latest.ep,
+          status: latest.status,
+        });
+        const peerOpenid = this.data.vm && this.data.vm.peer ? this.data.vm.peer.openid : null;
+        this.setData({ 'detailItem.pair': T.buildProgressPair(currentRaw, myOpenid, peerOpenid) });
+        this._flushProgress(itemId);
+        return;
+      }
+
+      delete this._progressDesired[itemId];
+      const peerOpenid = this.data.vm && this.data.vm.peer ? this.data.vm.peer.openid : null;
+      this.setData({ 'detailItem.pair': T.buildProgressPair(currentRaw, myOpenid, peerOpenid) });
+      this._load();
+    }).catch(() => {
+      if (this._unloaded) return;
+      this._progressInFlight[itemId] = false;
+      delete this._progressDesired[itemId];
+      wx.showToast({ title: '更新失败，已还原', icon: 'none' });
       this._load();
     });
   },
@@ -920,4 +1173,3 @@ Page({
   },
 
 });
-

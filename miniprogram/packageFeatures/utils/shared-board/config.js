@@ -37,6 +37,7 @@ const EVENT_TYPE = {
   ITEM_RESTORE: 'item_restore', // 恢复
   ITEM_EDIT: 'item_edit', // 改共享字段（番名/总集数/放送状态等）
   PROGRESS: 'progress', // 改自己进度（集数 / 状态）
+  TOGETHER_ADVANCE: 'together_advance', // 一起待看页一次推进两人的进度
 };
 
 // ── 人数上限（固定 2 人配对，不写死数字 2）──
@@ -114,6 +115,7 @@ const ERR = {
   DUPLICATE_ITEM: 'ERR_DUPLICATE_ITEM',
   INVALID_EP: 'ERR_INVALID_EP',
   INVALID_STATUS: 'ERR_INVALID_STATUS',
+  CONFLICT: 'ERR_CONFLICT',
 };
 
 // 「加入板」场景各错误码对应的用户提示（标题 + 内容），集中配置不硬编码进页面
@@ -337,6 +339,7 @@ const HISTORY_COPY = {
     progress_to: '把《{name}》追到第 {to} 话', // 单步/未折叠推进
     progress_from_to: '把《{name}》从第 {from} 话追到第 {to} 话', // 折叠区间
     progress_status: '把《{name}》标记为「{status}」', // 仅状态变化
+    together_advance: '记录了我俩一起看《{name}》到第 {to} 话',
   },
 };
 

@@ -1,0 +1,9 @@
+{
+  "name": "togetherWatch",
+  "version": "1.0.0",
+  "description": "维护共享追番板的一起待看子集，并原子推进双方进度",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

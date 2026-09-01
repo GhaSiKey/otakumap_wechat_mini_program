@@ -24,6 +24,7 @@ const EVENT_TYPE = {
   ITEM_RESTORE: 'item_restore',
   ITEM_EDIT: 'item_edit',
   PROGRESS: 'progress',
+  TOGETHER_ADVANCE: 'together_advance',
 };
 
 const BOARD_MEMBER_LIMIT = 2;
@@ -67,6 +68,7 @@ const ERR = {
   DUPLICATE_ITEM: 'ERR_DUPLICATE_ITEM',
   INVALID_EP: 'ERR_INVALID_EP',
   INVALID_STATUS: 'ERR_INVALID_STATUS',
+  CONFLICT: 'ERR_CONFLICT',
 };
 
 module.exports = {
