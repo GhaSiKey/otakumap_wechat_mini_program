@@ -78,11 +78,31 @@ const PICK_COPY = {
   ACTION: '选择', // 列表项右侧动作标签（取代 normal 模式的 › 箭头）
 };
 
-// 大图预览 URL：当前弹弹play 图源只有 small(141×200) 一个尺寸，无更大原图，
-// 故预览用的就是原封面 URL（诚实：全屏是「看得更大 + 可缩放」，非更高清）。
-// 留此 helper 是为将来接到有大图变体的图源时，只改此处即可让预览取高清、缩略仍用小图。
+// 弹弹play 当前会按接口返回不同封面：搜索通常是 small（约高 200px），详情通常是
+// medium（约高 400px）。两档文件名 hash 不同，绝不能靠替换 URL 中的 /small/ 猜大图；
+// 必须原样采用详情接口返回的 imageUrl。
+const COVER_TIER_PATH = {
+  SEARCH: '/image/poster/small/',
+  DETAIL: '/image/poster/medium/',
+};
+
+function normalizeCoverUrl(cover) {
+  return typeof cover === 'string' ? cover.trim() : '';
+}
+
+// 搜索小图负责快速出结果，详情封面负责最终展示/落库；详情缺图时安全回退搜索图。
+function preferDetailCover(searchCover, detailCover) {
+  return normalizeCoverUrl(detailCover) || normalizeCoverUrl(searchCover);
+}
+
+// 只用于识别需要补拉详情的存量缩略图，不用于构造 medium URL。
+function isSearchThumbnailCover(cover) {
+  return normalizeCoverUrl(cover).includes(COVER_TIER_PATH.SEARCH);
+}
+
+// 大图预览始终使用当前数据模型里最优的封面 URL；URL 本身不做任何改写。
 function previewCoverUrl(cover) {
-  return cover || '';
+  return normalizeCoverUrl(cover);
 }
 
 // 详情页分区标题（禁硬编码：标题文案统一收此处）
@@ -116,6 +136,9 @@ module.exports = {
   SEARCH_MODE,
   PICK_EVENT,
   PICK_COPY,
+  COVER_TIER_PATH,
+  preferDetailCover,
+  isSearchThumbnailCover,
   previewCoverUrl,
   SECTION_TITLES,
   EPISODE_PREVIEW_MAX,

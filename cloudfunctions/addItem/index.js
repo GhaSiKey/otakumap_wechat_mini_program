@@ -67,7 +67,7 @@ exports.main = async (event) => {
         sourceId: normSourceId,
         alias: [],
         addBy: OPENID,
-        progress: { [OPENID]: { ep: 0, status: C.PROGRESS_STATUS_DEFAULT, updateTime: now } },
+        progress: { [OPENID]: { ep: 0, status: C.PROGRESS_STATUS_DEFAULT, rev: 0, updateTime: now } },
         sortOrder: { [OPENID]: Date.now() },
         deleted: false,
         deletedBy: '',

@@ -15,6 +15,7 @@
         "pages/worldcup/detail/detail",
         "pages/shared-board/board-list",
         "pages/shared-board/shared-board",
+        "pages/together-watch/together-watch",
         "pages/board-history/board-history",
         "pages/board-report/board-report",
         "pages/anime-search/anime-search",

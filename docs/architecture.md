@@ -162,12 +162,14 @@ worldcup-data.js (冻结快照, CommonJS)
 ```
 微信云数据库
     ├── shared_boards      (板 + 成员 members[] + 配对 token)
-    └── shared_board_items (共享条目 + progress:{openid:{ep,status}} 私有进度)
+    ├── shared_board_items (共享条目 + progress:{openid:{ep,status,rev}} 私有进度 + 一起待看标记)
+    └── shared_board_events (个人/共同进度事件，供历史与追番小结)
               │
 云函数（写全走云函数，getWXContext 取可信 openid）
     ├── createBoard / joinBoard   建板 / 配对入板（一次性 token 防抢坑 + 原子条件更新防并发）
     ├── addItem / updateItem / deleteItem   加番去重 / 改共享字段 / 软删除
-    ├── updateProgress            只改 progress.${OPENID} 子键（动态 key 保私有性）
+    ├── updateProgress            只改 progress.${OPENID} 子键（事务 + revision 防旧请求覆盖）
+    ├── togetherWatch             维护持久待看子集 + 事务内同时推进双方进度
     ├── listMyBoards / getBoardDetail   读（也走云函数，逻辑集中服务端）
     ├── updateMemberProfile / markViewed  改昵称 / 记查看时间（未读红点）
     └── animeMeta                 弹play 番剧搜索/详情（加番时搜番名带出封面/集数）
@@ -183,7 +185,7 @@ utils/shared-board/transform.js (纯逻辑，可 Node 测试)
 - **筹备态**：单人可先用（加番、追进度），双人 UI 靠 `hasPeer`/`vm.peer` 天然隐藏，只留虚位空椅 + 邀请入口。定位是「候场室」非「单人模式」，避免稀释「共享」命根。
 - **数据来源无关**：cover/totalEp 可手填，也可加番时搜弹play 带出（Bangumi/TMDB 被墙，选了境内可用的弹play）；`sourceId` 记来源但功能不依赖它，换源不返工。
 
-详见 [shared-board.md](shared-board.md)（PRD）、[shared-board-ui.md](shared-board-ui.md)（UI）、[shared-board-data.md](shared-board-data.md)（数据层）。
+详见 [shared-board.md](shared-board.md)（PRD）、[shared-board-ui.md](shared-board-ui.md)（UI）、[shared-board-data.md](shared-board-data.md)（数据层）、[shared-board-together-watch.md](shared-board-together-watch.md)（一起待看第一版）。
 
 ### 6. 全局样式系统
 

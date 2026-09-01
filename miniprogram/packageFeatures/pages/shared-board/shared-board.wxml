@@ -61,19 +61,34 @@
     <text class="common-talk__arrow">›</text>
   </view>
 
-  <!-- ============ 顶部工具胶囊（报告入口 + 视图切换）============ -->
-  <!-- 左侧小结常驻；右侧仅在有番时出现。两项共用触控尺寸，但用不同底色区分「下钻」与「切换」。 -->
+  <!-- ============ 顶部工具胶囊（一起看 + 报告入口 + 视图切换）============ -->
+  <!-- 左侧两个固定下钻入口相邻；右侧仅在有番时显示视图切换。 -->
   <view class="board-tools">
-    <view
-      class="board-tool board-tool--report"
-      hover-class="board-tool--pressed"
-      hover-stay-time="{{itemViewInteraction.HOVER_STAY_MS}}"
-      aria-role="button"
-      aria-label="{{reportCopy.TITLE}}"
-      bindtap="onReportTap"
-    >
-      <t-icon name="{{reportCopy.ENTRY_ICON}}" size="{{itemViewInteraction.ICON_SIZE}}" aria-hidden="true" />
-      <text>{{reportCopy.TITLE}}</text>
+    <view class="board-tool-group">
+      <view
+        wx:if="{{vm.peer && (vm.phase === 'paired' || vm.phase === 'archived')}}"
+        class="board-tool board-tool--together"
+        hover-class="board-tool--pressed"
+        hover-stay-time="{{itemViewInteraction.HOVER_STAY_MS}}"
+        aria-role="button"
+        aria-label="一起看"
+        bindtap="onTogetherWatchTap"
+      >
+        <text class="board-tool__emoji" aria-hidden="true">🍿</text>
+        <text>一起看</text>
+      </view>
+
+      <view
+        class="board-tool board-tool--report"
+        hover-class="board-tool--pressed"
+        hover-stay-time="{{itemViewInteraction.HOVER_STAY_MS}}"
+        aria-role="button"
+        aria-label="{{reportCopy.TITLE}}"
+        bindtap="onReportTap"
+      >
+        <t-icon name="{{reportCopy.ENTRY_ICON}}" size="{{itemViewInteraction.ICON_SIZE}}" aria-hidden="true" />
+        <text>{{reportCopy.TITLE}}</text>
+      </view>
     </view>
 
     <view
@@ -281,7 +296,7 @@
 </view>
 
 <!-- ============ 加番弹层 ============ -->
-<t-popup visible="{{showAdd}}" placement="bottom" close-on-overlay-click bind:visible-change="onAddVisibleChange">
+<t-popup visible="{{showAdd}}" placement="bottom" close-on-overlay-click="{{!adding}}" bind:visible-change="onAddVisibleChange">
   <view class="sheet">
     <view class="sheet__handle"></view>
     <view class="sheet__header"><text class="sheet__title">添加番剧</text></view>
@@ -319,21 +334,22 @@
       <!-- ② 手填区：分隔标题随状态走——未选中「或手动填写」（另一条路），已选中「确认信息（可修改）」（带回的可编辑区，非手动） -->
       <view class="add-divider"><text class="add-divider__label">{{newItemPicked ? animeBindCopy.EDIT_TITLE : animeBindCopy.MANUAL_TITLE}}</text></view>
 
-      <t-input placeholder="输入番剧名称" value="{{newItemName}}" maxlength="60" bind:change="onItemNameInput" />
+      <t-input placeholder="输入番剧名称" value="{{newItemName}}" maxlength="60" disabled="{{adding}}" bind:change="onItemNameInput" />
 
       <!-- 总集数（选填）：自建步进器 −/输入/+，不引 t-stepper（免构建 npm） -->
       <view class="ep-stepper-row">
         <text class="ep-stepper-row__label">{{totalEpCopy.TOTAL_EP_LABEL}}</text>
         <view class="ep-stepper">
-          <view class="ep-stepper__btn {{!newItemTotalEp ? 'is-disabled' : ''}}" bindtap="onAddTotalEpDec">−</view>
+          <view class="ep-stepper__btn {{!newItemTotalEp || adding ? 'is-disabled' : ''}}" bindtap="onAddTotalEpDec">−</view>
           <input
             class="ep-stepper__input"
             type="number"
             placeholder="选填"
             value="{{newItemTotalEp}}"
+            disabled="{{adding}}"
             bind:input="onAddTotalEpInput"
           />
-          <view class="ep-stepper__btn" bindtap="onAddTotalEpInc">+</view>
+          <view class="ep-stepper__btn {{adding ? 'is-disabled' : ''}}" bindtap="onAddTotalEpInc">+</view>
         </view>
       </view>
       <view class="sheet__note ep-stepper-hint">{{totalEpCopy.ADD_HINT}}</view>
@@ -530,4 +546,3 @@
   bind:cancel="onStatusSheetCancel"
   bind:visible-change="onStatusSheetVisibleChange"
 />
-

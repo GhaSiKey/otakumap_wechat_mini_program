@@ -519,6 +519,14 @@ function describeEvent(e, myOpenid) {
       actionKey = 'progress_to';
       vars.to = typeof p.ep === 'number' ? p.ep : 0;
     }
+  } else if (e && e.type === EVENT_TYPE.TOGETHER_ADVANCE) {
+    actionKey = EVENT_TYPE.TOGETHER_ADVANCE;
+    const changes = Array.isArray(p.changes) ? p.changes : [];
+    const maxEp = changes.reduce((max, change) => {
+      const ep = change && typeof change.ep === 'number' ? change.ep : 0;
+      return ep > max ? ep : max;
+    }, 0);
+    vars.to = typeof p.targetEp === 'number' ? p.targetEp : maxEp;
   }
 
   return { mine, actionKey, vars };
@@ -617,14 +625,45 @@ function boardSinceDay(board, tzOffsetMin) {
   return localDayIndex(created, tzOffsetMin);
 }
 
-/** 单条 progress 事件的「推进话数」：max(0, ep-prevEp)。弃番/纠错回退不计负，不倒扣。 */
-function progressGain(e) {
-  if (!e || e.type !== EVENT_TYPE.PROGRESS) return 0;
+/**
+ * 把个人 progress / 双人 together_advance 统一展开为成员维度的进度变化。
+ * 双人事件仍只存一条历史，但报告能据 changes 分别归入我和 TA，避免少算或重复算。
+ */
+function progressChanges(e) {
+  if (!e) return [];
   const p = e.payload || {};
-  const ep = typeof p.ep === 'number' ? p.ep : 0;
-  const prev = typeof p.prevEp === 'number' ? p.prevEp : 0;
-  const gain = ep - prev;
-  return gain > 0 ? gain : 0;
+  let raw = [];
+  if (e.type === EVENT_TYPE.PROGRESS && e.actor) {
+    raw = [{
+      openid: e.actor,
+      prevEp: p.prevEp,
+      ep: p.ep,
+      prevStatus: p.prevStatus,
+      status: p.status,
+    }];
+  } else if (e.type === EVENT_TYPE.TOGETHER_ADVANCE && Array.isArray(p.changes)) {
+    raw = p.changes;
+  }
+  return raw
+    .filter((change) => change && change.openid)
+    .map((change) => {
+      const prevEp = typeof change.prevEp === 'number' ? change.prevEp : 0;
+      const ep = typeof change.ep === 'number' ? change.ep : prevEp;
+      return Object.assign({}, change, {
+        openid: change.openid,
+        prevEp,
+        ep,
+        gain: ep > prevEp ? ep - prevEp : 0,
+      });
+    });
+}
+
+/** 单条事件的推进话数；传 openid 时只返回该成员的实际增量。 */
+function progressGain(e, actorOpenid) {
+  return progressChanges(e).reduce((sum, change) => {
+    if (actorOpenid && change.openid !== actorOpenid) return sum;
+    return sum + change.gain;
+  }, 0);
 }
 
 /**
@@ -635,13 +674,11 @@ function windowProgress(events, myOpenid, peerOpenid, fromMs, toMs) {
   let me = 0;
   let peer = 0;
   (events || []).forEach((e) => {
-    if (!e || e.type !== EVENT_TYPE.PROGRESS) return;
+    if (!e) return;
     const t = toMillis(e.createTime);
     if (Number.isNaN(t) || t < fromMs || t >= toMs) return;
-    const gain = progressGain(e);
-    if (gain <= 0) return;
-    if (e.actor === myOpenid) me += gain;
-    else if (peerOpenid && e.actor === peerOpenid) peer += gain;
+    me += progressGain(e, myOpenid);
+    if (peerOpenid) peer += progressGain(e, peerOpenid);
   });
   return { me, peer };
 }
@@ -665,8 +702,7 @@ function momentumOf(recent, previous, band) {
 function activeDaySet(events, tzOffsetMin, actorOpenid) {
   const days = new Set();
   (events || []).forEach((e) => {
-    if (progressGain(e) <= 0) return;
-    if (actorOpenid && e.actor !== actorOpenid) return;
+    if (progressGain(e, actorOpenid) <= 0) return;
     const t = toMillis(e.createTime);
     if (Number.isNaN(t)) return;
     days.add(localDayIndex(t, tzOffsetMin));
@@ -742,7 +778,9 @@ function syncInfo(events, myOpenid, peerOpenid, tzOffsetMin) {
       cell = { actors: new Set(), name: e.itemName || '' };
       groups.set(key, cell);
     }
-    cell.actors.add(e.actor);
+    progressChanges(e).forEach((change) => {
+      if (change.gain > 0) cell.actors.add(change.openid);
+    });
     if (e.itemName) cell.name = e.itemName;
   });
   const syncedDays = new Set();
@@ -776,22 +814,23 @@ function syncDays(events, myOpenid, peerOpenid, tzOffsetMin) {
 function bingePeak(events, myOpenid, tzOffsetMin) {
   const cells = new Map(); // key: `${day}|${actor}` → { ep, byItem: Map(itemId→{ep,name}) }
   (events || []).forEach((e) => {
-    const gain = progressGain(e);
-    if (gain <= 0) return;
     const t = toMillis(e.createTime);
     if (Number.isNaN(t)) return;
     const day = localDayIndex(t, tzOffsetMin);
-    const key = `${day}|${e.actor}`;
-    let cell = cells.get(key);
-    if (!cell) {
-      cell = { ep: 0, byItem: new Map() };
-      cells.set(key, cell);
-    }
-    cell.ep += gain;
-    const prevItem = cell.byItem.get(e.itemId) || { ep: 0, name: e.itemName || '' };
-    prevItem.ep += gain;
-    if (e.itemName) prevItem.name = e.itemName;
-    cell.byItem.set(e.itemId, prevItem);
+    progressChanges(e).forEach((change) => {
+      if (change.gain <= 0) return;
+      const key = `${day}|${change.openid}`;
+      let cell = cells.get(key);
+      if (!cell) {
+        cell = { ep: 0, byItem: new Map() };
+        cells.set(key, cell);
+      }
+      cell.ep += change.gain;
+      const prevItem = cell.byItem.get(e.itemId) || { ep: 0, name: e.itemName || '' };
+      prevItem.ep += change.gain;
+      if (e.itemName) prevItem.name = e.itemName;
+      cell.byItem.set(e.itemId, prevItem);
+    });
   });
 
   let best = null;
@@ -895,18 +934,19 @@ function recentItemsProgress(events, items, myOpenid, peerOpenid, fromMs, toMs, 
 
   const agg = new Map(); // itemId → { me, peer }
   (events || []).forEach((e) => {
-    if (!e || e.type !== EVENT_TYPE.PROGRESS || !e.itemId) return;
+    if (!e || !e.itemId) return;
     const t = toMillis(e.createTime);
     if (Number.isNaN(t) || t < fromMs || t >= toMs) return;
-    const gain = progressGain(e);
-    if (gain <= 0) return;
+    const meGain = progressGain(e, myOpenid);
+    const peerGain = peerOpenid ? progressGain(e, peerOpenid) : 0;
+    if (meGain <= 0 && peerGain <= 0) return;
     let cell = agg.get(e.itemId);
     if (!cell) {
       cell = { me: 0, peer: 0 };
       agg.set(e.itemId, cell);
     }
-    if (e.actor === myOpenid) cell.me += gain;
-    else if (peerOpenid && e.actor === peerOpenid) cell.peer += gain;
+    cell.me += meGain;
+    cell.peer += peerGain;
   });
 
   const rows = [];
@@ -937,10 +977,10 @@ function myRecentProgress(events, items, myOpenid, fromMs, toMs, limit) {
   const agg = new Map(); // itemId → me gain
   let total = 0;
   (events || []).forEach((e) => {
-    if (!e || e.type !== EVENT_TYPE.PROGRESS || !e.itemId || e.actor !== myOpenid) return;
+    if (!e || !e.itemId) return;
     const t = toMillis(e.createTime);
     if (Number.isNaN(t) || t < fromMs || t >= toMs) return;
-    const gain = progressGain(e);
+    const gain = progressGain(e, myOpenid);
     if (gain <= 0) return;
     agg.set(e.itemId, (agg.get(e.itemId) || 0) + gain);
     total += gain;
@@ -989,9 +1029,10 @@ function dailyProgressSeries(events, myOpenid, peerOpenid, nowMs, tzOffsetMin, m
   const perDay = new Map(); // dayIndex → { me, peer, items:Set<itemId> }
   let firstDay = Infinity;
   (events || []).forEach((e) => {
-    if (!e || e.type !== EVENT_TYPE.PROGRESS) return;
-    const gain = progressGain(e);
-    if (gain <= 0) return;
+    if (!e) return;
+    const meGain = progressGain(e, myOpenid);
+    const peerGain = peerOpenid ? progressGain(e, peerOpenid) : 0;
+    if (meGain <= 0 && peerGain <= 0) return;
     const t = toMillis(e.createTime);
     if (Number.isNaN(t)) return;
     const day = localDayIndex(t, tzOffsetMin);
@@ -1003,8 +1044,8 @@ function dailyProgressSeries(events, myOpenid, peerOpenid, nowMs, tzOffsetMin, m
       perDay.set(day, cell);
     }
     if (e.itemId) cell.items.add(e.itemId); // 当天推进过的不同番（去重），供「几部番」统计
-    if (e.actor === myOpenid) cell.me += gain;
-    else if (peerOpenid && e.actor === peerOpenid) cell.peer += gain;
+    cell.me += meGain;
+    cell.peer += peerGain;
   });
   if (firstDay === Infinity) return { bars: [], max: 0 };
 
@@ -1281,4 +1322,3 @@ module.exports = {
   firstEventDayIndex,
   buildReportModel,
 };
-

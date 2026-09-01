@@ -20,6 +20,7 @@ Page({
     newBoardName: '',
     creating: false,
     avatarErr: {},    // {boardId: true} 对方头像加载失败 → 回退首字母（不开云存储时常见）
+    coverErr: {},     // {coverKey: true} 封面失败 → 当前 URL 回退首字色块；URL 升级后会生成新 key 重试
   },
 
   onLoad() {
@@ -76,6 +77,13 @@ Page({
     this.setData({ [`avatarErr.${boardId}`]: true });
   },
 
+  // 封面 CDN 失败时回退首字色块。错误 key 含完整 URL，small 升级为 medium 后不会被旧错误态拦住。
+  onCoverError(e) {
+    const { coverKey } = e.currentTarget.dataset;
+    if (!coverKey) return;
+    this.setData({ coverErr: Object.assign({}, this.data.coverErr, { [coverKey]: true }) });
+  },
+
   // 单个板卡片视图模型（P1 统一大卡：双人同轴头像 + 封面墙 + 番数 + 活跃时间）
   _toVM(board, myOpenid) {
     const members = board.members || [];
@@ -89,10 +97,14 @@ Page({
     // 溢出（itemCount 超过预览条数）计入 +N 角标。
     const preview = board.previewItems || [];
     const itemCount = board.itemCount || 0;
-    const covers = preview.map((it) => ({
-      cover: sanitizeAvatar(it.cover),
-      fallback: pickCoverColor(it.name || ''),
-    }));
+    const covers = preview.map((it, index) => {
+      const cover = sanitizeAvatar(it.cover);
+      return {
+        cover,
+        coverKey: `${board._id}:${index}:${cover}`,
+        fallback: pickCoverColor(it.name || ''),
+      };
+    });
     const moreCount = itemCount > covers.length ? itemCount - covers.length : 0;
 
     // 活跃/等待文案：配对态显示「和TA · X前一起追」；筹备态未配对显示「等 TA 点开链接」，
