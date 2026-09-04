@@ -17,6 +17,13 @@ Page({
         path: '/packageFeatures/pages/anime-checklist/anime-checklist',
       },
       {
+        id: 'pilgrimage',
+        title: '圣地巡礼',
+        desc: '搜索动画取景地，收藏番剧并在地图上探索',
+        emoji: '🗺️',
+        path: '/packageFeatures/pages/pilgrimage/pilgrimage-search',
+      },
+      {
         id: 'mahjong-score',
         title: '日麻点数计算',
         desc: '输入手牌自动计算符数、役种和点数',

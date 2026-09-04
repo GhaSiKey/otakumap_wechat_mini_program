@@ -2,7 +2,7 @@
 
 ## 概述
 
-OtakuMap 是一个微信小程序项目，采用「主包 + 功能分包」架构，包含番剧追踪、光栅卡、日麻点数计算和世界杯赔率四个独立功能模块。
+OtakuMap 是一个微信小程序项目，采用「主包 + 功能分包」架构，包含番剧追踪、光栅卡、日麻点数计算、世界杯赔率、共享追番板和圣地巡礼等独立功能模块。
 
 ## 架构分层
 
@@ -187,7 +187,29 @@ utils/shared-board/transform.js (纯逻辑，可 Node 测试)
 
 详见 [shared-board.md](shared-board.md)（PRD）、[shared-board-ui.md](shared-board-ui.md)（UI）、[shared-board-data.md](shared-board-data.md)（数据层）、[shared-board-together-watch.md](shared-board-together-watch.md)（一起待看第一版）。
 
-### 6. 全局样式系统
+### 6. pilgrimage（圣地巡礼）
+
+**设计思想**：境内作品检索 + 已知 Subject ID 查询 + 本地探索，不依赖 Bangumi API。
+
+```text
+弹弹play搜索/详情
+    └── animeMeta 严格解析 bangumiUrl / onlineDatabases
+          └── bgmSubjectId（缺失即空态，不猜测、不人工维护）
+                └── pilgrimageData 云函数
+                      ├── Anitabi /lite（摘要与完整地图数量）
+                      └── Anitabi /points/detail（公开地点子集）
+                            └── 本地地点/集数筛选 → 地图 / 列表 / 详情
+```
+
+- `animeMeta` 不读取弹弹play自有 `bangumiId`，也不访问 Bangumi 域名。
+- `pilgrimageData` 只允许服务端构造的两类 Anitabi 公共 API 路径，带 6 小时缓存和瞬时故障旧缓存降级。
+- 收藏与最近浏览使用本地 Storage；小程序不读取或保存设备当前位置。
+- 公共详情点位可能少于完整地图，UI 同时展示 `returnedCount` 与 `pointsLength`。
+- 地图点位进入微信地图前按区域做 WGS84 → GCJ-02；日本等境外坐标保持不变。
+
+详见 [pilgrimage.md](pilgrimage.md)。
+
+### 7. 全局样式系统
 
 基于 TDesign CSS 变量，支持深色模式：
 

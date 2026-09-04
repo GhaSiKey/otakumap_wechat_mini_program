@@ -128,6 +128,15 @@
     --td-shadow-2: 0 3px 14px 2px rgba(0, 0, 0, 0.05), 0 8px 10px 1px rgba(0, 0, 0, 0.06), 0 5px 5px -3px rgba(0, 0, 0, 0.1);
     --td-shadow-3: 0 6px 30px 5px rgba(0, 0, 0, 0.05), 0 16px 24px 2px rgba(0, 0, 0, 0.04), 0 8px 10px -5px rgba(0, 0, 0, 0.08);
     --td-shadow-4: 0 2px 8px 0 rgba(0, 0, 0, 0.06);
+    --pilgrimage-hero-text: #17345c;
+    --pilgrimage-sky-surface: #eaf6ff;
+    --pilgrimage-sky-border: #cfe8ff;
+    --pilgrimage-favorite-color: #f6685d;
+    --pilgrimage-favorite-surface: #fff0ed;
+    --pilgrimage-map-control-bg: rgba(255, 255, 255, 0.94);
+    --pilgrimage-map-control-shadow: 0 6rpx 24rpx rgba(23, 52, 92, 0.16);
+    --pilgrimage-hero-fade: linear-gradient(90deg, #eaf6ff 0%, rgba(234, 246, 255, 0.88) 34%, rgba(234, 246, 255, 0.12) 72%);
+    --pilgrimage-hero-image-opacity: 1;
   }
 }
 
@@ -213,6 +222,15 @@
     --td-shadow-1: 0 4px 6px rgba(0, 0, 0, 0.06), 0 1px 10px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.12);
     --td-shadow-2: 0 8px 10px rgba(0, 0, 0, 0.12), 0 3px 14px rgba(0, 0, 0, 0.1), 0 5px 5px rgba(0, 0, 0, 0.16);
     --td-shadow-3: 0 16px 24px rgba(0, 0, 0, 0.14), 0 6px 30px rgba(0, 0, 0, 0.12), 0 8px 10px rgba(0, 0, 0, 0.2);
+    --pilgrimage-hero-text: #d7e8ff;
+    --pilgrimage-sky-surface: #172b42;
+    --pilgrimage-sky-border: #244666;
+    --pilgrimage-favorite-color: #ff9285;
+    --pilgrimage-favorite-surface: #462624;
+    --pilgrimage-map-control-bg: rgba(36, 36, 36, 0.94);
+    --pilgrimage-map-control-shadow: 0 6rpx 24rpx rgba(0, 0, 0, 0.35);
+    --pilgrimage-hero-fade: linear-gradient(90deg, #172b42 0%, rgba(23, 43, 66, 0.9) 38%, rgba(23, 43, 66, 0.08) 74%);
+    --pilgrimage-hero-image-opacity: 0.68;
   }
 }
 

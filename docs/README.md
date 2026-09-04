@@ -8,17 +8,18 @@
 |------|------|------|
 | 番剧追踪 | 记录追番清单，标记已看完的番剧，支持拖拽排序 | 分包 pages/anime-checklist |
 | 共享追番板 | 两人共享番单、各自维护进度，并用「一起待看」共同选番和同步推进 | 分包 pages/shared-board |
+| 圣地巡礼 | 搜索番剧、收藏巡礼作品，并按地点/集数浏览 Anitabi 地图与参考图 | 分包 pages/pilgrimage |
 | 光栅卡 | 选择多张图片，倾斜手机体验百叶窗切换效果 | 分包 pages/lenticular |
 | 日麻点数计算 | 输入手牌自动计算符数、役种和点数 | 分包 pages/mahjong-score |
 | 世界杯赔率 | 2026 FIFA 世界杯赔率、赛程日历与赛事详情（静态快照） | 分包 pages/worldcup |
 
 ## 技术栈
 
-- **框架**: 微信小程序 (miniprogram)，原生开发；前 4 个功能纯客户端，共享追番板起引入微信云开发
+- **框架**: 微信小程序 (miniprogram)，原生开发；轻量工具纯客户端，共享追番板与圣地巡礼使用微信云开发
 - **UI库**: TDesign Miniprogram ^1.5.0（仅分包使用）
 - **分包策略**: 功能模块放入 subpackages 减小主包体积
 - **数据存储**: 本地 Storage（番剧清单等纯客户端功能）+ 微信云数据库（共享追番板，跨端共享 + openid 身份）
-- **后端**: 微信云开发（云函数 + 云数据库），仅共享追番板使用；环境 ID 配置在 `miniprogram/config/cloud.js`
+- **后端**: 微信云开发（云函数 + 云数据库），用于共享追番板、弹弹play 元数据和 Anitabi 巡礼数据代理；环境 ID 配置在 `miniprogram/config/cloud.js`
 
 ## 项目结构
 
@@ -32,7 +33,8 @@ otakumap/
 │   │   │   ├── anime-checklist/     # 番剧追踪
 │   │   │   ├── lenticular/          # 光栅卡
 │   │   │   ├── mahjong-score/       # 日麻点数计算
-│   │   │   └── worldcup/            # 世界杯赔率
+│   │   │   ├── worldcup/            # 世界杯赔率
+│   │   │   └── pilgrimage/          # 圣地巡礼搜索 / 地图 / 地点详情
 │   │   └── utils/
 │   │       ├── lenticular-engine.js # 光栅引擎核心算法
 │   │       ├── mahjong/             # 日麻计算核心模块
@@ -42,9 +44,10 @@ otakumap/
 │   │       │   ├── yaku-checker.js  # 役种判定
 │   │       │   ├── score-calculator.js # 点数计算
 │   │       │   └── engine.js        # 核心引擎
-│   │       └── worldcup/            # 世界杯数据模块
-│   │           ├── data/worldcup-data.js # 赔率数据快照
-│   │           └── transform.js     # 数据预处理（分组/色温/矩阵）
+│   │       ├── worldcup/            # 世界杯数据模块
+│   │       │   ├── data/worldcup-data.js # 赔率数据快照
+│   │       │   └── transform.js     # 数据预处理（分组/色温/矩阵）
+│   │       └── pilgrimage/          # 巡礼 API / 坐标 / 筛选 / 本地收藏
 │   ├── app.js                      # 应用入口
 │   ├── app.json                    # 应用配置
 │   └── app.wxss                    # 全局样式（TDesign CSS变量）
@@ -70,7 +73,7 @@ npm install
 
 ### 测试
 
-纯算法模块（`packageFeatures/utils/mahjong/`）有零依赖的 Node 回归测试，详见 [tests/README.md](../tests/README.md)：
+核心算法、云函数契约和关键页面交互均有零依赖的 Node 回归测试，详见 [tests/README.md](../tests/README.md)：
 
 ```bash
 # 项目根目录
@@ -94,7 +97,7 @@ TDesign 组件库通过 `project.config.json` 的 `packNpmRelationList` 配置�
 
 - 微信开发者文档: https://developers.weixin.qq.com/miniprogram/dev/framework/
 - TDesign 组件库: https://github.com/Tencent/tdesign-miniprogram
-- Bangumi API: https://bangumi.github.io/api/
+- Anitabi 公开 API: https://navi.anitabi.cn/docs/api/
 
 ## 相关项目
 

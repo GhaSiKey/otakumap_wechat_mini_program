@@ -1,0 +1,9 @@
+{
+  "name": "pilgrimageData",
+  "version": "1.0.0",
+  "description": "按已知 Bangumi subject id 代理 Anitabi 公开圣地巡礼数据",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

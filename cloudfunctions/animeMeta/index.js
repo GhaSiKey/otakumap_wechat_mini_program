@@ -18,6 +18,10 @@ const {
   needsDetailCover,
   selectUpgradeCandidates,
 } = require('./cover-policy');
+const {
+  extractBgmSubjectId,
+  normalizeBgmSubjectId,
+} = require('./bgm-subject');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV }); // 自动用当前云环境，不硬编码
 const db = cloud.database();
@@ -50,16 +54,47 @@ function sign(appId, appSecret, timestamp, signPath) {
 function httpsGet(fullUrl, headers, timeoutMs) {
   const https = require('https');
   return new Promise((resolve, reject) => {
-    const req = https.get(fullUrl, { headers }, (res) => {
+    let settled = false;
+    let req = null;
+    let absoluteTimer = null;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      if (absoluteTimer !== null) clearTimeout(absoluteTimer);
+      callback(value);
+    };
+    const fail = (error) => finish(reject, error);
+    const abortForTimeout = () => {
+      const error = new Error(`上游超时(${timeoutMs}ms)`);
+      fail(error);
+      if (req && typeof req.destroy === 'function') req.destroy(error);
+    };
+
+    req = https.get(fullUrl, { headers }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
-      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+      res.on('error', fail);
+      res.on('aborted', () => fail(new Error('上游响应中断')));
+      res.on('end', () => finish(resolve, {
+        status: res.statusCode,
+        body: Buffer.concat(chunks).toString('utf8'),
+      }));
     });
-    req.on('error', (e) => reject(e));
-    req.setTimeout(timeoutMs, () => {
-      req.destroy(new Error(`上游超时(${timeoutMs}ms)`));
-    });
+    req.on('error', fail);
+    absoluteTimer = setTimeout(abortForTimeout, timeoutMs);
+    if (typeof req.setTimeout === 'function') req.setTimeout(timeoutMs, abortForTimeout);
   });
+}
+
+function parsePositiveInteger(value) {
+  if (typeof value === 'number') {
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+  }
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (!/^[1-9]\d*$/.test(text)) return null;
+  const parsed = Number(text);
+  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 // 带签名请求弹弹play。signPath 用于签名（无查询参数），fullPath 是实际请求路径（可带 query）。
@@ -159,6 +194,7 @@ function pickRefItem(r) {
 function pickDetail(b) {
   return {
     sourceId: b.animeId,
+    bgmSubjectId: extractBgmSubjectId(b),
     name: b.animeTitle || '',
     cover: b.imageUrl || '',
     type: b.type || '',
@@ -181,6 +217,17 @@ function pickDetail(b) {
     episodeTitles: Array.isArray(b.episodes)
       ? b.episodes.map((e) => e && e.episodeTitle).filter(Boolean)
       : [],
+  };
+}
+
+// 已含字段的缓存只接受正安全整数，避免把字符串或损坏值继续透传给前端。
+// 上线前生成、完全没有 bgmSubjectId 字段的旧详情缓存会在 handleDetail 中按未命中处理，
+// 从弹弹play详情懒刷新一次，避免巡礼功能在旧缓存过期前误报“暂未关联”。
+function normalizeCachedDetail(cached) {
+  const detail = cached && typeof cached === 'object' && !Array.isArray(cached) ? cached : {};
+  return {
+    ...detail,
+    bgmSubjectId: normalizeBgmSubjectId(detail.bgmSubjectId),
   };
 }
 
@@ -284,11 +331,13 @@ async function handleSearch(cred, keyword) {
 
 // action: detail —— 按 animeId 拉详情，补放送状态/更新日/简介
 async function handleDetail(cred, animeId) {
-  const id = parseInt(animeId, 10);
-  if (!id || id <= 0) return fail(ERR.INVALID_PARAM, 'animeId 非法');
+  const id = parsePositiveInteger(animeId);
+  if (id === null) return fail(ERR.INVALID_PARAM, 'animeId 非法');
 
   const cached = await readCache(CACHE.KIND_DETAIL, String(id));
-  if (cached) return ok({ bangumi: cached, cached: true });
+  if (cached && Object.prototype.hasOwnProperty.call(cached, 'bgmSubjectId')) {
+    return ok({ bangumi: normalizeCachedDetail(cached), cached: true });
+  }
 
   const signPath = `${DDP.PATH_DETAIL}/${id}`; // 详情路径含 animeId，签名 path 也是它
   const json = await callDandanplay(cred, signPath, signPath);

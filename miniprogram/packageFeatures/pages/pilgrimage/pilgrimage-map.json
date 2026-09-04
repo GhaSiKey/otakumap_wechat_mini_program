@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "圣地地图",
+  "usingComponents": {
+    "t-search": "tdesign-miniprogram/search/search",
+    "t-empty": "tdesign-miniprogram/empty/empty",
+    "t-loading": "tdesign-miniprogram/loading/loading",
+    "t-icon": "tdesign-miniprogram/icon/icon",
+    "t-button": "tdesign-miniprogram/button/button"
+  }
+}

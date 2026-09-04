@@ -1,0 +1,188 @@
+<view class="page pilgrimage-map-page">
+  <view wx:if="{{state === 'loading'}}" class="page-state">
+    <t-loading theme="circular" size="44rpx" text="{{copy.LOADING}}" />
+  </view>
+
+  <view wx:elif="{{state === 'empty'}}" class="page-state page-state--message">
+    <t-empty description="{{emptyMessage}}" />
+    <view class="page-state__actions">
+      <t-button theme="primary" variant="outline" bind:tap="onBackToSearch">{{copy.BACK_SEARCH}}</t-button>
+    </view>
+  </view>
+
+  <view wx:elif="{{state === 'error'}}" class="page-state page-state--message">
+    <t-empty description="{{errorMessage}}" />
+    <view class="page-state__actions">
+      <t-button theme="primary" bind:tap="onRetry">{{copy.RETRY}}</t-button>
+      <t-button theme="default" variant="outline" bind:tap="onBackToSearch">{{copy.BACK_SEARCH}}</t-button>
+    </view>
+  </view>
+
+  <block wx:else>
+    <view class="subject-head">
+      <image
+        wx:if="{{coverUrl && !coverError}}"
+        class="subject-head__cover"
+        src="{{coverUrl}}"
+        data-coverurl="{{coverUrl}}"
+        mode="aspectFill"
+        bind:error="onSubjectCoverError"
+      />
+      <view wx:else class="subject-head__fallback">{{subject.initial}}</view>
+      <view class="subject-head__content">
+        <view class="subject-head__name">{{subject.displayName}}</view>
+        <view wx:if="{{subject.city}}" class="subject-head__city">
+          <t-icon name="location" size="26rpx" />
+          <text>{{subject.city}}</text>
+        </view>
+        <view class="subject-head__count">{{countText}}</view>
+      </view>
+      <view
+        class="favorite-button {{isFavorite ? 'favorite-button--active' : ''}}"
+        bind:tap="onToggleFavorite"
+      >
+        <t-icon name="{{isFavorite ? 'heart-filled' : 'heart'}}" size="42rpx" />
+      </view>
+    </view>
+
+    <view class="map-toolbar">
+      <view class="place-search">
+        <t-search
+          value="{{placeKeyword}}"
+          placeholder="{{copy.PLACE_SEARCH_PLACEHOLDER}}"
+          maxlength="{{placeKeywordMax}}"
+          aria-label="{{copy.PLACE_SEARCH_PLACEHOLDER}}"
+          bind:change="onPlaceSearchChange"
+          bind:submit="onPlaceSearchSubmit"
+          bind:clear="onPlaceSearchClear"
+        />
+      </view>
+      <view class="view-switch" aria-label="{{copy.VIEW_SWITCH_LABEL}}">
+        <view
+          class="view-switch__item {{viewMode === 'map' ? 'view-switch__item--active' : ''}} {{filteredPoints.length && !markers.length ? 'view-switch__item--disabled' : ''}}"
+          data-mode="map"
+          aria-disabled="{{filteredPoints.length && !markers.length}}"
+          bind:tap="onViewModeTap"
+        >
+          <t-icon name="map" size="28rpx" />
+          <text>{{copy.MAP_TAB}}</text>
+        </view>
+        <view
+          class="view-switch__item {{viewMode === 'list' ? 'view-switch__item--active' : ''}}"
+          data-mode="list"
+          bind:tap="onViewModeTap"
+        >
+          <t-icon name="view-list" size="28rpx" />
+          <text>{{copy.LIST_TAB}}</text>
+        </view>
+      </view>
+    </view>
+
+    <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="episode-rail">
+      <view
+        wx:for="{{episodeOptions}}"
+        wx:key="key"
+        class="episode-chip {{selectedEpisodeKey === item.key ? 'episode-chip--active' : ''}}"
+        data-key="{{item.key}}"
+        bind:tap="onEpisodeTap"
+      >
+        <text>{{item.label}}</text>
+        <text wx:if="{{item.count}}" class="episode-chip__count">{{item.count}}</text>
+      </view>
+    </scroll-view>
+
+    <view
+      wx:if="{{hasActiveFilter || isPartial}}"
+      class="filter-summary {{hasActiveFilter ? '' : 'filter-summary--link-only'}}"
+    >
+      <text wx:if="{{hasActiveFilter}}">{{filteredCountText}}</text>
+      <view wx:if="{{isPartial}}" class="filter-summary__link" bind:tap="onCopyFullMapLink">
+        {{copy.COPY_FULL_MAP}}
+      </view>
+    </view>
+
+    <view wx:if="{{!filteredPoints.length}}" class="filter-empty">
+      <t-empty description="{{copy.NO_PLACE_RESULT}}" />
+      <view class="filter-empty__reset" bind:tap="onResetFilters">{{copy.RESET_FILTER}}</view>
+    </view>
+
+    <block wx:elif="{{viewMode === 'map'}}">
+      <map
+        id="pilgrimageMap"
+        class="pilgrimage-map"
+        latitude="{{mapCenter.latitude}}"
+        longitude="{{mapCenter.longitude}}"
+        scale="{{mapScale}}"
+        markers="{{markers}}"
+        enable-zoom
+        enable-scroll
+        bind:markertap="onMarkerTap"
+        bind:updated="onMapUpdated"
+      ></map>
+
+      <view class="map-action-row">
+        <view class="map-action" bind:tap="onFitAll">
+          <t-icon name="layers" size="30rpx" />
+          <text>{{copy.FIT_ALL}}</text>
+        </view>
+      </view>
+
+      <view wx:if="{{selectedPoint}}" class="selected-point" bind:tap="onSelectedPointTap">
+        <image
+          wx:if="{{selectedPoint.imageThumb && !pointImageErrors[selectedPoint.key]}}"
+          class="selected-point__image"
+          src="{{selectedPoint.imageThumb}}"
+          data-pointkey="{{selectedPoint.key}}"
+          mode="aspectFill"
+          lazy-load
+          bind:error="onPointImageError"
+        />
+        <view wx:else class="selected-point__image selected-point__image--empty">
+          <t-icon name="image-off" size="38rpx" />
+        </view>
+        <view class="selected-point__content">
+          <view class="selected-point__name">{{selectedPoint.displayName}}</view>
+          <view class="selected-point__time">{{selectedPoint.episodeTimeText}}</view>
+          <view class="selected-point__source">{{selectedPoint.sourceText}}</view>
+        </view>
+        <view class="selected-point__action">
+          <text>{{copy.VIEW_DETAIL}}</text>
+          <t-icon name="chevron-right" size="30rpx" />
+        </view>
+      </view>
+      <view wx:else class="map-tip">{{copy.MAP_TIP}}</view>
+    </block>
+
+    <view wx:else class="point-list">
+      <view
+        wx:for="{{filteredPoints}}"
+        wx:key="id"
+        class="point-row"
+        data-pointid="{{item.id}}"
+        data-pointkey="{{item.key}}"
+        bind:tap="onPointRowTap"
+      >
+        <image
+          wx:if="{{item.imageThumb && !pointImageErrors[item.key]}}"
+          class="point-row__image"
+          src="{{item.imageThumb}}"
+          data-pointkey="{{item.key}}"
+          mode="aspectFill"
+          lazy-load
+          bind:error="onPointImageError"
+        />
+        <view wx:else class="point-row__image point-row__image--empty">
+          <t-icon name="image-off" size="38rpx" />
+        </view>
+        <view class="point-row__content">
+          <view class="point-row__name">{{item.displayName}}</view>
+          <view class="point-row__time">{{item.episodeTimeText}}</view>
+          <view class="point-row__source">{{item.sourceText}}</view>
+        </view>
+        <t-icon name="chevron-right" size="32rpx" class="point-row__arrow" />
+      </view>
+    </view>
+
+    <view class="map-footnote">{{copy.DATA_SOURCE_NOTE}}</view>
+  </block>
+</view>
