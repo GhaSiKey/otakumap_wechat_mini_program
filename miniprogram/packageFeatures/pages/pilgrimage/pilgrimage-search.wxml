@@ -1,0 +1,192 @@
+<view class="page pilgrimage-search-page">
+  <view class="discovery-hero">
+    <image
+      class="discovery-hero__image"
+      src="../../assets/pilgrimage/discovery-hero.jpg"
+      mode="aspectFill"
+    />
+    <view class="discovery-hero__fade"></view>
+    <view class="discovery-hero__copy">
+      <view class="discovery-hero__title">{{copy.HERO_TITLE}}</view>
+      <view class="discovery-hero__subtitle">{{copy.HERO_SUBTITLE}}</view>
+    </view>
+  </view>
+
+  <view class="search-box">
+    <view class="search-box__input">
+      <t-search
+        value="{{keyword}}"
+        placeholder="{{copy.SEARCH_PLACEHOLDER}}"
+        maxlength="{{searchKeywordMax}}"
+        aria-label="{{copy.SEARCH_ARIA_LABEL}}"
+        bind:change="onSearchChange"
+        bind:submit="onSearch"
+      />
+    </view>
+    <view
+      class="search-box__submit"
+      hover-class="search-box__submit--hover"
+      aria-role="button"
+      aria-label="{{copy.SEARCH_ACTION}}"
+      bind:tap="onSearch"
+    >
+      <t-icon name="search" size="30rpx" aria-hidden="true" />
+      <text>{{copy.SEARCH_ACTION}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{searched}}" class="result-section result-section--active">
+    <view class="section-heading result-heading">
+      <view>
+        <view class="section-title">{{copy.RESULT_TITLE}}</view>
+        <view class="section-caption">{{copy.RESULT_CAPTION}}</view>
+      </view>
+      <view wx:if="{{fromCache && animes.length}}" class="cache-note">{{copy.CACHE_LABEL}}</view>
+    </view>
+
+    <view wx:if="{{loading}}" class="state-box">
+      <t-loading theme="circular" size="40rpx" text="{{copy.SEARCHING}}" />
+    </view>
+
+    <view wx:elif="{{!animes.length}}" class="state-box state-box--empty">
+      <t-empty description="{{hint}}" />
+    </view>
+
+    <view wx:else class="result-list">
+      <view
+        wx:for="{{animes}}"
+        wx:key="sourceId"
+        class="result-item {{resolvingSourceId === item.sourceId ? 'result-item--loading' : ''}}"
+        data-sourceid="{{item.sourceId}}"
+        data-name="{{item.name}}"
+        data-cover="{{item.cover}}"
+        aria-role="button"
+        aria-label="{{item.openAriaLabel}}"
+        bind:tap="onAnimeTap"
+      >
+        <image
+          wx:if="{{item.cover && !coverErrorKeys[item.coverKey]}}"
+          class="result-item__cover"
+          src="{{item.cover}}"
+          mode="aspectFill"
+          lazy-load
+          data-key="{{item.coverKey}}"
+          bind:error="onCoverError"
+        />
+        <view wx:else class="result-item__fallback">{{item.initial}}</view>
+        <view class="result-item__content">
+          <view class="result-item__name">{{item.name}}</view>
+          <view wx:if="{{item.meta}}" class="result-item__meta">{{item.meta}}</view>
+          <view class="result-item__hint">
+            <t-icon name="map-search" size="26rpx" />
+            <text>{{copy.RESULT_ACTION_HINT}}</text>
+          </view>
+        </view>
+        <view class="result-item__action">
+          <t-loading wx:if="{{resolvingSourceId === item.sourceId}}" theme="circular" size="32rpx" />
+          <t-icon wx:else name="chevron-right" size="34rpx" />
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{favorites.length}}" class="subject-section">
+    <view class="section-heading">
+      <view>
+        <view class="section-title">{{copy.FAVORITES_TITLE}}</view>
+        <view class="section-caption">{{copy.FAVORITES_CAPTION}}</view>
+      </view>
+      <view class="section-count">{{favorites.length}}</view>
+    </view>
+    <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="subject-rail">
+      <view
+        wx:for="{{favorites}}"
+        wx:key="key"
+        class="subject-card"
+        data-subjectid="{{item.bgmSubjectId}}"
+        data-sourceid="{{item.sourceId}}"
+        data-name="{{item.name}}"
+        data-cover="{{item.cover}}"
+        aria-role="button"
+        aria-label="{{item.openAriaLabel}}"
+        bind:tap="onSavedSubjectTap"
+      >
+        <view class="subject-card__poster-wrap">
+          <image
+            wx:if="{{item.cover && !coverErrorKeys[item.coverKey]}}"
+            class="subject-card__poster"
+            src="{{item.cover}}"
+            mode="aspectFill"
+            lazy-load
+            data-key="{{item.coverKey}}"
+            bind:error="onCoverError"
+          />
+          <view wx:else class="subject-card__fallback">{{item.initial}}</view>
+          <view
+            class="subject-card__favorite"
+            data-subjectid="{{item.bgmSubjectId}}"
+            aria-role="button"
+            aria-label="{{item.removeFavoriteAriaLabel}}"
+            catch:tap="onRemoveFavorite"
+          >
+            <t-icon name="heart-filled" size="30rpx" />
+          </view>
+        </view>
+        <view class="subject-card__name">{{item.name}}</view>
+        <view class="subject-card__meta">{{item.meta}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view wx:if="{{recents.length}}" class="subject-section">
+    <view class="section-heading">
+      <view>
+        <view class="section-title">{{copy.RECENTS_TITLE}}</view>
+        <view class="section-caption">{{copy.RECENTS_CAPTION}}</view>
+      </view>
+    </view>
+    <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="recent-rail">
+      <view
+        wx:for="{{recents}}"
+        wx:key="key"
+        class="recent-item"
+        data-subjectid="{{item.bgmSubjectId}}"
+        data-sourceid="{{item.sourceId}}"
+        data-name="{{item.name}}"
+        data-cover="{{item.cover}}"
+        aria-role="button"
+        aria-label="{{item.openAriaLabel}}"
+        bind:tap="onSavedSubjectTap"
+      >
+        <image
+          wx:if="{{item.cover && !coverErrorKeys[item.coverKey]}}"
+          class="recent-item__poster"
+          src="{{item.cover}}"
+          mode="aspectFill"
+          lazy-load
+          data-key="{{item.coverKey}}"
+          bind:error="onCoverError"
+        />
+        <view wx:else class="recent-item__fallback">{{item.initial}}</view>
+        <view class="recent-item__name">{{item.name}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view wx:if="{{!searched}}" class="result-section result-section--initial">
+    <view class="section-heading">
+      <view>
+        <view class="section-title">{{copy.DISCOVER_TITLE}}</view>
+        <view class="section-caption">{{copy.DISCOVER_CAPTION}}</view>
+      </view>
+    </view>
+
+    <view class="initial-guide">
+      <view class="initial-guide__icon"><t-icon name="map-search" size="52rpx" /></view>
+      <view class="initial-guide__title">{{copy.INITIAL_TITLE}}</view>
+      <view class="initial-guide__desc">{{copy.INITIAL_DESC}}</view>
+    </view>
+  </view>
+
+  <view class="source-footnote">{{copy.DATA_SOURCE_NOTE}}</view>
+</view>

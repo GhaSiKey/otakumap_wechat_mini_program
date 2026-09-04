@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "圣地巡礼",
+  "usingComponents": {
+    "t-search": "tdesign-miniprogram/search/search",
+    "t-empty": "tdesign-miniprogram/empty/empty",
+    "t-loading": "tdesign-miniprogram/loading/loading",
+    "t-icon": "tdesign-miniprogram/icon/icon"
+  }
+}

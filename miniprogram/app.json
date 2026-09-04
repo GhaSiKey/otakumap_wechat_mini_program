@@ -19,7 +19,10 @@
         "pages/board-history/board-history",
         "pages/board-report/board-report",
         "pages/anime-search/anime-search",
-        "pages/anime-search/anime-detail"
+        "pages/anime-search/anime-detail",
+        "pages/pilgrimage/pilgrimage-search",
+        "pages/pilgrimage/pilgrimage-map",
+        "pages/pilgrimage/spot-detail"
       ]
     }
   ],

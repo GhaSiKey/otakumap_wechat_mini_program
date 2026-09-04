@@ -1,0 +1,138 @@
+<view class="page spot-detail-page">
+  <view wx:if="{{state === 'loading'}}" class="detail-state">
+    <t-loading theme="circular" size="44rpx" text="{{copy.LOADING}}" />
+  </view>
+
+  <view wx:elif="{{state === 'error' || state === 'empty'}}" class="detail-state detail-state--message">
+    <t-empty description="{{stateMessage}}" />
+    <view class="detail-state__actions">
+      <t-button wx:if="{{state === 'error'}}" theme="primary" bind:tap="onRetry">{{copy.RETRY}}</t-button>
+      <t-button theme="default" variant="outline" bind:tap="onBack">{{copy.BACK_MAP}}</t-button>
+    </view>
+  </view>
+
+  <block wx:else>
+    <view
+      class="media-frame {{imageState === 'missing' || imageState === 'error' ? 'media-frame--compact' : ''}}"
+      bind:tap="onPreviewImage"
+    >
+      <image
+        wx:if="{{displayImageUrl}}"
+        class="media-frame__image"
+        src="{{displayImageUrl}}"
+        mode="aspectFill"
+        data-pointid="{{point.id}}"
+        data-url="{{displayImageUrl}}"
+        bind:load="onImageLoad"
+        bind:error="onImageError"
+      />
+      <view wx:if="{{imageState === 'loading'}}" class="media-frame__status media-frame__loading">
+        <t-loading theme="circular" size="40rpx" />
+      </view>
+      <view wx:elif="{{imageState === 'missing'}}" class="media-frame__status media-frame__empty">
+        <t-icon name="image-off" size="58rpx" />
+        <text>{{copy.NO_IMAGE}}</text>
+      </view>
+      <view wx:elif="{{imageState === 'error'}}" class="media-frame__status media-frame__empty media-frame__empty--error">
+        <t-icon name="image-error" size="58rpx" />
+        <text>{{copy.IMAGE_UNAVAILABLE}}</text>
+      </view>
+      <view wx:if="{{imageState === 'ready'}}" class="media-frame__preview">
+        <t-icon name="zoom-in" size="27rpx" />
+        <text>{{copy.PREVIEW_IMAGE}}</text>
+      </view>
+    </view>
+
+    <view class="place-intro">
+      <view class="place-intro__name">{{point.displayName}}</view>
+      <view wx:if="{{point.originalName}}" class="place-intro__original">{{point.originalName}}</view>
+      <view class="place-meta place-meta--accent">
+        <t-icon name="play-circle" size="28rpx" />
+        <text>{{point.episodeTimeText}}</text>
+        <text class="place-meta__divider">·</text>
+        <text>{{subject.displayName}}</text>
+      </view>
+      <view class="place-meta">
+        <t-icon name="location" size="28rpx" />
+        <text>{{point.coordinateText}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{point.sourceText || point.originUrl}}" class="source-panel">
+      <view class="source-panel__icon"><t-icon name="compass" size="34rpx" /></view>
+      <view class="source-panel__content">
+        <view class="source-panel__label">{{copy.SOURCE_LABEL}}</view>
+        <view class="source-panel__name">{{point.sourceText}}</view>
+      </view>
+      <view wx:if="{{point.originUrl}}" class="source-panel__copy" bind:tap="onCopySource">
+        <text>{{copy.COPY_SOURCE}}</text>
+        <t-icon name="file-copy" size="27rpx" />
+      </view>
+    </view>
+
+    <view class="detail-actions">
+      <t-button
+        class="detail-actions__primary"
+        t-class="detail-actions__button"
+        block="{{true}}"
+        theme="primary"
+        size="large"
+        icon="map-navigation"
+        content="{{copy.OPEN_NAVIGATION}}"
+        disabled="{{!point.hasCoordinate}}"
+        bind:tap="onOpenLocation"
+      />
+      <view
+        wx:if="{{showBackFallback}}"
+        class="detail-actions__back"
+        aria-role="button"
+        bind:tap="onBack"
+      >
+        <t-icon name="map" size="27rpx" />
+        <text>{{copy.BACK_MAP}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{sameEpisodePoints.length}}" class="same-episode">
+      <view class="same-episode__heading">
+        <view class="same-episode__title">{{copy.SAME_EPISODE_TITLE}}</view>
+        <view class="same-episode__count">{{sameEpisodePoints.length}}</view>
+      </view>
+      <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="same-episode__rail">
+        <view
+          wx:for="{{sameEpisodePoints}}"
+          wx:key="id"
+          class="same-card"
+          data-pointid="{{item.id}}"
+          bind:tap="onSameEpisodeTap"
+        >
+          <image
+            wx:if="{{item.imageThumb && !sameEpisodeImageErrors[item.key]}}"
+            class="same-card__image"
+            src="{{item.imageThumb}}"
+            mode="aspectFill"
+            lazy-load
+            data-pointkey="{{item.key}}"
+            data-url="{{item.imageThumb}}"
+            bind:error="onSameEpisodeImageError"
+          />
+          <view wx:else class="same-card__image same-card__image--empty">
+            <t-icon name="image-off" size="34rpx" />
+          </view>
+          <view class="same-card__name">{{item.displayName}}</view>
+          <view class="same-card__time">{{item.episodeTimeText}}</view>
+        </view>
+      </scroll-view>
+    </view>
+
+    <view class="etiquette-panel">
+      <view class="etiquette-panel__icon"><t-icon name="notification" size="34rpx" /></view>
+      <view>
+        <view class="etiquette-panel__title">{{copy.ETIQUETTE_TITLE}}</view>
+        <view class="etiquette-panel__text">{{copy.ETIQUETTE_TEXT}}</view>
+      </view>
+    </view>
+
+    <view class="detail-footnote">{{copy.DATA_SOURCE_NOTE}}</view>
+  </block>
+</view>

@@ -1,10 +1,13 @@
 /**
- * animeMeta 存量封面升级云函数测试
+ * animeMeta 云函数测试
  *
- * 用极小 wx-server-sdk mock 验证：成员鉴权、详情缓存复用、条件更新（CAS）以及
- * “只改 cover，不动活跃时间/历史”的写入边界。不会访问真实云环境或弹弹play。
+ * 用极小 wx-server-sdk / https mock 验证：BGM subject ID 解析、旧详情缓存兼容、
+ * 成员鉴权、详情缓存复用、条件更新（CAS）以及“只改 cover”的写入边界。
+ * 不会访问真实云环境或弹弹play。
  */
 const Module = require('module');
+const { EventEmitter } = require('events');
+const Subject = require('../cloudfunctions/animeMeta/bgm-subject');
 
 let pass = 0;
 let fail = 0;
@@ -18,8 +21,66 @@ function eq(name, actual, expected) {
   }
 }
 
+function runSubjectParserTests() {
+  eq('解析 bangumi.tv canonical subject URL', Subject.parseBgmSubjectId(' https://bangumi.tv/subject/975 '), 975);
+  eq('同时允许 http 的 bgm.tv canonical subject URL', Subject.parseBgmSubjectId('http://BGM.TV/subject/12345'), 12345);
+  eq(
+    '多个合法来源一致时解析唯一 subject ID',
+    Subject.extractBgmSubjectId({
+      bangumiUrl: 'https://bangumi.tv/subject/11',
+      onlineDatabases: [{ url: 'https://bgm.tv/subject/11' }],
+    }),
+    11
+  );
+  eq(
+    '多个合法来源冲突时宁可空态也不误绑',
+    Subject.extractBgmSubjectId({
+      bangumiUrl: 'https://bangumi.tv/subject/11',
+      onlineDatabases: [{ url: 'https://bgm.tv/subject/22' }],
+    }),
+    null
+  );
+  eq(
+    'raw bangumiUrl 非法时回退 onlineDatabases.url',
+    Subject.extractBgmSubjectId({
+      bangumiUrl: 'https://bangumi.tv/subject/11?from=ddp',
+      onlineDatabases: [
+        { name: 'IMDb', url: 'https://www.imdb.com/title/tt123/' },
+        { name: 'Bangumi', url: 'https://bgm.tv/subject/22' },
+      ],
+    }),
+    22
+  );
+  eq(
+    '绝不把弹弹play bangumiId 当 subject ID',
+    Subject.extractBgmSubjectId({ bangumiId: '12345' }),
+    null
+  );
+  eq(
+    '拒绝 query、伪域名、非 canonical 路径与非正安全整数',
+    [
+      'https://bgm.tv/subject/1?from=ddp',
+      'https://bgm.tv/subject/1#section',
+      'https://bgm.tv/subject/1/',
+      'https://bgm.tv:443/subject/1',
+      'https://user@bgm.tv/subject/1',
+      'https://anime.bgm.tv/subject/1',
+      'https://bgm.tv.evil.example/subject/1',
+      'https://bgm.tv/foo/../subject/1',
+      'ftp://bgm.tv/subject/1',
+      'https://bgm.tv/subject/0',
+      'https://bgm.tv/subject/01',
+      'https://bgm.tv/subject/9007199254740993',
+    ].map(Subject.parseBgmSubjectId),
+    Array(12).fill(null)
+  );
+}
+
 async function run() {
+  runSubjectParserTests();
   const sourceId = 14360;
+  const freshSourceId = 22345;
+  const ddpIdOnlySourceId = 22346;
   const small = 'https://assets.anixplayer.net/image/poster/small/14360-34a7dad806748262214bfb81852bd57c.jpg';
   const medium = 'https://assets.anixplayer.net/image/poster/medium/14360-c7351ec616e97746a8f34ddaa3525aea.jpg';
   let casQuery = null;
@@ -27,6 +88,51 @@ async function run() {
   let currentOpenid = 'me';
   let lockDoc = null;
   let itemProjection = null;
+  let upstreamCalls = 0;
+  const cacheWrites = [];
+  const cacheDocs = new Map([
+    [
+      `detail:${sourceId}`,
+      {
+        expireAt: Date.now() + 60_000,
+        // 模拟上线前已存在、没有 bgmSubjectId 的详情缓存。
+        payload: { sourceId, cover: medium, airDay: 5, isOnAir: true },
+      },
+    ],
+  ]);
+  const upstreamDetails = new Map([
+    [
+      sourceId,
+      {
+        animeId: sourceId,
+        animeTitle: '旧缓存待补映射的番剧',
+        imageUrl: medium,
+        bangumiUrl: 'https://bgm.tv/subject/328609',
+      },
+    ],
+    [
+      freshSourceId,
+      {
+        animeId: freshSourceId,
+        animeTitle: '带 BGM 映射的番剧',
+        // DDP 自有 ID 故意与正确 subject ID 不同，保证不会误用。
+        bangumiId: '999999',
+        // query 使直接 URL 无效，应回退 onlineDatabases。
+        bangumiUrl: 'https://bangumi.tv/subject/11?from=ddp',
+        onlineDatabases: [{ name: 'Bangumi', url: 'https://bgm.tv/subject/975' }],
+      },
+    ],
+    [
+      ddpIdOnlySourceId,
+      {
+        animeId: ddpIdOnlySourceId,
+        animeTitle: '只有 DDP 新 ID 的番剧',
+        bangumiId: '12345',
+        bangumiUrl: null,
+        onlineDatabases: [{ name: 'Bangumi', url: 'https://bgm.tv.evil.example/subject/12345' }],
+      },
+    ],
+  ]);
 
   const db = {
     collection(name) {
@@ -70,20 +176,25 @@ async function run() {
             lockDoc = Object.assign({}, data);
             return { _id: data._id };
           },
-          doc: (id) => ({
-            get: async () => {
-              if (String(id).startsWith('cover_upgrade_lock:')) {
-                if (!lockDoc) throw new Error('not found');
-                return { data: lockDoc };
-              }
-              return {
-                data: {
-                  expireAt: Date.now() + 60_000,
-                  payload: { sourceId, cover: medium, airDay: 5, isOnAir: true },
-                },
-              };
-            },
-          }),
+          doc: (id) => {
+            const cacheId = String(id);
+            return {
+              get: async () => {
+                if (cacheId.startsWith('cover_upgrade_lock:')) {
+                  if (!lockDoc) throw new Error('not found');
+                  return { data: lockDoc };
+                }
+                const record = cacheDocs.get(cacheId);
+                if (!record) throw new Error('not found');
+                return { data: record };
+              },
+              set: async ({ data }) => {
+                cacheWrites.push({ id: cacheId, data });
+                cacheDocs.set(cacheId, data);
+                return { stats: { updated: 1 } };
+              },
+            };
+          },
           where: (query) => ({
             update: async ({ data }) => {
               if (!lockDoc || query._id !== lockDoc._id || query.leaseUntil !== lockDoc.leaseUntil) {
@@ -105,6 +216,27 @@ async function run() {
     database: () => db,
     getWXContext: () => ({ OPENID: currentOpenid }),
   };
+  const httpsMock = {
+    get(url, options, callback) {
+      upstreamCalls++;
+      const request = new EventEmitter();
+      request.setTimeout = () => request;
+      request.destroy = (error) => {
+        if (error) process.nextTick(() => request.emit('error', error));
+      };
+
+      process.nextTick(() => {
+        const response = new EventEmitter();
+        response.statusCode = 200;
+        callback(response);
+        const id = Number(String(url).split('/').pop());
+        const body = JSON.stringify({ success: true, bangumi: upstreamDetails.get(id) || {} });
+        response.emit('data', Buffer.from(body));
+        response.emit('end');
+      });
+      return request;
+    },
+  };
   const originalLoad = Module._load;
   const originalAppId = process.env.DDP_APP_ID;
   const originalSecret = process.env.DDP_APP_SECRET;
@@ -113,12 +245,64 @@ async function run() {
   try {
     Module._load = function mockLoad(request, parent, isMain) {
       if (request === 'wx-server-sdk') return cloudMock;
+      if (request === 'https') return httpsMock;
       return originalLoad.call(this, request, parent, isMain);
     };
     process.env.DDP_APP_ID = 'test-app';
     process.env.DDP_APP_SECRET = 'test-secret';
     delete require.cache[indexPath];
     const fn = require(indexPath);
+
+    for (const invalidAnimeId of ['123abc', 123.9, '1e3', 0, -1]) {
+      const invalidDetail = await fn.main({ action: 'detail', animeId: invalidAnimeId });
+      eq(`严格拒绝非法 animeId ${String(invalidAnimeId)}`, invalidDetail.code, 'ERR_INVALID_PARAM');
+    }
+    eq('非法 animeId 不请求弹弹play', upstreamCalls, 0);
+
+    const writesBeforeLegacyRead = cacheWrites.length;
+    const legacy = await fn.main({ action: 'detail', animeId: sourceId });
+    eq(
+      '旧详情缓存缺字段时懒刷新并补出 subject ID',
+      {
+        cached: legacy.data.cached,
+        hasField: Object.prototype.hasOwnProperty.call(legacy.data.bangumi, 'bgmSubjectId'),
+        bgmSubjectId: legacy.data.bangumi.bgmSubjectId,
+      },
+      { cached: false, hasField: true, bgmSubjectId: 328609 }
+    );
+    eq('旧缓存只在真实详情刷新成功后覆盖', cacheWrites.length, writesBeforeLegacyRead + 1);
+
+    const fresh = await fn.main({ action: 'detail', animeId: freshSourceId });
+    eq(
+      '新详情经裁剪返回 onlineDatabases 回退解析的 subject ID',
+      { cached: fresh.data.cached, bgmSubjectId: fresh.data.bangumi.bgmSubjectId },
+      { cached: false, bgmSubjectId: 975 }
+    );
+    eq(
+      '详情裁剪不透传原始 URL 或 DDP bangumiId',
+      {
+        bangumiUrl: Object.prototype.hasOwnProperty.call(fresh.data.bangumi, 'bangumiUrl'),
+        onlineDatabases: Object.prototype.hasOwnProperty.call(fresh.data.bangumi, 'onlineDatabases'),
+        bangumiId: Object.prototype.hasOwnProperty.call(fresh.data.bangumi, 'bangumiId'),
+      },
+      { bangumiUrl: false, onlineDatabases: false, bangumiId: false }
+    );
+    eq('新详情缓存只保存裁剪后的 subject ID', cacheDocs.get(`detail:${freshSourceId}`).payload.bgmSubjectId, 975);
+
+    const freshCached = await fn.main({ action: 'detail', animeId: freshSourceId });
+    eq(
+      '新详情缓存命中后保留数值 subject ID 且不再请求上游',
+      { cached: freshCached.data.cached, bgmSubjectId: freshCached.data.bangumi.bgmSubjectId, upstreamCalls },
+      { cached: true, bgmSubjectId: 975, upstreamCalls: 2 }
+    );
+
+    const ddpOnly = await fn.main({ action: 'detail', animeId: ddpIdOnlySourceId });
+    eq(
+      '云函数详情也绝不从 DDP bangumiId 或伪域名推导 subject ID',
+      ddpOnly.data.bangumi.bgmSubjectId,
+      null
+    );
+
     const result = await fn.main({ action: 'upgradeBoardCovers', boardId: 'board-1' });
 
     eq('存量升级成功信封', result.ok, true);
@@ -174,7 +358,7 @@ run()
     failures.push(`  ❌ 云函数测试异常\n     ${e && e.stack ? e.stack : e}`);
   })
   .finally(() => {
-    console.log('\nanimeMeta 存量封面升级测试');
+    console.log('\nanimeMeta 云函数与 BGM subjectId 测试');
     console.log('─'.repeat(40));
     if (failures.length) {
       console.log(failures.join('\n'));
