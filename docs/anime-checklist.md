@@ -2,12 +2,13 @@
 
 ## 功能说明
 
-记录用户的追番清单，支持：
-- 添加番剧名称
-- 标记已看完/未看
-- 拖拽排序
-- 左右滑动删除
-- 分享追番清单
+番剧追踪页使用弹弹play 的真实番剧元数据，并在本地保存个人观看进度：
+
+- 搜索番剧后自动带入名称、封面、总集数、年份、评分和放送信息
+- 支持手动输入，兼容迁移旧版追番清单
+- 记录当前看到第几集，支持快捷前进/回退
+- 按想看、在追、看完筛选，支持排序、删除和分享
+- 封面加载失败时显示首字占位，亮色/暗色主题均可用
 
 ## 页面路径
 
@@ -17,95 +18,46 @@
 
 ## 数据结构
 
-### animeItem
+本地 Storage key 仍为 `anime_checklist_data`，写入版本化 envelope：
 
 ```typescript
-interface animeItem {
-  id: string;           // 唯一标识，格式: anime_{timestamp}_{random9}
-  name: string;        // 番剧名称
-  watched: boolean;    // 是否已看完
-  createTime: number;  // 创建时间戳
+interface AnimeChecklistItem {
+  id: string;
+  sourceId: number | null;      // 弹弹play animeId
+  name: string;
+  cover: string;
+  typeDesc: string;
+  year: string;
+  startDate: string;
+  rating: number;
+  totalEp: number | null;
+  currentEp: number;
+  status: 'want' | 'watching' | 'caught_up' | 'paused' | 'done' | 'dropped';
+  watched: boolean;             // 旧模板兼容字段，由 status 派生
+  airStatus: 'airing' | 'finished' | 'unknown';
+  airDay: number | null;        // 0=周日，1=周一…6=周六
+  createTime: number;
+  updateTime: number;
 }
 ```
 
-### Storage Key
+旧版裸数组 `{ id, name, watched, createTime }[]` 会在读取时归一化为版本 2，缺失的元数据使用安全默认值。当前进度属于用户本地记录，真实接口只提供番剧总集数和放送信息。
 
-```
-anime_checklist_data
-```
+## 真实数据链路
 
-存储完整的 `animeItem[]` 数组。
+页面通过 `utils/anime-meta/cloud-api.js` 调用 `animeMeta` 云函数。点击“搜索番剧自动添加”进入 `anime-search` 的 `pick` 模式，选中结果后通过 EventChannel 返回；随后按 `sourceId` 补拉详情，优先使用详情 medium 封面，失败时保留搜索结果。
 
-## 核心方法
+搜索或详情服务不可用时不影响已保存清单，手动输入仍可使用。封面 URL 只使用接口原值，不自行拼接清晰度路径。
 
-### _updateLists(animeList)
+## 交互与状态
 
-从单一数据源派生出两个子列表并同步到视图。
+页面顶部展示全部数量、在追数量、看完数量和平均完成度。每张卡片展示真实封面、放送信息、进度条及“看到下一集”操作；已知总集数时进度不会超过 100%，未知总集数显示当前集数。排序模式收敛为上移、下移和删除操作。
 
-**参数**:
-- `animeList: animeItem[]` - 单一数据源
+空清单提供搜索引导；筛选无结果时显示分类空态；封面失败回退到首字色块。所有颜色使用 TDesign CSS 变量并适配暗色模式。
 
-**逻辑**:
-```javascript
-const unwatchedList = animeList.filter(item => !item.watched);
-const watchedList = animeList.filter(item => item.watched);
-this.setData({ animeList, unwatchedList, watchedList, watchedCount: watchedList.length });
-this._saveData(animeList);
-```
+## 相关代码
 
-### 动画状态机
-
-```
-onToggleWatched(id)
-    │
-    ├── Phase 1 (0-400ms)
-    │   └── checkbox 弹跳 + 卡片闪光
-    │   └── setData({ animPhase: 'phase1', animatingId: id })
-    │
-    ├── Phase 2 (400-750ms) [仅长距离移动]
-    │   └── 卡片滑出原列表
-    │   └── setData({ animPhase: 'phase2' })
-    │
-    └── Phase 3 (750-1150ms) [仅长距离移动]
-        └── 卡片滑入新列表
-        └── setData({ animPhase: 'phase3' })
-```
-
-**动画类名**:
-- `.anime-item--glow` - 卡片闪光
-- `.anime-item--fly-down` / `--fly-up` - 滑出
-- `.anime-item--enter-from-top` / `--enter-from-bottom` - 滑入
-- `.anim-bounce-in` / `.anim-bounce-out` - checkbox 弹跳
-
-## 界面布局
-
-```
-┌─────────────────────────────────────┐
-│  输入框: "输入番剧名称，回车添加"    │ [+]│
-├─────────────────────────────────────┤
-│  已看 3/10 部              [排序]   │
-├─────────────────────────────────────┤
-│  待追                               │
-│  ┌─────────────────────────────┐    │
-│  │ ○ 进击的巨人 S4            │    │
-│  └─────────────────────────────┘    │
-│  ┌─────────────────────────────┐    │
-│  │ ○ 鬼灭之刃                 │    │
-│  └─────────────────────────────┘    │
-│  已看完                             │
-│  ┌─────────────────────────────┐    │
-│  │ ● 咒术回战                 │    │
-│  └─────────────────────────────┘    │
-└─────────────────────────────────────┘
-```
-
-## API 接口
-
-无后端接口，数据存储在微信本地 Storage。
-
-## 扩展计划
-
-- [ ] 对接 Bangumi API 自动补全番剧名称
-- [ ] 云端同步追番数据
-- [ ] 追番进度（看到第几集）
-- [ ] 番剧评分和评论
+- 页面：`miniprogram/packageFeatures/pages/anime-checklist/`
+- 数据归一化：`miniprogram/packageFeatures/utils/anime-checklist/transform.js`
+- 展示配置：`miniprogram/packageFeatures/utils/anime-checklist/config.js`
+- 元数据接口：`miniprogram/packageFeatures/utils/anime-meta/cloud-api.js`

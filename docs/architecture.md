@@ -26,30 +26,12 @@ OtakuMap 是一个微信小程序项目，采用「主包 + 功能分包」架�
 
 ### 1. anime-checklist（番剧追踪）
 
-**设计思想**: 单一数据源 + 派生视图
+**设计思想**：真实番剧元数据 + 本地进度记录。
 
-```
-animeList (单一数据源)
-    │
-    ├── filter → unwatchedList (待追)
-    └── filter → watchedList (已看完)
-```
-
-**关键实现**:
-
-- `_updateLists()`: 核心派生方法，从 animeList 派生出两个子列表
-- 状态管理: `isEditMode`、`animatingId`、`animPhase` 管理 UI 状态
-- 动画状态机: 三阶段动画 (phase1→phase2→phase3)
-- 持久化: `wx.setStorageSync` 存储到本地
-
-**类比 Android 开发**:
-
-| 微信小程序 | Android |
-|-----------|---------|
-| `Page.data` | ViewModel + LiveData |
-| `this.setData()` | `LiveData.setValue()` |
-| `_updateLists()` | Transformations.map() |
-| `wx.setStorageSync` | SharedPreferences / Room |
+- `animeMeta` 云函数提供搜索与详情；追踪页通过搜索弹层选番，补拉详情封面和放送信息。
+- `transform.js` 负责 v2 数据封装、旧裸数组迁移、状态归一和进度计算。
+- 页面按全部/在追/想看/看完筛选，进度和个人状态保存在 `wx.setStorageSync`。
+- `animeList` 是规范化后的单一数据源，`filteredList`、统计摘要均由其派生。
 
 ### 2. lenticular（光栅卡）
 
@@ -232,20 +214,13 @@ utils/shared-board/transform.js (纯逻辑，可 Node 测试)
 ### anime-checklist 数据流
 
 ```
-用户输入 → onAddAnime()
-    │
-    → 生成 newItem { id, name, watched: false, createTime }
-    │
-    → animeList = [newItem, ...animeList]
-    │
-    → _updateLists()
-        │
-        ├── unwatchedList = animeList.filter(!watched)
-        ├── watchedList = animeList.filter(watched)
-        │
-        → setData({ animeList, unwatchedList, watchedList, ... })
-        │
-        → _saveData() → wx.setStorageSync()
+搜索番剧 → animeMeta.search → 选择结果 → animeMeta.detail（补封面/放送信息）
+                                      │
+手动输入 ─────────────────────────────┘
+                                      ↓
+normalizeItem / splitLists → animeList + filteredList + summary
+                                      ↓
+                         wx.setStorageSync（version: 2）
 ```
 
 ### 光栅卡数据流

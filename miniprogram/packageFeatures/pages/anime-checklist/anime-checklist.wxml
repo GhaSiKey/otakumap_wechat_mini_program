@@ -1,137 +1,78 @@
-<!-- ==================== 顶部输入区 ==================== -->
-<view class="input-area">
-  <view class="input-wrapper">
-    <t-input
-      value="{{inputValue}}"
-      placeholder="输入番剧名称，回车添加"
-      clearable
-      confirm-type="done"
-      bind:change="onInputChange"
-      bind:enter="onAddAnime"
-    />
+<view class="page">
+  <view class="hero-card">
+    <view class="hero-copy">
+      <text class="eyebrow">MY WATCHLIST</text>
+      <text class="hero-title">番剧追踪</text>
+      <text class="hero-subtitle">把每一集的进度，留在自己的时间线上</text>
+    </view>
+    <view class="hero-ring">
+      <text class="hero-percent">{{summary.progress}}%</text>
+      <text class="hero-percent-label">完成度</text>
+    </view>
+    <view class="summary-grid">
+      <view class="summary-item"><text class="summary-value">{{summary.total}}</text><text class="summary-label">全部</text></view>
+      <view class="summary-item"><text class="summary-value">{{summary.watching}}</text><text class="summary-label">追踪中</text></view>
+      <view class="summary-item"><text class="summary-value">{{summary.done}}</text><text class="summary-label">已看完</text></view>
+    </view>
   </view>
-  <view class="add-btn" bind:tap="onAddAnime">
-    <t-icon name="add" size="48rpx" />
+
+  <view class="add-panel">
+    <view class="search-entry" bind:tap="onOpenSearch">
+      <t-icon name="search" size="40rpx" />
+      <view class="search-entry-copy"><text class="search-entry-title">搜索番剧自动添加</text><text class="search-entry-hint">真实封面 · 集数 · 放送信息</text></view>
+      <t-icon name="chevron-right" size="36rpx" />
+    </view>
+    <view class="manual-entry">
+      <t-input value="{{inputValue}}" placeholder="{{copy.MANUAL_PLACEHOLDER}}" clearable confirm-type="done" bind:change="onInputChange" bind:enter="onAddAnime" />
+      <view class="manual-add" bind:tap="onAddAnime"><t-icon name="add" size="40rpx" /></view>
+    </view>
   </view>
-</view>
 
-<!-- ==================== 工具栏 ==================== -->
-<view class="toolbar" wx:if="{{unwatchedList.length + watchedList.length > 0}}">
-  <text class="stats">已看 {{watchedCount}} / {{unwatchedList.length + watchedList.length}} 部</text>
-  <view class="edit-toggle" bind:tap="onToggleEditMode">
-    <t-icon name="{{isEditMode ? 'check' : 'edit-1'}}" size="36rpx" />
-    <text class="edit-toggle-text">{{isEditMode ? '完成' : '排序'}}</text>
+  <view class="toolbar" wx:if="{{summary.total}}">
+    <scroll-view scroll-x class="filter-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="filters">
+        <view wx:for="{{filters}}" wx:key="key" class="filter {{activeFilter === item.key ? 'filter--active' : ''}}" data-filter="{{item.key}}" bind:tap="onFilterChange">{{item.label}}<text class="filter-count" wx:if="{{item.count}}">{{item.count}}</text></view>
+      </view>
+    </scroll-view>
+    <view class="toolbar-action" bind:tap="onToggleEditMode"><t-icon name="{{isEditMode ? 'check' : 'edit-1'}}" size="32rpx" /><text>{{isEditMode ? '完成' : '排序'}}</text></view>
   </view>
-</view>
 
-<!-- ==================== 空状态 ==================== -->
-<t-empty wx:if="{{unwatchedList.length === 0 && watchedList.length === 0}}" description="还没有追番，快去添加吧" />
+  <view wx:if="{{!summary.total}}" class="empty-state">
+    <view class="empty-illustration">✦</view><text class="empty-title">{{copy.EMPTY}}</text><text class="empty-hint">{{copy.EMPTY_HINT}}</text><view class="empty-cta" bind:tap="onOpenSearch">搜索一部番剧</view>
+  </view>
 
-<!-- ==================== 番剧列表 ==================== -->
-<view class="anime-list">
+  <view wx:elif="{{!filteredList.length}}" class="empty-filter"><text>{{copy.FILTER_EMPTY}}</text></view>
 
-  <!-- ========== 待追区块 ========== -->
-  <block wx:if="{{unwatchedList.length > 0}}">
-    <text class="section-title">待追</text>
-    <view wx:for="{{unwatchedList}}" wx:key="id">
-      <view class="anime-item {{animatingId === item.id && animPhase === 'phase1' ? 'anime-item--glow' : ''}} {{animatingId === item.id && animPhase === 'phase2' && animDirection === 'check' ? 'anime-item--fly-down' : ''}} {{animatingId === item.id && animPhase === 'phase2' && animDirection === 'uncheck' ? 'anime-item--fly-up' : ''}} {{animatingId === item.id && animPhase === 'phase3' && animDirection === 'check' ? 'anime-item--enter-from-top' : ''}} {{animatingId === item.id && animPhase === 'phase3' && animDirection === 'uncheck' ? 'anime-item--enter-from-bottom' : ''}}">
-        <t-swipe-cell disabled="{{isEditMode}}">
-          <view class="anime-card {{animatingId === item.id && animPhase === 'phase1' ? 'anime-card--flash' : ''}}" bind:tap="{{isEditMode ? '' : 'onToggleWatched'}}" data-id="{{item.id}}">
-
-            <!-- checkbox 图标 -->
-            <view
-              class="anime-checkbox {{animatingId === item.id && animPhase === 'phase1' && animDirection === 'check' ? 'anim-bounce-in' : ''}} {{animatingId === item.id && animPhase === 'phase1' && animDirection === 'uncheck' ? 'anim-bounce-out' : ''}}"
-            >
-              <t-icon
-                name="{{item.watched ? 'check-circle-filled' : 'circle'}}"
-                size="44rpx"
-                color="{{item.watched ? '#0052d9' : '#dcdcdc'}}"
-              />
-            </view>
-
-            <!-- 番剧名 -->
-            <text class="anime-name {{item.watched ? 'anime-name--watched' : ''}}">{{item.name}}</text>
-
-            <!-- 排序按钮 -->
-            <view wx:if="{{isEditMode}}" class="sort-buttons">
-              <view
-                class="sort-btn {{index === 0 ? 'sort-btn--disabled' : ''}}"
-                bind:tap="onMoveUp"
-                data-id="{{item.id}}"
-                data-group="unwatched"
-              >
-                <t-icon name="chevron-up" size="40rpx" />
-              </view>
-              <view
-                class="sort-btn {{index === unwatchedList.length - 1 ? 'sort-btn--disabled' : ''}}"
-                bind:tap="onMoveDown"
-                data-id="{{item.id}}"
-                data-group="unwatched"
-              >
-                <t-icon name="chevron-down" size="40rpx" />
-              </view>
-            </view>
-          </view>
-
-          <view slot="right" class="delete-btn" bind:tap="onDeleteAnime" data-id="{{item.id}}">
-            删除
-          </view>
-        </t-swipe-cell>
+  <view wx:else class="anime-list">
+    <view wx:for="{{filteredList}}" wx:key="id" class="anime-card {{item.status === 'done' ? 'anime-card--done' : ''}}">
+      <view class="cover-wrap">
+        <image wx:if="{{item.cover && !item.coverError}}" class="cover" src="{{item.cover}}" mode="aspectFill" data-id="{{item.id}}" binderror="onCoverError" />
+        <view wx:else class="cover-fallback">{{item.initial}}</view>
+        <view wx:if="{{item.status === 'done'}}" class="done-mark" bind:tap="onToggleWatched" data-id="{{item.id}}"><t-icon name="check" size="24rpx" /></view>
+      </view>
+      <view class="card-body">
+        <view class="card-heading"><text class="anime-name">{{item.name}}</text><t-tag size="small" variant="light" theme="{{item.status === 'done' ? 'success' : item.status === 'watching' ? 'primary' : 'default'}}">{{item.statusLabel}}</t-tag></view>
+        <view class="meta-line"><text wx:if="{{item.year}}">{{item.year}}</text><text wx:if="{{item.year && item.totalEp}}"> · </text><text>{{item.totalEp ? item.totalEp + ' 集' : copy.UNKNOWN_EP}}</text><text wx:if="{{item.airLabel}}"> · {{item.airLabel}}</text></view>
+        <view class="progress-row"><view class="progress-track"><view class="progress-fill" style="width: {{item.progressPercent || 0}}%;"></view></view><text class="progress-text">{{item.totalEp ? item.currentEp + '/' + item.totalEp : '第 ' + item.currentEp + ' 集'}}</text></view>
+        <view class="card-actions" wx:if="{{!isEditMode}}">
+          <view class="stepper" bind:tap="onAdjustProgress" data-id="{{item.id}}" data-delta="-1"><t-icon name="remove" size="28rpx" /></view>
+          <view class="advance-btn" bind:tap="onAdjustProgress" data-id="{{item.id}}" data-delta="1"><t-icon name="play-circle-stroke" size="30rpx" /><text>{{item.status === 'done' ? copy.DONE_ACTION : copy.ADVANCE}}</text></view>
+          <view class="stepper" bind:tap="onAdjustProgress" data-id="{{item.id}}" data-delta="1"><t-icon name="add" size="28rpx" /></view>
+        </view>
+        <view class="sort-actions" wx:else><view bind:tap="onMoveUp" data-id="{{item.id}}"><t-icon name="chevron-up" size="32rpx" /></view><view bind:tap="onMoveDown" data-id="{{item.id}}"><t-icon name="chevron-down" size="32rpx" /></view><view class="delete-link" bind:tap="onDeleteAnime" data-id="{{item.id}}">删除</view></view>
       </view>
     </view>
-  </block>
-
-  <!-- ========== 已看完区块 ========== -->
-  <block wx:if="{{watchedList.length > 0}}">
-    <text class="section-title">已看完</text>
-    <view wx:for="{{watchedList}}" wx:key="id">
-      <view class="anime-item {{animatingId === item.id && animPhase === 'phase1' ? 'anime-item--glow' : ''}} {{animatingId === item.id && animPhase === 'phase2' && animDirection === 'check' ? 'anime-item--fly-down' : ''}} {{animatingId === item.id && animPhase === 'phase2' && animDirection === 'uncheck' ? 'anime-item--fly-up' : ''}} {{animatingId === item.id && animPhase === 'phase3' && animDirection === 'check' ? 'anime-item--enter-from-top' : ''}} {{animatingId === item.id && animPhase === 'phase3' && animDirection === 'uncheck' ? 'anime-item--enter-from-bottom' : ''}}">
-        <t-swipe-cell disabled="{{isEditMode}}">
-          <view class="anime-card anime-card--watched {{animatingId === item.id && animPhase === 'phase1' ? 'anime-card--flash' : ''}}">
-
-            <!-- checkbox 图标 -->
-            <view
-              class="anime-checkbox {{animatingId === item.id && animPhase === 'phase1' && animDirection === 'check' ? 'anim-bounce-in' : ''}} {{animatingId === item.id && animPhase === 'phase1' && animDirection === 'uncheck' ? 'anim-bounce-out' : ''}}"
-              bind:tap="onToggleWatched"
-              data-id="{{item.id}}"
-            >
-              <t-icon
-                name="check-circle-filled"
-                size="44rpx"
-                color="#0052d9"
-              />
-            </view>
-
-            <!-- 番剧名 -->
-            <text class="anime-name anime-name--watched">{{item.name}}</text>
-
-            <!-- 排序按钮 -->
-            <view wx:if="{{isEditMode}}" class="sort-buttons">
-              <view
-                class="sort-btn {{index === 0 ? 'sort-btn--disabled' : ''}}"
-                bind:tap="onMoveUp"
-                data-id="{{item.id}}"
-                data-group="watched"
-              >
-                <t-icon name="chevron-up" size="40rpx" />
-              </view>
-              <view
-                class="sort-btn {{index === watchedList.length - 1 ? 'sort-btn--disabled' : ''}}"
-                bind:tap="onMoveDown"
-                data-id="{{item.id}}"
-                data-group="watched"
-              >
-                <t-icon name="chevron-down" size="40rpx" />
-              </view>
-            </view>
-          </view>
-
-          <view slot="right" class="delete-btn" bind:tap="onDeleteAnime" data-id="{{item.id}}">
-            删除
-          </view>
-        </t-swipe-cell>
-      </view>
-    </view>
-  </block>
-
+  </view>
 </view>
+
+
+<view wx:if="{{showSearch}}" class="sheet-mask" bind:tap="onCloseSearch"><view class="search-sheet" catch:tap="noop">
+  <view class="sheet-handle"></view><view class="sheet-header"><text class="sheet-title">{{copy.SEARCH_TITLE}}</text><view bind:tap="onCloseSearch"><t-icon name="close" size="38rpx" /></view></view>
+  <text class="sheet-hint">{{copy.SEARCH_HINT}}</text>
+  <view class="sheet-search"><t-search value="{{searchKeyword}}" placeholder="{{copy.SEARCH_PLACEHOLDER}}" action="搜索" bind:change="onSearchChange" bind:submit="onSearch" bind:action-click="onSearch" /></view>
+  <view wx:if="{{searchLoading}}" class="sheet-state"><t-loading theme="circular" size="36rpx" text="搜索中…" /></view>
+  <view wx:elif="{{!searchResults.length}}" class="sheet-state">{{searchHint}}</view>
+  <scroll-view wx:else scroll-y class="search-results">
+    <view wx:for="{{searchResults}}" wx:key="sourceId" class="search-result" data-index="{{index}}" bind:tap="onPickAnime"><image class="result-cover" src="{{item.cover}}" mode="aspectFill" /><view class="result-info"><text class="result-name">{{item.name}}</text><text class="result-meta">{{item.year || copy.YEAR_UNKNOWN}} · {{item.totalEp ? item.totalEp + ' 集' : copy.UNKNOWN_EP}}</text></view><text class="result-action">{{copy.SEARCH_ACTION}}</text></view>
+  </scroll-view>
+</view></view>
