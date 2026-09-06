@@ -1,236 +1,242 @@
+const { searchAnime, getAnimeDetail } = require('../../utils/anime-meta/cloud-api');
+const { SEARCH_MODE, PICK_EVENT, preferDetailCover, airStatusOf } = require('../../utils/anime-meta/config');
+const T = require('../../utils/anime-checklist/transform');
+const { COPY, FILTERS } = require('../../utils/anime-checklist/config');
+
 const STORAGE_KEY = 'anime_checklist_data';
+const ANIME_SEARCH_URL = '/packageFeatures/pages/anime-search/anime-search';
+const ANIM = { PHASE1: 400, PHASE2: 350, PHASE3: 400 };
 
-function generateId() {
-  return `anime_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-// 动画时间配置（ms）
-const ANIM = {
-  PHASE1: 400,  // checkbox 弹跳 + 卡片闪光
-  PHASE2: 350,  // 卡片滑出
-  PHASE3: 400,  // 卡片在新位置滑入
-};
+function generateId() { return `anime_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`; }
 
 Page({
   data: {
-    inputValue: '',
-    animeList: [],        // 单一数据源，持久化用
-    unwatchedList: [],    // 派生：待追
-    watchedList: [],      // 派生：已看完
-    isEditMode: false,
-    watchedCount: 0,
-    // 动画状态机
-    animatingId: '',
-    animPhase: '',
-    animDirection: '',
+    inputValue: '', animeList: [], unwatchedList: [], watchedList: [], filteredList: [],
+    watchedCount: 0, totalCount: 0, isEditMode: false,
+    activeFilter: 'all', filters: [],
+    summary: { total: 0, watched: 0, watching: 0, done: 0, progress: 0 },
+    copy: COPY,
+    showAdd: false, showSearch: false, adding: false, newItemName: '', newItemTotalEp: '',
+    newItemPicked: false, newItemCover: '', newItemCoverError: false, pickedAnime: null,
+    metaLoading: false, metaError: '', searchKeyword: '', searchResults: [], searchLoading: false, searched: false, searchHint: COPY.SEARCH_INITIAL,
+    coverErrors: {},
+    statusOptions: T.STATUSES.map((value) => ({ value, label: T.STATUS_LABELS[value] })),
+    animatingId: '', animPhase: '', animDirection: '',
+    draggingId: '', dragOverId: '',
   },
 
-  // ==================== 生命周期 ====================
+  onLoad() { this._unloaded = false; this._pickedMeta = null; this._airMetaWait = null; this._searchRequestId = 0; this._loadStored(); },
+  onShow() { if (this._loadedOnce) this._loadStored(); },
+  onUnload() { this._unloaded = true; this._pickedMeta = null; this._airMetaWait = null; },
 
-  onLoad() {
-    const saved = wx.getStorageSync(STORAGE_KEY);
-    if (saved && Array.isArray(saved)) {
-      this._updateLists(saved);
-    }
+  _loadStored() {
+    let saved; try { saved = wx.getStorageSync(STORAGE_KEY); } catch (e) { saved = []; }
+    const migrated = T.migrateStoredValue(saved, Date.now()); this._loadedOnce = true;
+    this._setLists(migrated.items, false);
+    if (!saved || Array.isArray(saved) || saved.version !== T.VERSION) this._saveData(migrated.items);
   },
 
-  // ==================== 派生列表 ====================
-  // 核心辅助方法：从 animeList 派生出两个子列表并同步到视图
-  // 相当于 Android 中 LiveData.map / Transformations.switchMap
-
-  _updateLists(animeList) {
-    const unwatchedList = animeList.filter(item => !item.watched);
-    const watchedList = animeList.filter(item => item.watched);
-    this.setData({
-      animeList,
-      unwatchedList,
-      watchedList,
-      watchedCount: watchedList.length,
-    });
-    this._saveData(animeList);
+  _setLists(items, save = true) {
+    const vm = T.splitLists(items); const filter = this.data.activeFilter || 'all';
+    const filteredList = filter === 'all' ? vm.animeList : vm.animeList.filter((it) => filter === 'watching' ? ['watching', 'caught_up'].includes(it.status) : it.status === filter);
+    const coverErrors = this.data.coverErrors || {};
+    vm.animeList.forEach((item) => { item.coverError = !!coverErrors[item.id]; });
+    const watching = vm.animeList.filter((it) => it.status === 'watching' || it.status === 'caught_up').length;
+    const progressItems = vm.animeList.filter((it) => typeof it.progressPercent === 'number');
+    const summary = { total: vm.totalCount, watched: vm.watchedCount, done: vm.watchedCount, watching, progress: progressItems.length ? Math.round(progressItems.reduce((sum, it) => sum + it.progressPercent, 0) / progressItems.length) : 0 };
+    const countOf = (key) => key === 'all' ? vm.totalCount : key === 'watching' ? watching : vm.animeList.filter((it) => it.status === key).length;
+    const filters = FILTERS.map((item) => ({ ...item, count: countOf(item.key) }));
+    this.setData({ ...vm, filteredList, summary, filters, activeFilter: filter }); if (save) this._saveData(vm.animeList);
   },
+  // 旧页面/调试脚本仍可能调用此名称，保留别名避免迁移期间断链。
+  _updateLists(items) { this._setLists(items); },
+  _saveData(items) { try { wx.setStorageSync(STORAGE_KEY, { version: T.VERSION, items }); } catch (e) {} },
 
-  // ==================== 输入框相关 ====================
-
-  onInputChange(e) {
-    this.setData({ inputValue: e.detail.value });
+  onInputChange(e) { this.setData({ inputValue: (e.detail && (e.detail.value ?? e.detail)) || '' }); },
+  onOpenSearch() {
+    // 每次打开都开启一轮全新的搜索会话，避免上一次关闭前的请求迟到回写。
+    this._searchRequestId += 1;
+    this.setData({ showSearch: true, searchKeyword: '', searchResults: [], searchLoading: false, searched: false, searchHint: COPY.SEARCH_INITIAL });
   },
+  onCloseSearch() {
+    // 关闭只影响展示状态；递增请求序号，让已关闭弹层的迟到结果失效。
+    this._searchRequestId += 1;
+    this.setData({ showSearch: false });
+  },
+  noop() {},
+  onSearchChange(e) { this.setData({ searchKeyword: (e.detail && (e.detail.value ?? e.detail)) || '' }); },
+  async onSearch() {
+    if (this.data.searchLoading) return;
+    const keyword = String(this.data.searchKeyword || '').trim(); if (!keyword) return;
+    const requestId = ++this._searchRequestId;
+    this.setData({ searchLoading: true, searched: true, searchResults: [], searchHint: COPY.SEARCHING });
+    const result = await searchAnime(keyword);
+    if (this._unloaded || requestId !== this._searchRequestId) return;
+    if (!result || !result.ok) { this.setData({ searchLoading: false, searchHint: COPY.SEARCH_ERROR }); return; }
+    const searchResults = ((result.data && result.data.animes) || []).map((item) => ({ ...item, initial: (item.name || '?').slice(0, 1), added: this.data.animeList.some((entry) => (item.sourceId && entry.sourceId === item.sourceId) || entry.name === item.name) }));
+    this.setData({ searchLoading: false, searchResults, searchHint: searchResults.length ? '' : COPY.SEARCH_EMPTY });
+  },
+  onPickAnime(e) {
+    const item = this.data.searchResults[e.currentTarget.dataset.index];
+    // 选中即加入，但保留搜索弹层，方便继续查看和添加其他番剧。
+    if (item && !item.added) this._onPickedForAdd(item);
+  },
+  onAddTap() { this._pickedMeta = null; this._airMetaWait = null; this.setData({ showAdd: true, newItemName: '', newItemTotalEp: '', newItemPicked: false, newItemCover: '', newItemCoverError: false, metaError: '' }); },
+  onAddVisibleChange(e) { if (this.data.adding && !(e.detail && e.detail.visible)) return; this.setData({ showAdd: !!(e.detail && e.detail.visible) }); },
 
-  onAddAnime() {
-    const name = this.data.inputValue.trim();
-    if (!name) return;
-
-    const exists = this.data.animeList.some(item => item.name === name);
-    if (exists) {
+  onAddSearchTap() {
+    if (this.data.adding) return;
+    wx.navigateTo({ url: `${ANIME_SEARCH_URL}?mode=${SEARCH_MODE.PICK}`, events: { [PICK_EVENT]: (picked) => this._onPickedForAdd(picked) } });
+  },
+  _onPickedForAdd(picked) {
+    if (!picked) return;
+    const sourceId = T.positiveId(picked.sourceId); const name = String(picked.name || '').trim(); const cover = String(picked.cover || '').trim(); const totalEp = T.totalEpOf(picked.totalEp);
+    this._pickedMeta = { sourceId, cover };
+    this.setData({ newItemName: name || this.data.newItemName, newItemTotalEp: totalEp ? String(totalEp) : this.data.newItemTotalEp, newItemCover: cover, newItemCoverError: false, newItemPicked: true, pickedAnime: picked, metaLoading: !!sourceId, metaError: '' });
+    this._airMetaWait = sourceId ? this._fetchDetailMeta(sourceId, this._pickedMeta) : Promise.resolve();
+    this._commitPickedAnime(name, totalEp, this._pickedMeta, picked);
+  },
+  async _commitPickedAnime(name, totalEp, pickedMeta, picked) {
+    if (this.data.animeList.some((item) => item.name === name)) {
+      this._markSearchResultAdded(picked);
+      this._pickedMeta = null;
+      this._airMetaWait = null;
+      this.setData({ newItemPicked: false, metaLoading: false, metaError: '' });
       wx.showToast({ title: '已经添加过了', icon: 'none' });
       return;
     }
+    const now = Date.now();
+    const item = T.normalizeItem({ id: generateId(), name, totalEp, ...(pickedMeta || {}), typeDesc: picked.typeDesc, year: picked.year, startDate: picked.startDate, rating: picked.rating, createTime: now, updateTime: now, status: 'want', watched: false }, now);
+    this._setLists([item, ...this.data.animeList]);
+    this._markSearchResultAdded(picked);
+    this.setData({ adding: false, newItemPicked: false });
+    wx.showToast({ title: '已加入追踪', icon: 'success' });
 
-    const newItem = {
-      id: generateId(),
-      name,
-      watched: false,
-      createTime: Date.now(),
-    };
+    // 详情请求在后台补齐高清封面和放送信息，弹窗保持可用，不阻塞继续浏览。
+    const detailWait = this._airMetaWait;
+    await (detailWait ? detailWait.catch(() => {}) : Promise.resolve());
+    if (this._unloaded || this._pickedMeta !== pickedMeta) return;
+    const enriched = T.normalizeItem({ ...this.data.animeList.find((entry) => entry.id === item.id), ...pickedMeta }, now);
+    this._setLists(this.data.animeList.map((entry) => entry.id === item.id ? enriched : entry));
+    this._pickedMeta = null;
+    this._airMetaWait = null;
+  },
+  _markSearchResultAdded(picked) {
+    const sourceId = T.positiveId(picked && picked.sourceId);
+    const name = String((picked && picked.name) || '').trim();
+    this.setData({ searchResults: this.data.searchResults.map((item) => sourceId && T.positiveId(item.sourceId) === sourceId || (!sourceId && item.name === name) ? { ...item, added: true } : item) });
+  },
+  async _fetchDetailMeta(sourceId, pickedMeta) {
+    const r = await getAnimeDetail(sourceId);
+    if (this._unloaded || this._pickedMeta !== pickedMeta || !pickedMeta || pickedMeta.sourceId !== sourceId) return;
+    if (!r || !r.ok || !r.data || !r.data.bangumi) { this.setData({ metaLoading: false, metaError: '详情暂时不可用，仍可使用搜索结果添加' }); return; }
+    const b = r.data.bangumi; pickedMeta.cover = preferDetailCover(pickedMeta.cover, b.cover); pickedMeta.bgmSubjectId = T.positiveId(b.bgmSubjectId); pickedMeta.airDay = Number.isInteger(b.airDay) ? b.airDay : null; pickedMeta.airStatus = airStatusOf(b.isOnAir);
+    this.setData({ newItemCover: pickedMeta.cover, newItemCoverError: false, metaLoading: false, metaError: '' });
+  },
+  onReselectAnime() { if (this.data.adding) return; this._pickedMeta = null; this._airMetaWait = null; this.setData({ newItemPicked: false, newItemCover: '', newItemCoverError: false, metaLoading: false, metaError: '' }); this.onAddSearchTap(); },
+  onAddCoverError() { this.setData({ newItemCoverError: true }); },
+  onCoverError(e) { const id = e.currentTarget.dataset.id; const coverErrors = { ...(this.data.coverErrors || {}), [id]: true }; const animeList = this.data.animeList.map((item) => item.id === id ? { ...item, coverError: true } : item); this.setData({ coverErrors, animeList, filteredList: this.data.filteredList.map((item) => item.id === id ? { ...item, coverError: true } : item) }); },
+  onItemNameInput(e) { if (!this.data.adding) this.setData({ newItemName: e.detail.value }); },
+  onAddTotalEpInput(e) { if (!this.data.adding) this.setData({ newItemTotalEp: String(e.detail.value || '').replace(/[^\d]/g, '') }); },
 
-    // 新番剧插入到列表头部（未看的最前面）
-    const animeList = [newItem, ...this.data.animeList];
-    this._updateLists(animeList);
-    this.setData({ inputValue: '' });
-    wx.showToast({ title: '已添加', icon: 'success' });
+  async onConfirmAdd() {
+    if (this.data.adding) return;
+    const name = String(this.data.newItemPicked ? this.data.newItemName : this.data.inputValue || this.data.newItemName).trim();
+    if (!name) { wx.showToast({ title: '输入番剧名称', icon: 'none' }); return; }
+    if (this.data.animeList.some((item) => item.name === name)) { wx.showToast({ title: '已经添加过了', icon: 'none' }); return; }
+    const pickedMeta = this._pickedMeta; this.setData({ adding: true });
+    try {
+      if (this._airMetaWait) await Promise.race([this._airMetaWait.catch(() => {}), new Promise((resolve) => setTimeout(resolve, 3000))]);
+      const now = Date.now(); const item = T.normalizeItem({ id: generateId(), name, totalEp: T.totalEpOf(this.data.newItemTotalEp), ...(pickedMeta || {}), createTime: now, updateTime: now, status: 'want', watched: false }, now);
+      this._setLists([item, ...this.data.animeList]); this._pickedMeta = null; this._airMetaWait = null;
+      this.setData({ showAdd: false, inputValue: '', newItemName: '', newItemTotalEp: '', newItemPicked: false, newItemCover: '' }); wx.showToast({ title: '已添加', icon: 'success' });
+    } finally { if (!this._unloaded) this.setData({ adding: false }); }
+  },
+  onAddAnime() {
+    const name = String(this.data.inputValue || '').trim(); if (!name) return;
+    if (this.data.animeList.some((item) => item.name === name)) { wx.showToast({ title: '已经添加过了', icon: 'none' }); return; }
+    const now = Date.now(); this._setLists([T.normalizeItem({ id: generateId(), name, createTime: now, updateTime: now, status: 'want' }, now), ...this.data.animeList]); this.setData({ inputValue: '' }); wx.showToast({ title: '已添加', icon: 'success' });
   },
 
-  // ==================== 核心：三阶段动画 ====================
-  //
-  // 拆分列表后，toggle watched 时卡片会从一个 wx:for 消失，
-  // 在另一个 wx:for 出现。CSS 动画类名通过 animatingId 匹配，
-  // 所以飞出/飞入动画仍然生效。
-  //
   onToggleWatched(e) {
-    const { id } = e.currentTarget.dataset;
-    const { animeList, animatingId } = this.data;
-    const targetItem = animeList.find(item => item.id === id);
-    if (!targetItem || animatingId) return;
+    if (this.data.isEditMode) return;
+    const id = e.currentTarget.dataset.id; const target = this.data.animeList.find((item) => item.id === id); if (!target || this.data.animatingId) return;
+    const status = target.status === 'done' ? 'watching' : 'done'; const updated = this.data.animeList.map((item) => item.id === id ? { ...item, status, watched: status === 'done', currentEp: status === 'done' ? (item.totalEp || item.currentEp) : item.currentEp, updateTime: Date.now() } : item);
+    const direction = status === 'done' ? 'check' : 'uncheck'; const source = status === 'done' ? this.data.unwatchedList : this.data.watchedList;
+    this.setData({ animeList: updated, watchedCount: updated.filter((item) => item.status === 'done').length, animatingId: id, animPhase: 'phase1', animDirection: direction });
+    if (source.length <= 1) { setTimeout(() => this._finishAnimation(updated), ANIM.PHASE1); return; }
+    setTimeout(() => { if (!this._unloaded) this.setData({ animPhase: 'phase2' }); }, ANIM.PHASE1);
+    setTimeout(() => { if (!this._unloaded) { this._setLists(updated); this.setData({ animatingId: id, animPhase: 'phase3', animDirection: direction }); } }, ANIM.PHASE1 + ANIM.PHASE2);
+    setTimeout(() => { if (!this._unloaded) this.setData({ animatingId: '', animPhase: '', animDirection: '' }); }, ANIM.PHASE1 + ANIM.PHASE2 + ANIM.PHASE3);
+  },
+  _finishAnimation(items) { if (this._unloaded) return; this._setLists(items); this.setData({ animatingId: '', animPhase: '', animDirection: '' }); },
+  onSetStatus(e) { this._updateItemStatus(e.currentTarget.dataset.id, e.currentTarget.dataset.status); },
+  _updateItemStatus(id, status) { if (!T.STATUSES.includes(status)) return; this._setLists(this.data.animeList.map((item) => item.id === id ? { ...item, status, watched: status === 'done', currentEp: status === 'done' ? (item.totalEp || item.currentEp) : item.currentEp, updateTime: Date.now() } : item)); },
+  onProgressInput(e) { const id = e.currentTarget.dataset.id; const item = this.data.animeList.find((it) => it.id === id); if (item) this._updateProgress(id, T.currentEpOf(e.detail.value, item.totalEp)); },
+  onAdjustProgress(e) { const id = e.currentTarget.dataset.id; const item = this.data.animeList.find((it) => it.id === id); if (item) this._updateProgress(id, T.currentEpOf(item.currentEp + Number(e.currentTarget.dataset.delta || 0), item.totalEp)); },
+  onDecreaseEp(e) { this.onAdjustProgress({ currentTarget: { dataset: { id: e.currentTarget.dataset.id, delta: -1 } } }); },
+  onIncreaseEp(e) { this.onAdjustProgress({ currentTarget: { dataset: { id: e.currentTarget.dataset.id, delta: 1 } } }); },
+  onAdvanceEp(e) { const id = e.currentTarget.dataset.id; const item = this.data.animeList.find((it) => it.id === id); if (!item || item.status === 'done') return; if (item.totalEp && item.currentEp + 1 >= item.totalEp) this._updateProgress(id, item.totalEp); else this.onIncreaseEp(e); },
+  // 卡片中间按钮用于一次性完成/重新加入追踪，单独承担状态切换。
+  onMarkDone(e) { if (this.data.isEditMode) return; this.onToggleWatched(e); },
+  _updateProgress(id, currentEp) { this._setLists(this.data.animeList.map((item) => { if (item.id !== id) return item; const done = item.totalEp && currentEp >= item.totalEp; return { ...item, currentEp, status: done ? 'done' : (item.status === 'want' || item.status === 'done' ? 'watching' : item.status), watched: !!done, updateTime: Date.now() }; })); },
 
-    const willWatch = !targetItem.watched;
-    const direction = willWatch ? 'check' : 'uncheck';
-
-    // 更新 animeList 中目标项的 watched 状态
-    const updated = animeList.map(item =>
-      item.id === id ? { ...item, watched: willWatch } : item
-    );
-
-    // 判断是否需要飞行动画：
-    // 同组内只有自己一个 → 短距离（列表瞬间为空再出现在另一个列表）
-    const sourceList = willWatch
-      ? this.data.unwatchedList
-      : this.data.watchedList;
-    const isShortMove = sourceList.length <= 1;
-
-    // ---- Phase 1: checkbox 弹跳 + 卡片闪光 ----
-    // 先更新 watched 状态但暂不重新派生列表，让卡片留在原位播放动画
-    this.setData({
-      animeList: updated,
-      watchedCount: updated.filter(item => item.watched).length,
-      animatingId: id,
-      animPhase: 'phase1',
-      animDirection: direction,
+  onDeleteAnime(e) { const id = e.currentTarget.dataset.id; const target = this.data.animeList.find((item) => item.id === id); if (!target) return; wx.showModal({ title: '确认删除', content: `确定要删除「${target.name}」吗？`, confirmText: '删除', confirmColor: '#e34d59', success: (res) => { if (res.confirm) { this._setLists(this.data.animeList.filter((item) => item.id !== id)); wx.showToast({ title: '已删除', icon: 'success' }); } } }); },
+  onToggleEditMode() { const isEditMode = !this.data.isEditMode; this._dragSourceId = ''; this.setData({ isEditMode, draggingId: '', dragOverId: '' }); },
+  onMoveUp(e) { this._move(e.currentTarget.dataset.id, -1); }, onMoveDown(e) { this._move(e.currentTarget.dataset.id, 1); },
+  _move(id, delta) { const index = this.data.animeList.findIndex((item) => item.id === id); const next = index + delta; if (index < 0 || next < 0 || next >= this.data.animeList.length) return; const items = [...this.data.animeList]; [items[index], items[next]] = [items[next], items[index]]; this._setLists(items); },
+  onDragStart(e) {
+    if (!this.data.isEditMode || this._dragSourceId) return;
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    this._dragSourceId = id;
+    // Show feedback immediately; the geometry query below completes
+    // asynchronously on device.
+    this.setData({ draggingId: id, dragOverId: id });
+    if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
+    // Cache card positions at the start of the gesture. Querying on every
+    // touchmove is unreliable on device while the page is scrolling.
+    this.createSelectorQuery().selectAll('.anime-card').boundingClientRect((rects) => {
+      if (this._dragSourceId !== id) return;
+      this._dragRects = rects || [];
+      this._dragIds = this.data.filteredList.map((item) => item.id);
+    }).exec();
+  },
+  onDragMove(e) {
+    if (!this._dragSourceId || !this._dragRects || !this._dragRects.length) return;
+    const touch = e.touches && e.touches[0];
+    if (!touch) return;
+    const fingerY = typeof touch.clientY === 'number' ? touch.clientY : touch.pageY;
+    if (typeof fingerY !== 'number') return;
+    // Pick the card whose vertical centre is closest to the finger. This
+    // allows dropping in the gaps between cards as well as directly on one.
+    let targetIndex = 0;
+    let distance = Infinity;
+    this._dragRects.forEach((rect, index) => {
+      if (!rect) return;
+      const center = rect.top + rect.height / 2;
+      const nextDistance = Math.abs(fingerY - center);
+      if (nextDistance < distance) { distance = nextDistance; targetIndex = index; }
     });
-
-    if (isShortMove) {
-      // 短距离：Phase1 结束后直接派生列表
-      setTimeout(() => {
-        const unwatchedList = updated.filter(item => !item.watched);
-        const watchedList = updated.filter(item => item.watched);
-        this.setData({
-          unwatchedList,
-          watchedList,
-          animatingId: '',
-          animPhase: '',
-          animDirection: '',
-        });
-        this._saveData(updated);
-      }, ANIM.PHASE1);
-    } else {
-      // 长距离：完整三阶段
-      setTimeout(() => {
-        this.setData({ animPhase: 'phase2' });
-      }, ANIM.PHASE1);
-
-      setTimeout(() => {
-        // Phase3：重新派生列表，卡片出现在新列表中并播放飞入动画
-        const unwatchedList = updated.filter(item => !item.watched);
-        const watchedList = updated.filter(item => item.watched);
-        this.setData({
-          unwatchedList,
-          watchedList,
-          animPhase: 'phase3',
-        });
-        this._saveData(updated);
-      }, ANIM.PHASE1 + ANIM.PHASE2);
-
-      setTimeout(() => {
-        this.setData({ animatingId: '', animPhase: '', animDirection: '' });
-      }, ANIM.PHASE1 + ANIM.PHASE2 + ANIM.PHASE3);
-    }
+    const targetId = this._dragIds && this._dragIds[targetIndex];
+    if (targetId && targetId !== this.data.dragOverId) this.setData({ dragOverId: targetId });
   },
-
-  // ==================== 删除（带确认弹窗） ====================
-
-  onDeleteAnime(e) {
-    const { id } = e.currentTarget.dataset;
-    const target = this.data.animeList.find(item => item.id === id);
-    if (!target) return;
-
-    wx.showModal({
-      title: '确认删除',
-      content: `确定要删除「${target.name}」吗？`,
-      confirmText: '删除',
-      confirmColor: '#e34d59',
-      success: (res) => {
-        if (res.confirm) {
-          const animeList = this.data.animeList.filter(item => item.id !== id);
-          this._updateLists(animeList);
-          wx.showToast({ title: '已删除', icon: 'success' });
-        }
-      },
-    });
+  onDragEnd() {
+    const sourceId = this._dragSourceId;
+    const targetId = this.data.dragOverId;
+    this._dragSourceId = '';
+    this._dragRects = [];
+    this._dragIds = [];
+    this.setData({ draggingId: '', dragOverId: '' });
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    const sourceIndex = this.data.animeList.findIndex((item) => item.id === sourceId);
+    const targetIndex = this.data.animeList.findIndex((item) => item.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+    const items = [...this.data.animeList];
+    const [moved] = items.splice(sourceIndex, 1);
+    items.splice(targetIndex, 0, moved);
+    this._setLists(items);
   },
-
-  // ==================== 排序 ====================
-
-  onToggleEditMode() {
-    this.setData({ isEditMode: !this.data.isEditMode });
-  },
-
-  // 排序模式下，在同组子列表内上移
-  onMoveUp(e) {
-    const { id, group } = e.currentTarget.dataset;
-    const subList = group === 'watched' ? [...this.data.watchedList] : [...this.data.unwatchedList];
-    const subIndex = subList.findIndex(item => item.id === id);
-    if (subIndex <= 0) return;
-
-    // 子列表内交换
-    [subList[subIndex - 1], subList[subIndex]] = [subList[subIndex], subList[subIndex - 1]];
-
-    // 映射回 animeList：unwatched 在前，watched 在后
-    const animeList = group === 'watched'
-      ? [...this.data.unwatchedList, ...subList]
-      : [...subList, ...this.data.watchedList];
-
-    this._updateLists(animeList);
-  },
-
-  // 排序模式下，在同组子列表内下移
-  onMoveDown(e) {
-    const { id, group } = e.currentTarget.dataset;
-    const subList = group === 'watched' ? [...this.data.watchedList] : [...this.data.unwatchedList];
-    const subIndex = subList.findIndex(item => item.id === id);
-    if (subIndex < 0 || subIndex >= subList.length - 1) return;
-
-    // 子列表内交换
-    [subList[subIndex], subList[subIndex + 1]] = [subList[subIndex + 1], subList[subIndex]];
-
-    // 映射回 animeList
-    const animeList = group === 'watched'
-      ? [...this.data.unwatchedList, ...subList]
-      : [...subList, ...this.data.watchedList];
-
-    this._updateLists(animeList);
-  },
-
-  // ==================== 持久化 ====================
-
-  _saveData(animeList) {
-    wx.setStorageSync(STORAGE_KEY, animeList);
-  },
-
-  // ==================== 分享 ====================
-
-  onShareAppMessage() {
-    return {
-      title: '我的番剧追踪清单',
-      path: '/pages/anime-checklist/anime-checklist',
-    };
-  },
+  onFilterChange(e) { const activeFilter = e.currentTarget.dataset.filter || (e.detail && e.detail.value) || 'all'; this.setData({ activeFilter }, () => this._setLists(this.data.animeList, false)); },
+  onShareAppMessage() { return { title: '我的番剧追踪清单', path: '/packageFeatures/pages/anime-checklist/anime-checklist' }; },
 });
