@@ -15,7 +15,7 @@ page {
 }
 
 @media (prefers-color-scheme: light) {
-  page {
+  .page {
     --mahjong-bg: #f6f4f2;
     --mahjong-surface: rgba(255, 255, 255, 0.9);
     --mahjong-surface-strong: #ffffff;
@@ -350,7 +350,7 @@ page {
 .modal-action-button.primary, .sheet-close-button { background: var(--mahjong-green); }
 
 @media (prefers-color-scheme: dark) {
-  page {
+  .page {
     --mahjong-bg: #FAF9F5;
     --mahjong-surface: #FFFFFF;
     --mahjong-surface-soft: #F1F0FF;
