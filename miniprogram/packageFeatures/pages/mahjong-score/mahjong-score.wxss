@@ -118,7 +118,7 @@ page {
 .tile.red .tile-value { color: #c63c44; }
 .tile-slot { border: 1rpx dashed rgba(247,239,228,0.22); display: flex; align-items: center; justify-content: center; color: var(--mahjong-faint); font-size: 34rpx; }
 .agari-row { justify-content: space-between; padding-top: 18rpx; border-top: 1rpx solid var(--mahjong-border); }
-.agari-label text { display: block; }
+.agari-label-title { display: block; }
 .agari-hint { margin-top: 5rpx; color: var(--mahjong-faint); font-size: 19rpx; }
 .agari-action { min-width: 86rpx; min-height: 88rpx; display: flex; align-items: center; justify-content: center; }
 .agari-slot { width: 62rpx; height: 84rpx; margin: 0; border: 1rpx dashed var(--mahjong-gold); display: flex; align-items: center; justify-content: center; color: var(--mahjong-gold); font-size: 34rpx; }
@@ -151,16 +151,16 @@ page {
 .settings-body { padding: 0 20rpx 20rpx; border-top: 1rpx solid var(--mahjong-border); }
 .chip-row { display: flex; flex-wrap: wrap; padding-top: 16rpx; }
 .option-chip { min-height: 58rpx; margin: 0 10rpx 10rpx 0; padding: 0 18rpx; border: 1rpx solid var(--mahjong-border); border-radius: 18rpx; display: flex; align-items: center; color: var(--mahjong-muted); font-size: 22rpx; }
-.option-chip text { margin-left: 8rpx; color: var(--mahjong-faint); font-size: 18rpx; }
+.option-chip-han { margin-left: 8rpx; color: var(--mahjong-faint); font-size: 18rpx; }
 .option-chip.selected { border-color: var(--mahjong-teal); color: var(--mahjong-teal); background: rgba(0,212,170,0.12); }
 .option-chip.disabled { opacity: .4; }
 .counter-row { display: flex; padding-top: 18rpx; }
 .counter-item { flex: 1; display: flex; align-items: center; justify-content: space-between; margin-right: 16rpx; color: var(--mahjong-muted); font-size: 23rpx; }
 .counter { display: flex; align-items: center; border: 1rpx solid var(--mahjong-border); border-radius: 14rpx; overflow: hidden; color: var(--mahjong-text); }
-.counter text { width: 44rpx; text-align: center; }
+.counter-value { width: 44rpx; text-align: center; }
 .counter-btn { width: 58rpx; height: 56rpx; display: flex; align-items: center; justify-content: center; color: var(--mahjong-text); background: rgba(255,255,255,0.06); font-size: 30rpx; }
 .indicator-row { display: flex; align-items: center; padding-top: 18rpx; color: var(--mahjong-muted); font-size: 22rpx; }
-.indicator-row > text { width: 110rpx; }
+.indicator-label { width: 110rpx; }
 .indicator-tiles { display: flex; flex-wrap: wrap; align-items: center; }
 .tile-add { width: 42rpx; height: 60rpx; border: 1rpx dashed var(--mahjong-border); border-radius: 7rpx; display: flex; align-items: center; justify-content: center; color: var(--mahjong-faint); font-size: 28rpx; }
 
@@ -171,22 +171,22 @@ page {
 .calculate-button.ready { color: #fff; background: var(--mahjong-coral); box-shadow: 0 10rpx 25rpx rgba(255,107,107,0.22); }
 .picker-toggle { justify-content: space-between; min-height: 54rpx; color: var(--mahjong-muted); font-size: 20rpx; }
 .picker-mode { display: flex; justify-content: space-between; padding: 10rpx 0; color: var(--mahjong-gold); font-size: 21rpx; }
-.picker-mode view { color: var(--mahjong-muted); }
+.picker-mode-cancel { color: var(--mahjong-muted); }
 .tile-picker { padding-top: 8rpx; }
 .picker-tabs, .meld-suit-tabs { display: flex; border-bottom: 1rpx solid var(--mahjong-border); }
 .picker-tab { flex: 1; min-height: 54rpx; display: flex; align-items: center; justify-content: center; color: var(--mahjong-muted); font-size: 21rpx; }
 .picker-tab.active { color: var(--mahjong-teal); border-bottom: 4rpx solid var(--mahjong-teal); }
 .picker-grid { display: flex; flex-wrap: wrap; justify-content: center; padding-top: 12rpx; }
 .picker-tile { width: 58rpx; height: 68rpx; margin: 0 5rpx 8rpx; border-radius: 9rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #24202b; background: #f8f0df; box-shadow: 0 4rpx 0 #b0a694; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
-.picker-tile text { font-size: 28rpx; font-weight: 700; line-height: 1; }
+.picker-tile-label { font-size: 28rpx; font-weight: 700; line-height: 1; }
 .picker-tile small { margin-top: 4rpx; color: #6d6265; font-size: 13rpx; }
 .picker-tile:active { transform: translateY(2rpx); }
-.picker-tile.tile-m text { color: #b33445; }
-.picker-tile.tile-p text { color: #195aa8; }
-.picker-tile.tile-s text { color: #16744d; }
+.picker-tile.tile-m .picker-tile-label { color: #b33445; }
+.picker-tile.tile-p .picker-tile-label { color: #195aa8; }
+.picker-tile.tile-s .picker-tile-label { color: #16744d; }
 .picker-tile.red-picker { background: #ffe7de; }
-.picker-tile.red-picker text { color: #c63c44; font-size: 22rpx; }
-.picker-tile.honor-picker text { color: #26202b; font-size: 24rpx; }
+.picker-tile.red-picker .picker-tile-label { color: #c63c44; font-size: 22rpx; }
+.picker-tile.honor-picker .picker-tile-label { color: #26202b; font-size: 24rpx; }
 
 .meld-editor, .result-sheet { position: fixed; z-index: 100; inset: 0; visibility: hidden; opacity: 0; transition: opacity .2s ease; }
 .meld-editor.show, .result-sheet.show { visibility: visible; opacity: 1; }
@@ -194,7 +194,7 @@ page {
 .meld-editor-content, .sheet-content { position: absolute; left: 24rpx; right: 24rpx; bottom: 20rpx; max-height: calc(100vh - 80rpx); overflow: hidden; border: 1rpx solid var(--mahjong-border); border-radius: 28rpx; color: var(--mahjong-text); background: var(--mahjong-surface-strong); transform: translateY(30rpx); transition: transform .24s ease; }
 .meld-editor.show .meld-editor-content, .result-sheet.show .sheet-content { transform: translateY(0); }
 .modal-header { display: flex; justify-content: space-between; padding: 24rpx; border-bottom: 1rpx solid var(--mahjong-border); font-size: 30rpx; }
-.modal-header view { color: var(--mahjong-muted); font-size: 38rpx; }
+.modal-close { color: var(--mahjong-muted); font-size: 38rpx; }
 .meld-type-selector { display: flex; padding: 18rpx 22rpx 4rpx; }
 .meld-type-btn { flex: 1; min-height: 56rpx; margin-right: 8rpx; border: 1rpx solid var(--mahjong-border); border-radius: 13rpx; display: flex; align-items: center; justify-content: center; color: var(--mahjong-muted); font-size: 21rpx; }
 .meld-type-btn.active { color: var(--mahjong-teal); border-color: var(--mahjong-teal); background: rgba(0,212,170,0.12); }
@@ -203,8 +203,8 @@ page {
 .meld-editor-content .picker-grid { padding: 14rpx 18rpx; }
 .meld-editor-content .picker-tile { width: 50rpx; height: 60rpx; }
 .modal-actions { display: flex; padding: 12rpx 22rpx 22rpx; }
-.modal-actions button, .sheet-footer button { flex: 1; height: 72rpx; margin: 0 6rpx; border: 1rpx solid var(--mahjong-border); border-radius: 16rpx; color: var(--mahjong-muted); background: transparent; font-size: 25rpx; }
-.modal-actions button.primary, .sheet-footer button { color: #fff; border: 0; background: var(--mahjong-coral); }
+.modal-action-button, .sheet-close-button { flex: 1; height: 72rpx; margin: 0 6rpx; border: 1rpx solid var(--mahjong-border); border-radius: 16rpx; color: var(--mahjong-muted); background: transparent; font-size: 25rpx; }
+.modal-action-button.primary, .sheet-close-button { color: #fff; border: 0; background: var(--mahjong-coral); }
 
 .sheet-content { left: 0; right: 0; bottom: 0; max-height: 86vh; border-radius: 30rpx 30rpx 0 0; }
 .sheet-handle { width: 90rpx; height: 8rpx; margin: 14rpx auto 4rpx; border-radius: 8rpx; background: var(--mahjong-faint); }
@@ -347,7 +347,7 @@ page {
 .limit-label { color: #AD352F; background: #FFF0ED; }
 .payment-card, .result-block { background: #F7F7FB; }
 .yaku-chip { color: var(--mahjong-green-dark); background: #E9E6FF; }
-.sheet-footer button, .modal-actions button.primary { background: var(--mahjong-green); }
+.modal-action-button.primary, .sheet-close-button { background: var(--mahjong-green); }
 
 @media (prefers-color-scheme: dark) {
   page {
@@ -492,8 +492,8 @@ page {
   letter-spacing: 1rpx;
 }
 .calculate-button::after,
-.modal-actions button::after,
-.sheet-footer button::after {
+.modal-action-button::after,
+.sheet-close-button::after {
   border: 0;
 }
 .calculate-button:not(.ready) {
@@ -512,7 +512,7 @@ page {
   font-size: 21rpx;
   font-weight: 600;
 }
-.picker-toggle text:last-child {
+.picker-toggle-detail {
   color: var(--mahjong-muted);
   font-weight: 500;
 }
@@ -533,7 +533,7 @@ page {
   margin: 0 4rpx 8rpx;
   font-size: 27rpx;
 }
-.picker-tile text {
+.picker-tile-label {
   font-weight: 700;
 }
 .inline-small {
