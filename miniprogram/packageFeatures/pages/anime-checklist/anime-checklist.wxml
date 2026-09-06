@@ -59,7 +59,7 @@
           <view class="advance-btn" bind:tap="onMarkDone" data-id="{{item.id}}"><t-icon name="{{item.status === 'done' ? 'play-circle-stroke' : 'check'}}" size="30rpx" /><text>{{item.status === 'done' ? copy.REOPEN : copy.MARK_DONE}}</text></view>
           <view class="stepper" bind:tap="onAdjustProgress" data-id="{{item.id}}" data-delta="1"><t-icon name="add" size="28rpx" /></view>
         </view>
-        <view class="sort-actions" wx:else><view bind:tap="onMoveUp" data-id="{{item.id}}"><t-icon name="chevron-up" size="32rpx" /></view><view bind:tap="onMoveDown" data-id="{{item.id}}"><t-icon name="chevron-down" size="32rpx" /></view><view class="delete-link" bind:tap="onDeleteAnime" data-id="{{item.id}}">删除</view></view>
+        <view class="sort-actions" wx:else><view class="sort-btn" bind:tap="onMoveUp" data-id="{{item.id}}" aria-role="button" aria-label="上移"><t-icon name="chevron-up" size="40rpx" /></view><view class="sort-btn" bind:tap="onMoveDown" data-id="{{item.id}}" aria-role="button" aria-label="下移"><t-icon name="chevron-down" size="40rpx" /></view><view class="delete-link" bind:tap="onDeleteAnime" data-id="{{item.id}}">删除</view></view>
       </view>
     </view>
   </view>
