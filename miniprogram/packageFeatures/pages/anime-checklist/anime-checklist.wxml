@@ -69,7 +69,7 @@
 <view wx:if="{{showSearch}}" class="sheet-mask" bind:tap="onCloseSearch"><view class="search-sheet" catch:tap="noop">
   <view class="sheet-handle"></view><view class="sheet-header"><text class="sheet-title">{{copy.SEARCH_TITLE}}</text><view bind:tap="onCloseSearch"><t-icon name="close" size="38rpx" /></view></view>
   <text class="sheet-hint">{{copy.SEARCH_HINT}}</text>
-  <view class="sheet-search"><t-input value="{{searchKeyword}}" placeholder="{{copy.SEARCH_PLACEHOLDER}}" clearable confirm-type="search" bind:change="onSearchChange" bind:enter="onSearch" /><view class="sheet-search__submit" aria-role="button" aria-label="搜索" bind:tap="onSearch"><t-icon name="search" size="30rpx" /><text>{{copy.SEARCH_SUBMIT}}</text></view></view>
+  <view class="sheet-search"><t-icon class="sheet-search__icon" name="search" size="34rpx" /><t-input value="{{searchKeyword}}" placeholder="{{copy.SEARCH_PLACEHOLDER}}" clearable confirm-type="search" bind:change="onSearchChange" bind:enter="onSearch" /><view class="sheet-search__submit" aria-role="button" aria-label="搜索" bind:tap="onSearch"><t-icon name="search" size="30rpx" /><text>{{copy.SEARCH_SUBMIT}}</text></view></view>
   <view wx:if="{{searchLoading}}" class="sheet-state"><t-loading theme="circular" size="36rpx" text="搜索中…" /></view>
   <view wx:elif="{{!searchResults.length}}" class="sheet-state">{{searchHint}}</view>
   <scroll-view wx:else scroll-y class="search-results">
