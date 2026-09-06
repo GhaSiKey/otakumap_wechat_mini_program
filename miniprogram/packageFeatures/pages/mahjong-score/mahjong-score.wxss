@@ -1,5 +1,5 @@
 /* 日麻点数计算器：OtakuMap 轻纸张贴纸主题 */
-page {
+.page {
   --mahjong-bg: #FAF9F5;
   --mahjong-surface: #FFFFFF;
   --mahjong-surface-strong: #FFFFFF;
@@ -231,7 +231,7 @@ page {
 
 
 /* OtakuMap 日麻工具箱主题：轻快、圆润、带一点贴纸感 */
-page {
+.page {
   --mahjong-bg: #FAF9F5;
   --mahjong-surface: #FFFFFF;
   --mahjong-surface-soft: #F1F0FF;
