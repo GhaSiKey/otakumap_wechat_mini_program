@@ -89,7 +89,34 @@ Page({
   },
 
   onLoad() {
-    // 初始化
+    this.syncNavigationTheme();
+    this._themeChangeHandler = () => this.syncNavigationTheme();
+    if (wx.onThemeChange) wx.onThemeChange(this._themeChangeHandler);
+  },
+
+  onShow() {
+    this.syncNavigationTheme();
+  },
+
+  onUnload() {
+    if (this._themeChangeHandler && wx.offThemeChange) {
+      wx.offThemeChange(this._themeChangeHandler);
+    }
+  },
+
+  syncNavigationTheme() {
+    wx.setNavigationBarColor({
+      frontColor: '#11295C',
+      backgroundColor: '#FAF9F5',
+      animation: { duration: 180, timingFunc: 'easeIn' },
+    });
+    if (wx.setBackgroundColor) {
+      wx.setBackgroundColor({
+        backgroundColor: '#FAF9F5',
+        backgroundColorTop: '#FAF9F5',
+        backgroundColorBottom: '#FAF9F5',
+      });
+    }
   },
 
   // ==================== 场况设置 ====================
