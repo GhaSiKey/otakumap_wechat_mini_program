@@ -54,20 +54,20 @@ function createTile(suit, value, isRed = false) {
  * @returns {Object} 牌对象
  */
 function parseTile(str) {
-  const match = str.match(/^(\d)([mpsz])$/);
+  if (typeof str !== 'string') return null;
+  const match = /^(\d)([mpsz])$/.exec(str);
   if (!match) return null;
 
-  let value = parseInt(match[1], 10);
+  const digit = Number(match[1]);
   const suit = match[2];
-  let isRed = false;
-
-  // 0 表示赤5
-  if (value === 0) {
-    value = 5;
-    isRed = true;
+  // 0 只表示数牌的赤五；字牌没有赤牌，且仅允许 1-7。
+  if (suit === 'z') {
+    if (digit < 1 || digit > 7) return null;
+    return createTile(suit, digit, false);
   }
-
-  return createTile(suit, value, isRed);
+  if (digit === 0) return createTile(suit, 5, true);
+  if (digit < 1 || digit > 9) return null;
+  return createTile(suit, digit, false);
 }
 
 /**
@@ -76,27 +76,22 @@ function parseTile(str) {
  * @returns {Array} 牌对象数组
  */
 function parseTiles(str) {
+  if (typeof str !== 'string' || str.length === 0) return [];
   const tiles = [];
-  const pattern = /(\d+)([mpsz])/g;
-  let match;
-
-  while ((match = pattern.exec(str)) !== null) {
+  // 紧凑格式必须完整匹配，避免静默忽略非法片段。
+  let pos = 0;
+  while (pos < str.length) {
+    const match = /^(\d+)([mpsz])/.exec(str.slice(pos));
+    if (!match) return [];
     const values = match[1];
     const suit = match[2];
-
     for (const char of values) {
-      let value = parseInt(char, 10);
-      let isRed = false;
-
-      if (value === 0) {
-        value = 5;
-        isRed = true;
-      }
-
-      tiles.push(createTile(suit, value, isRed));
+      const tile = parseTile(char + suit);
+      if (!tile) return [];
+      tiles.push(tile);
     }
+    pos += match[0].length;
   }
-
   return tiles;
 }
 

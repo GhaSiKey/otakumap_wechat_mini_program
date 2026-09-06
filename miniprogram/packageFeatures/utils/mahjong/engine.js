@@ -7,7 +7,50 @@ const { parseHand, parseHandFromString } = require('./parser');
 const { calculateFu } = require('./fu-calculator');
 const { checkAllYaku, calculateTotalHan } = require('./yaku-checker');
 const { calculateScore, formatScoreDisplay } = require('./score-calculator');
-const { countDora, parseTiles } = require('./config/tiles');
+const { countDora, parseTiles, parseTile } = require('./config/tiles');
+
+function normalizeTile(tile) {
+  if (typeof tile === 'string') return parseTile(tile);
+  if (!tile || typeof tile !== 'object') return null;
+  if (!['m', 'p', 's', 'z'].includes(tile.suit) || !Number.isInteger(tile.value)) return null;
+  if (tile.isRed && (tile.suit === 'z' || tile.value !== 5)) return null;
+  if (!tile.isRed && (tile.value < 1 || tile.value > (tile.suit === 'z' ? 7 : 9))) return null;
+  const parsed = parseTile(`${tile.isRed ? 0 : tile.value}${tile.suit}`);
+  return parsed ? { ...parsed, isRed: !!tile.isRed } : null;
+}
+
+function normalizeHand(hand) {
+  if (!hand || typeof hand !== 'object') return null;
+  const closed = Array.isArray(hand.closed) ? hand.closed.map(normalizeTile) : null;
+  const agariTile = hand.agariTile == null ? null : normalizeTile(hand.agariTile);
+  const melds = Array.isArray(hand.melds) ? hand.melds.map((m) => ({
+    ...m,
+    tiles: Array.isArray(m.tiles) ? m.tiles.map(normalizeTile) : [],
+  })) : [];
+  if (!closed || closed.some((t) => !t) || (hand.agariTile != null && !agariTile) || melds.some((m) => m.tiles.some((t) => !t))) return null;
+  return { ...hand, closed, melds, agariTile };
+}
+
+function normalizeSituation(situation = {}, hand = {}) {
+  const s = situation && typeof situation === 'object' ? situation : {};
+  return {
+    bakaze: s.bakaze || 'east',
+    jikaze: s.jikaze || 'east',
+    isParent: s.isParent != null ? !!s.isParent : (s.jikaze || 'east') === 'east',
+    isTsumo: s.isTsumo != null ? !!s.isTsumo : hand.isTsumo !== false,
+    isRiichi: !!s.isRiichi || !!s.isDoubleRiichi,
+    isDoubleRiichi: !!s.isDoubleRiichi,
+    isIppatsu: !!s.isIppatsu,
+    isRinshan: !!s.isRinshan,
+    isChankan: !!s.isChankan,
+    isHaitei: !!s.isHaitei,
+    isHoutei: !!s.isHoutei,
+    isTenhou: !!s.isTenhou,
+    isChiihou: !!s.isChiihou,
+    honba: Math.max(0, Number(s.honba) || 0),
+    kyoutaku: Math.max(0, Number(s.kyoutaku) || 0),
+  };
+}
 
 /**
  * 计算和牌点数 (主入口)
@@ -17,8 +60,21 @@ const { countDora, parseTiles } = require('./config/tiles');
  * @param {Object} input.dora - 宝牌信息
  * @returns {Object} 计算结果
  */
-function calculate(input) {
-  const { hand, situation, dora = {} } = input;
+function calculate(input = {}) {
+  const rawHand = input && input.hand;
+  const hand = normalizeHand(rawHand);
+  const situation = normalizeSituation(input && input.situation, hand || {});
+  const rawDora = (input && input.dora) || {};
+  const dora = {
+    ...rawDora,
+    indicators: Array.isArray(rawDora.indicators) ? rawDora.indicators.map(normalizeTile).filter(Boolean) : [],
+    uraIndicators: Array.isArray(rawDora.uraIndicators) ? rawDora.uraIndicators.map(normalizeTile).filter(Boolean) : [],
+  };
+  if (!hand) return { success: false, error: '手牌输入格式不正确' };
+  // 场况是和牌方式的唯一来源，保持手牌对象与之同步，避免默认值导致自摸/荣和错算。
+  hand.isTsumo = situation.isTsumo;
+  const validation = validateHand(hand);
+  if (!validation.valid) return { success: false, error: validation.error };
 
   // 1. 解析手牌，获取所有可能的和牌形式
   const parseResult = parseHand(hand);
@@ -57,7 +113,7 @@ function calculate(input) {
 
     // 计算宝牌
     const allTiles = getAllHandTiles(hand);
-    const doraCount = countAllDoraForHand(allTiles, dora, situation.isRiichi);
+    const doraCount = countAllDoraForHand(allTiles, dora, situation.isRiichi && isMenzen);
 
     // 总翻数
     const totalHan = yakuHan + doraCount.total;
@@ -214,19 +270,37 @@ function calculateFromString(handStr, agariStr, options = {}) {
  * @returns {Object} { valid: boolean, error?: string }
  */
 function validateHand(hand) {
+  if (!hand || !Array.isArray(hand.closed)) return { valid: false, error: '缺少门前手牌' };
   const { closed, melds = [], agariTile } = hand;
+  if (!Array.isArray(melds)) return { valid: false, error: '副露格式不正确' };
+  if (agariTile == null) return { valid: false, error: '缺少和牌张' };
+  const allInputTiles = [...closed, agariTile];
+  for (const tile of allInputTiles) {
+    if (!tile || !['m', 'p', 's', 'z'].includes(tile.suit) || !Number.isInteger(tile.value) || tile.value < 1 || tile.value > (tile.suit === 'z' ? 7 : 9)) {
+      return { valid: false, error: '存在无效牌' };
+    }
+  }
+  for (const meld of melds) {
+    if (!meld || !Array.isArray(meld.tiles) || !meld.tiles.length) return { valid: false, error: '副露格式不正确' };
+    if (!['chi', 'pon', 'kan', 'minkan', 'ankan', 'shuntsu', 'koutsu', 'kantsu'].includes(meld.type)) return { valid: false, error: '副露类型不正确' };
+    const expectedMeldSize = ['kan', 'minkan', 'ankan', 'kantsu'].includes(meld.type) ? 4 : 3;
+    if (meld.tiles.length !== expectedMeldSize) return { valid: false, error: '副露牌数不正确' };
+    for (const tile of meld.tiles) {
+      if (!tile || !['m', 'p', 's', 'z'].includes(tile.suit) || !Number.isInteger(tile.value) || tile.value < 1 || tile.value > (tile.suit === 'z' ? 7 : 9)) return { valid: false, error: '存在无效牌' };
+    }
+  }
 
   // 检查总牌数
   const closedCount = closed.length + (agariTile ? 1 : 0);
   const meldCount = melds.reduce((sum, m) => {
-    if (m.type === 'kantsu' || m.type === 'ankan') return sum + 4;
+    if (['kantsu', 'kan', 'minkan', 'ankan'].includes(m.type)) return sum + 4;
     return sum + 3;
   }, 0);
 
   const totalCount = closedCount + meldCount;
 
   // 标准和牌: 14张 (有杠时可能更多)
-  const expectedCount = 14 + melds.filter((m) => m.type === 'kantsu' || m.type === 'ankan').length;
+  const expectedCount = 14 + melds.filter((m) => ['kantsu', 'kan', 'minkan', 'ankan'].includes(m.type)).length;
 
   if (totalCount !== expectedCount) {
     return {

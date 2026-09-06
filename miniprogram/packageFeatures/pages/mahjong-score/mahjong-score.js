@@ -52,6 +52,7 @@ Page({
     isRinshan: false,
     isChankan: false,
     isHaitei: false,
+    isHoutei: false,
 
     // 手牌（门前）
     handTiles: [],
@@ -68,6 +69,8 @@ Page({
     currentSuit: 'm',
     selectorMode: 'hand', // 'hand' | 'agari' | 'dora' | 'ura' | 'meld'
     expandedPanel: '',
+    showTilePicker: true,
+    errorMessage: '',
 
     // 副露编辑状态
     showMeldEditor: false,
@@ -101,7 +104,15 @@ Page({
 
   onTsumoChange(e) {
     const isTsumo = e.currentTarget.dataset.value === 'true' || e.currentTarget.dataset.value === true;
-    this.setData({ isTsumo });
+    const updates = { isTsumo };
+    if (isTsumo) {
+      updates.isChankan = false;
+      updates.isHoutei = false;
+    } else {
+      updates.isRinshan = false;
+      updates.isHaitei = false;
+    }
+    this.setData(updates);
   },
 
   onHonbaChange(e) {
@@ -168,8 +179,15 @@ Page({
   },
 
   onHaiteiChange(e) {
+    if (!this.data.isTsumo) return;
     const isHaitei = e.currentTarget.dataset.value === 'true' || e.currentTarget.dataset.value === true;
     this.setData({ isHaitei });
+  },
+
+  onHouteiChange(e) {
+    if (this.data.isTsumo) return;
+    const isHoutei = e.currentTarget.dataset.value === 'true' || e.currentTarget.dataset.value === true;
+    this.setData({ isHoutei });
   },
 
   // ==================== 折叠面板 ====================
@@ -179,6 +197,10 @@ Page({
     this.setData({
       expandedPanel: this.data.expandedPanel === panel ? '' : panel,
     });
+  },
+
+  toggleTilePicker() {
+    this.setData({ showTilePicker: !this.data.showTilePicker });
   },
 
   // ==================== 牌选择器 ====================
@@ -196,6 +218,17 @@ Page({
     };
 
     const { selectorMode, handTiles, doraIndicators, uraIndicators } = this.data;
+
+    if (selectorMode === 'hand' || selectorMode === 'agari') {
+      if (tile.isRed && this.getExactTileCount(tile) >= 1) {
+        wx.showToast({ title: '每种花色最多一张赤五', icon: 'none' });
+        return;
+      }
+      if (this.getHandTileCount(tile) >= 4) {
+        wx.showToast({ title: '同一种牌最多4张', icon: 'none' });
+        return;
+      }
+    }
 
     switch (selectorMode) {
       case 'hand':
@@ -217,6 +250,7 @@ Page({
           wx.showToast({ title: '最多5张', icon: 'none' });
           return;
         }
+        if (tile.isRed) return;
         this.setData({ doraIndicators: [...doraIndicators, tile], selectorMode: 'hand' });
         break;
 
@@ -225,6 +259,7 @@ Page({
           wx.showToast({ title: '最多5张', icon: 'none' });
           return;
         }
+        if (tile.isRed) return;
         this.setData({ uraIndicators: [...uraIndicators, tile], selectorMode: 'hand' });
         break;
     }
@@ -236,26 +271,26 @@ Page({
     const index = e.currentTarget.dataset.index;
     const handTiles = [...this.data.handTiles];
     handTiles.splice(index, 1);
-    this.setData({ handTiles });
+    this.setData({ handTiles, errorMessage: '' });
   },
 
   onRemoveAgariTile() {
-    this.setData({ agariTile: null });
+    this.setData({ agariTile: null, errorMessage: '' });
   },
 
   openAgariSelector() {
     if (this.data.agariTile) return;
-    this.setData({ selectorMode: 'agari' });
+    this.setData({ selectorMode: 'agari', showTilePicker: true });
     wx.showToast({ title: '请选择和牌张', icon: 'none', duration: 1500 });
   },
 
   openDoraSelector() {
-    this.setData({ selectorMode: 'dora' });
+    this.setData({ selectorMode: 'dora', showTilePicker: true });
     wx.showToast({ title: '请选择表宝牌', icon: 'none', duration: 1500 });
   },
 
   openUraSelector() {
-    this.setData({ selectorMode: 'ura' });
+    this.setData({ selectorMode: 'ura', showTilePicker: true });
     wx.showToast({ title: '请选择里宝牌', icon: 'none', duration: 1500 });
   },
 
@@ -274,7 +309,7 @@ Page({
   },
 
   cancelSelectorMode() {
-    this.setData({ selectorMode: 'hand' });
+    this.setData({ selectorMode: 'hand', showTilePicker: true });
   },
 
   // ==================== 副露操作 ====================
@@ -306,6 +341,15 @@ Page({
 
     const { editingMeldTiles, editingMeldType } = this.data;
     const maxTiles = (editingMeldType === 'kan' || editingMeldType === 'ankan') ? 4 : 3;
+    const usedInEditor = editingMeldTiles.filter((item) => item.suit === tile.suit && item.value === tile.value).length;
+    if (tile.isRed && this.getExactTileCount(tile) >= 1) {
+      wx.showToast({ title: '每种花色最多一张赤五', icon: 'none' });
+      return;
+    }
+    if (this.getHandTileCount(tile) + usedInEditor >= 4) {
+      wx.showToast({ title: '同一种牌最多4张', icon: 'none' });
+      return;
+    }
 
     if (editingMeldTiles.length >= maxTiles) {
       wx.showToast({ title: `最多${maxTiles}张`, icon: 'none' });
@@ -413,7 +457,7 @@ Page({
   // ==================== 计算 ====================
 
   onCalculate() {
-    console.log('onCalculate triggered');
+    this.setData({ errorMessage: '' });
     const {
       handTiles,
       agariTile,
@@ -429,6 +473,7 @@ Page({
       isRinshan,
       isChankan,
       isHaitei,
+      isHoutei,
       doraIndicators,
       uraIndicators,
     } = this.data;
@@ -439,16 +484,14 @@ Page({
     const meldCount = melds.length;
     const requiredHandTiles = 13 - meldCount * 3;
 
-    console.log('handTiles:', handTiles.length, 'required:', requiredHandTiles, 'agariTile:', agariTile);
-
     // 验证
     if (handTiles.length !== requiredHandTiles) {
-      wx.showToast({ title: `请选择${requiredHandTiles}张手牌`, icon: 'none' });
+      this.showValidationError(`还需要选择 ${requiredHandTiles - handTiles.length} 张手牌`);
       return;
     }
 
     if (!agariTile) {
-      wx.showToast({ title: '请选择和牌张', icon: 'none' });
+      this.showValidationError('请选择和牌张');
       return;
     }
 
@@ -480,6 +523,7 @@ Page({
       isRinshan,
       isChankan,
       isHaitei,
+      isHoutei,
       honba,
       kyoutaku,
     };
@@ -490,26 +534,76 @@ Page({
       uraIndicators: isRiichi || isDoubleRiichi ? uraIndicators : [],
     };
 
-    console.log('Calling mahjong.calculate with:', { hand, situation, dora });
+    const validation = mahjong.validateHand(hand);
+    if (!validation.valid) {
+      this.showValidationError(validation.error || '手牌不合法');
+      return;
+    }
 
-    // 计算
     const result = mahjong.calculate({ hand, situation, dora });
 
-    console.log('Calculate result:', result);
-
     if (!result.success) {
-      wx.showToast({ title: result.error || '无法和牌', icon: 'none' });
+      this.showValidationError(result.error || '无法和牌');
       return;
     }
 
     this.setData({
       result,
       showResult: true,
+      errorMessage: '',
     });
   },
 
   onCloseResult() {
     this.setData({ showResult: false });
+  },
+
+  showValidationError(message) {
+    this.setData({ errorMessage: message });
+    wx.showToast({ title: message, icon: 'none' });
+  },
+
+  preventMove() {},
+
+  getHandTileCount(tile) {
+    const all = [...this.data.handTiles];
+    if (this.data.agariTile) all.push(this.data.agariTile);
+    this.data.melds.forEach((meld) => all.push(...meld.tiles));
+    return all.filter((item) => item.suit === tile.suit && item.value === tile.value).length;
+  },
+
+  getExactTileCount(tile) {
+    const all = [...this.data.handTiles];
+    if (this.data.agariTile) all.push(this.data.agariTile);
+    this.data.melds.forEach((meld) => all.push(...meld.tiles));
+    return all.filter((item) => item.suit === tile.suit && item.value === tile.value && !!item.isRed === !!tile.isRed).length;
+  },
+
+  getTileCountLabel() {
+    const required = 13 - this.data.melds.length * 3;
+    return `${this.data.handTiles.length}/${required}`;
+  },
+
+  getRiichiActive() {
+    return this.data.isRiichi || this.data.isDoubleRiichi;
+  },
+
+  getResultLimitName(limitName) {
+    const names = {
+      满贯: '满贯',
+      跳满: '跳满',
+      倍满: '倍满',
+      三倍满: '三倍满',
+      役满: '役满',
+      双倍役满: '双倍役满',
+      MANGAN: '满贯',
+      HANEMAN: '跳满',
+      BAIMAN: '倍满',
+      SANBAIMAN: '三倍满',
+      YAKUMAN: '役满',
+      DOUBLE_YAKUMAN: '双倍役满',
+    };
+    return names[limitName] || limitName;
   },
 
   // ==================== 工具方法 ====================
