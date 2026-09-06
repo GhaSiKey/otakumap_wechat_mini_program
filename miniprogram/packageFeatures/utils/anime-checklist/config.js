@@ -26,6 +26,8 @@ const COPY = {
   ADDED: '已添加',
   FILTER_EMPTY: '这个分类还没有番剧',
   ADVANCE: '看到下一集',
-  DONE_ACTION: '已追平',
+  MARK_DONE: '一键看完',
+  REOPEN: '重新追踪',
+  DRAG_HINT: '长按卡片拖动排序',
 };
 module.exports = { STATUS, STATUS_LABELS, FILTERS, COPY };

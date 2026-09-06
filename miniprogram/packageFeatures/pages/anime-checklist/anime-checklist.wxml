@@ -34,7 +34,7 @@
         <view wx:for="{{filters}}" wx:key="key" class="filter {{activeFilter === item.key ? 'filter--active' : ''}}" data-filter="{{item.key}}" bind:tap="onFilterChange">{{item.label}}<text class="filter-count" wx:if="{{item.count}}">{{item.count}}</text></view>
       </view>
     </scroll-view>
-    <view class="toolbar-action" bind:tap="onToggleEditMode"><t-icon name="{{isEditMode ? 'check' : 'edit-1'}}" size="32rpx" /><text>{{isEditMode ? '完成' : '排序'}}</text></view>
+    <text wx:if="{{isEditMode}}" class="drag-hint">{{copy.DRAG_HINT}}</text><view class="toolbar-action" bind:tap="onToggleEditMode"><t-icon name="{{isEditMode ? 'check' : 'edit-1'}}" size="32rpx" /><text>{{isEditMode ? '完成' : '排序'}}</text></view>
   </view>
 
   <view wx:if="{{!summary.total}}" class="empty-state">
@@ -44,7 +44,7 @@
   <view wx:elif="{{!filteredList.length}}" class="empty-filter"><text>{{copy.FILTER_EMPTY}}</text></view>
 
   <view wx:else class="anime-list">
-    <view wx:for="{{filteredList}}" wx:key="id" class="anime-card {{item.status === 'done' ? 'anime-card--done' : ''}}">
+    <view wx:for="{{filteredList}}" wx:key="id" class="anime-card {{item.status === 'done' ? 'anime-card--done' : ''}} {{draggingId === item.id ? 'anime-card--dragging' : ''}} {{dragOverId === item.id ? 'anime-card--drag-over' : ''}}" data-id="{{item.id}}" bind:longpress="onDragStart" catch:touchmove="onDragMove" catch:touchend="onDragEnd" catch:touchcancel="onDragEnd">
       <view class="cover-wrap">
         <image wx:if="{{item.cover && !item.coverError}}" class="cover" src="{{item.cover}}" mode="aspectFill" data-id="{{item.id}}" binderror="onCoverError" />
         <view wx:else class="cover-fallback">{{item.initial}}</view>
@@ -56,7 +56,7 @@
         <view class="progress-row"><view class="progress-track"><view class="progress-fill" style="width: {{item.progressPercent || 0}}%;"></view></view><text class="progress-text">{{item.totalEp ? item.currentEp + '/' + item.totalEp : '第 ' + item.currentEp + ' 集'}}</text></view>
         <view class="card-actions" wx:if="{{!isEditMode}}">
           <view class="stepper" bind:tap="onAdjustProgress" data-id="{{item.id}}" data-delta="-1"><t-icon name="remove" size="28rpx" /></view>
-          <view class="advance-btn" bind:tap="onAdjustProgress" data-id="{{item.id}}" data-delta="1"><t-icon name="play-circle-stroke" size="30rpx" /><text>{{item.status === 'done' ? copy.DONE_ACTION : copy.ADVANCE}}</text></view>
+          <view class="advance-btn" bind:tap="onMarkDone" data-id="{{item.id}}"><t-icon name="{{item.status === 'done' ? 'play-circle-stroke' : 'check'}}" size="30rpx" /><text>{{item.status === 'done' ? copy.REOPEN : copy.MARK_DONE}}</text></view>
           <view class="stepper" bind:tap="onAdjustProgress" data-id="{{item.id}}" data-delta="1"><t-icon name="add" size="28rpx" /></view>
         </view>
         <view class="sort-actions" wx:else><view bind:tap="onMoveUp" data-id="{{item.id}}"><t-icon name="chevron-up" size="32rpx" /></view><view bind:tap="onMoveDown" data-id="{{item.id}}"><t-icon name="chevron-down" size="32rpx" /></view><view class="delete-link" bind:tap="onDeleteAnime" data-id="{{item.id}}">删除</view></view>

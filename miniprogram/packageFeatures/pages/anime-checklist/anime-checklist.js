@@ -22,6 +22,7 @@ Page({
     coverErrors: {},
     statusOptions: T.STATUSES.map((value) => ({ value, label: T.STATUS_LABELS[value] })),
     animatingId: '', animPhase: '', animDirection: '',
+    draggingId: '', dragOverId: '',
   },
 
   onLoad() { this._unloaded = false; this._pickedMeta = null; this._airMetaWait = null; this._searchRequestId = 0; this._loadStored(); },
@@ -176,12 +177,47 @@ Page({
   onDecreaseEp(e) { this.onAdjustProgress({ currentTarget: { dataset: { id: e.currentTarget.dataset.id, delta: -1 } } }); },
   onIncreaseEp(e) { this.onAdjustProgress({ currentTarget: { dataset: { id: e.currentTarget.dataset.id, delta: 1 } } }); },
   onAdvanceEp(e) { const id = e.currentTarget.dataset.id; const item = this.data.animeList.find((it) => it.id === id); if (!item || item.status === 'done') return; if (item.totalEp && item.currentEp + 1 >= item.totalEp) this._updateProgress(id, item.totalEp); else this.onIncreaseEp(e); },
+  // 卡片中间按钮用于一次性完成/重新加入追踪，单独承担状态切换。
+  onMarkDone(e) { if (this.data.isEditMode) return; this.onToggleWatched(e); },
   _updateProgress(id, currentEp) { this._setLists(this.data.animeList.map((item) => { if (item.id !== id) return item; const done = item.totalEp && currentEp >= item.totalEp; return { ...item, currentEp, status: done ? 'done' : (item.status === 'want' || item.status === 'done' ? 'watching' : item.status), watched: !!done, updateTime: Date.now() }; })); },
 
   onDeleteAnime(e) { const id = e.currentTarget.dataset.id; const target = this.data.animeList.find((item) => item.id === id); if (!target) return; wx.showModal({ title: '确认删除', content: `确定要删除「${target.name}」吗？`, confirmText: '删除', confirmColor: '#e34d59', success: (res) => { if (res.confirm) { this._setLists(this.data.animeList.filter((item) => item.id !== id)); wx.showToast({ title: '已删除', icon: 'success' }); } } }); },
-  onToggleEditMode() { this.setData({ isEditMode: !this.data.isEditMode }); },
+  onToggleEditMode() { const isEditMode = !this.data.isEditMode; this._dragSourceId = ''; this.setData({ isEditMode, draggingId: '', dragOverId: '' }); },
   onMoveUp(e) { this._move(e.currentTarget.dataset.id, -1); }, onMoveDown(e) { this._move(e.currentTarget.dataset.id, 1); },
   _move(id, delta) { const index = this.data.animeList.findIndex((item) => item.id === id); const next = index + delta; if (index < 0 || next < 0 || next >= this.data.animeList.length) return; const items = [...this.data.animeList]; [items[index], items[next]] = [items[next], items[index]]; this._setLists(items); },
+  onDragStart(e) {
+    if (!this.data.isEditMode || this._dragSourceId) return;
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    this._dragSourceId = id;
+    this.setData({ draggingId: id, dragOverId: id });
+    if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
+  },
+  onDragMove(e) {
+    if (!this._dragSourceId) return;
+    const touch = e.touches && e.touches[0];
+    if (!touch || typeof touch.clientY !== 'number') return;
+    this.createSelectorQuery().selectAll('.anime-card').fields({ rect: true, dataset: true }, (cards) => {
+      if (!this._dragSourceId || !Array.isArray(cards)) return;
+      const target = cards.find((card) => touch.clientY >= card.top && touch.clientY <= card.bottom);
+      const targetId = target && target.dataset && target.dataset.id;
+      if (targetId && targetId !== this.data.dragOverId) this.setData({ dragOverId: targetId });
+    }).exec();
+  },
+  onDragEnd() {
+    const sourceId = this._dragSourceId;
+    const targetId = this.data.dragOverId;
+    this._dragSourceId = '';
+    this.setData({ draggingId: '', dragOverId: '' });
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    const sourceIndex = this.data.animeList.findIndex((item) => item.id === sourceId);
+    const targetIndex = this.data.animeList.findIndex((item) => item.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+    const items = [...this.data.animeList];
+    const [moved] = items.splice(sourceIndex, 1);
+    items.splice(targetIndex, 0, moved);
+    this._setLists(items);
+  },
   onFilterChange(e) { const activeFilter = e.currentTarget.dataset.filter || (e.detail && e.detail.value) || 'all'; this.setData({ activeFilter }, () => this._setLists(this.data.animeList, false)); },
   onShareAppMessage() { return { title: '我的番剧追踪清单', path: '/packageFeatures/pages/anime-checklist/anime-checklist' }; },
 });
