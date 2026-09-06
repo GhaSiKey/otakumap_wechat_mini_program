@@ -378,3 +378,171 @@ page {
   background: linear-gradient(135deg, #5146AD 0%, #8B68D8 100%);
   box-shadow: 0 10rpx 18rpx rgba(81,70,173,.22);
 }
+
+
+/* 截图回归优化：明确层级、按钮状态和小屏可视区域 */
+.summary-row {
+  align-items: flex-end;
+}
+.wind-group {
+  min-width: 0;
+}
+.seat-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 92rpx;
+}
+.seat-group .summary-label {
+  margin-bottom: 10rpx;
+}
+.seat-selector-row {
+  display: flex;
+  align-items: center;
+  margin-top: 14rpx;
+  padding-top: 14rpx;
+  border-top: 1rpx solid #ECECF4;
+}
+.seat-selector-label {
+  flex-shrink: 0;
+  width: 110rpx;
+  margin: 0;
+}
+.seat-buttons {
+  flex: 1;
+  min-width: 0;
+  padding: 4rpx;
+  border-radius: 14rpx;
+}
+.seat-button {
+  flex: 1;
+  min-width: 0;
+  margin-right: 0;
+  padding: 10rpx 8rpx;
+  font-size: 22rpx;
+}
+.seat-button + .seat-button {
+  margin-left: 4rpx;
+}
+
+.page-title,
+.card-title,
+.settings-title,
+.sheet-total,
+.calculate-button,
+.picker-tab,
+.picker-tile,
+.win-type-option,
+.wind-button,
+.seat-button,
+.text-action {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+}
+.page-title { letter-spacing: 0; }
+.card-title { font-weight: 700; }
+.settings-title { font-weight: 600; }
+.card-caption, .settings-summary, .summary-label, .agari-hint, .picker-toggle, .inline-small {
+  letter-spacing: 0;
+}
+
+.text-action {
+  min-width: 104rpx;
+  min-height: 52rpx;
+  padding: 0 14rpx;
+  border-radius: 999rpx;
+  color: var(--mahjong-green-dark);
+  background: #F1F0FF;
+  font-size: 22rpx;
+  text-align: center;
+}
+.empty-meld {
+  min-height: 84rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.agari-action {
+  min-width: 92rpx;
+}
+.agari-slot {
+  border-width: 2rpx;
+  border-radius: 12rpx;
+  background: #FFF9E9;
+  font-weight: 700;
+}
+
+.bottom-dock {
+  max-height: 48vh;
+  overflow-y: auto;
+  padding-top: 12rpx;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 14rpx);
+}
+.calculate-row {
+  padding-bottom: 12rpx;
+}
+.calculate-button {
+  height: 82rpx;
+  line-height: 82rpx;
+  padding: 0;
+  border: 0;
+  color: #FFFFFF;
+  font-size: 27rpx;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+}
+.calculate-button::after,
+.modal-actions button::after,
+.sheet-footer button::after {
+  border: 0;
+}
+.calculate-button:not(.ready) {
+  color: #8179B0;
+  background: #E4E1F3;
+  box-shadow: none;
+}
+.calculate-button.ready {
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #5146AD 0%, #8B68D8 100%);
+}
+.picker-toggle {
+  min-height: 56rpx;
+  padding: 0 14rpx;
+  color: var(--mahjong-green-dark);
+  font-size: 21rpx;
+  font-weight: 600;
+}
+.picker-toggle text:last-child {
+  color: var(--mahjong-muted);
+  font-weight: 500;
+}
+.picker-tabs, .meld-suit-tabs {
+  min-height: 58rpx;
+}
+.picker-tab {
+  min-height: 58rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+.picker-grid {
+  padding: 10rpx 2rpx 4rpx;
+}
+.picker-tile {
+  width: 56rpx;
+  height: 66rpx;
+  margin: 0 4rpx 8rpx;
+  font-size: 27rpx;
+}
+.picker-tile text {
+  font-weight: 700;
+}
+.inline-small {
+  font-weight: 500;
+}
+@media (max-width: 360px) {
+  .page { padding-left: 20rpx; padding-right: 20rpx; }
+  .wind-button { min-width: 54rpx; padding-left: 8rpx; padding-right: 8rpx; }
+  .seat-selector-label { width: 96rpx; }
+  .tile, .tile-slot { width: 50rpx; }
+  .bottom-dock { padding-left: 20rpx; padding-right: 20rpx; }
+}
