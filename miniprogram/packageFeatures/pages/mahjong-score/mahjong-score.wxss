@@ -577,3 +577,95 @@ page {
 .bottom-dock > .tile-picker {
   pointer-events: auto;
 }
+
+
+/* 场况选择控件：统一为三组等宽分段按钮 */
+.summary-card {
+  padding: 24rpx;
+}
+.choice-block + .choice-block {
+  margin-top: 20rpx;
+}
+.choice-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36rpx;
+  margin-bottom: 10rpx;
+}
+.choice-heading .summary-label {
+  margin: 0;
+  color: var(--mahjong-text);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+.choice-current {
+  color: var(--mahjong-green);
+  font-size: 21rpx;
+  font-weight: 600;
+}
+.segmented-control {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  padding: 5rpx;
+  border: 1rpx solid #E3E1F2;
+  border-radius: 17rpx;
+  box-sizing: border-box;
+  background: #F1F0FF;
+}
+.wind-buttons, .seat-buttons {
+  margin: 0;
+}
+.wind-button, .seat-button {
+  flex: 1;
+  min-width: 88rpx;
+  min-height: 68rpx;
+  margin: 0;
+  padding: 0 10rpx;
+  border: 0;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  color: var(--mahjong-muted);
+  background: transparent;
+  font-size: 25rpx;
+  font-weight: 600;
+  transition: transform .14s ease, background-color .14s ease, color .14s ease;
+}
+.wind-button + .wind-button,
+.seat-button + .seat-button {
+  margin-left: 4rpx;
+}
+.wind-button.active, .seat-button.active {
+  color: #FFFFFF;
+  border-color: transparent;
+  background: linear-gradient(135deg, #5146AD 0%, #6B5BCE 100%);
+  box-shadow: 0 5rpx 12rpx rgba(81,70,173,.22);
+}
+.wind-button:active, .seat-button:active, .win-type-option:active {
+  transform: scale(.97);
+  opacity: .82;
+}
+.win-type {
+  margin-top: 20rpx;
+  padding: 5rpx;
+  border: 1rpx solid #E3E1F2;
+  border-radius: 17rpx;
+  background: #F7F7FB;
+}
+.win-type-option {
+  min-height: 68rpx;
+  border: 0;
+  border-radius: 12rpx;
+  color: var(--mahjong-muted);
+  font-size: 25rpx;
+  font-weight: 600;
+}
+.win-type-option.active {
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #5146AD 0%, #6B5BCE 100%);
+  box-shadow: 0 5rpx 12rpx rgba(81,70,173,.18);
+}

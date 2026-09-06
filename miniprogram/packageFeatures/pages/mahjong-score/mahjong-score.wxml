@@ -9,21 +9,15 @@
   </view>
 
   <view class="summary-card">
-    <view class="summary-row">
-      <view class="wind-group">
-        <text class="summary-label">场风</text>
-        <view class="wind-buttons">
-          <view wx:for="{{windOptions}}" wx:key="value" class="wind-button {{bakaze === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="onBakazeChange">{{item.label}}</view>
-        </view>
-      </view>
-      <view class="seat-group">
-        <text class="summary-label">自风</text>
-        <view class="seat-value">{{jikaze === 'east' ? '东' : jikaze === 'south' ? '南' : jikaze === 'west' ? '西' : '北'}}</view>
+    <view class="choice-block">
+      <view class="choice-heading"><text class="summary-label">场风</text><text class="choice-current">{{bakaze === 'east' ? '东场' : bakaze === 'south' ? '南场' : bakaze === 'west' ? '西场' : '北场'}}</text></view>
+      <view class="segmented-control wind-buttons">
+        <view wx:for="{{windOptions}}" wx:key="value" class="wind-button {{bakaze === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="onBakazeChange">{{item.label}}</view>
       </view>
     </view>
-    <view class="seat-selector-row">
-      <text class="summary-label seat-selector-label">调整自风</text>
-      <view class="seat-buttons">
+    <view class="choice-block">
+      <view class="choice-heading"><text class="summary-label">自风</text><text class="choice-current">{{jikaze === 'east' ? '东家' : jikaze === 'south' ? '南家' : jikaze === 'west' ? '西家' : '北家'}}</text></view>
+      <view class="segmented-control seat-buttons">
         <view wx:for="{{windOptions}}" wx:key="value" class="seat-button {{jikaze === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="onJikazeChange">{{item.label}}</view>
       </view>
     </view>
