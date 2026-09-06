@@ -1,4 +1,5 @@
 {
-  "navigationBarTitleText": "OtakuMap",
+  "navigationStyle": "custom",
+  "navigationBarTitleText": "",
   "usingComponents": {}
 }

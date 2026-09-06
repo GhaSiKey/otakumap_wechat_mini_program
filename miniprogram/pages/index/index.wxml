@@ -1,30 +1,110 @@
-<!-- 首页 — 功能入口 -->
-<view class="page">
-
-  <!-- 头部 -->
-  <view class="header">
-    <text class="header-title">OtakuMap</text>
-    <text class="header-subtitle">二次元工具箱</text>
+<!-- 首页 — OtakuMap 工具入口 -->
+<view class="page {{viewportClass}}" style="{{viewportStyle}}">
+  <!-- 自定义透明导航栏：原生导航栏会用不透明底色截断顶部纸片素材。 -->
+  <view class="index-navbar" style="{{navbarStyle}}">
+    <text class="index-navbar__title" style="{{navbarTitleStyle}}" aria-label="OtakuMap">OtakuMap</text>
   </view>
 
-  <!-- 功能卡片列表 -->
-  <view class="feature-list">
-    <view
-      class="feature-card"
-      wx:for="{{features}}"
-      wx:key="id"
-      data-path="{{item.path}}"
-      bind:tap="onNavigate"
-    >
-      <view class="feature-icon-wrap">
-        <text class="feature-icon-text">{{item.emoji}}</text>
-      </view>
-      <view class="feature-info">
-        <text class="feature-title">{{item.title}}</text>
-        <text class="feature-desc">{{item.desc}}</text>
-      </view>
-      <text class="feature-arrow">›</text>
+  <!-- 轻量纸张氛围层：使用概念稿中的纸片、胶带和星星元素，保持不占布局空间。 -->
+  <view class="header-ambient" aria-hidden="true">
+    <image
+      class="header-banner"
+      src="/pages/index/assets/header-paper-banner.png"
+      mode="scaleToFill"
+      data-asset-id="header-paper-banner"
+      data-src="/pages/index/assets/header-paper-banner.png"
+      bind:load="onAssetLoad"
+      bind:error="onAssetError"
+      aria-hidden="true"
+    />
+    <view class="header-ambient__wash"></view>
+    <view class="header-ambient__grid"></view>
+    <text class="header-spark header-spark--blue header-spark--one">✦</text>
+    <text class="header-spark header-spark--coral header-spark--two">✦</text>
+    <text class="header-spark header-spark--yellow header-spark--three">✧</text>
+    <text class="header-spark header-spark--blue header-spark--four">✦</text>
+  </view>
+
+  <view class="header">
+    <image
+      class="wordmark"
+      src="/pages/index/assets/otakumap-wordmark.png"
+      mode="aspectFit"
+      data-asset-id="wordmark"
+      data-src="/pages/index/assets/otakumap-wordmark.png"
+      bind:load="onAssetLoad"
+      bind:error="onAssetError"
+      aria-label="OtakuMap"
+    />
+    <text class="header-subtitle">二次元工具箱</text>
+    <view class="header-rule" aria-hidden="true">
+      <view class="header-rule__line header-rule__line--blue"></view>
+      <view class="header-rule__line header-rule__line--coral"></view>
     </view>
   </view>
 
+  <view class="feature-grid">
+    <view
+      class="feature-card feature-card--grid feature-card--{{item.tone}} feature-card--enter feature-card--enter-{{item.motion}}"
+      wx:for="{{gridFeatures}}"
+      wx:key="id"
+      data-path="{{item.path}}"
+      aria-label="打开{{item.title}}"
+      hover-class="feature-card--pressed"
+      hover-stay-time="80"
+      bind:tap="onNavigate"
+      >
+      <view class="feature-card__motion">
+        <view class="feature-media feature-media--{{item.tone}}">
+          <block wx:if="{{item.id == 'lenticular'}}">
+            <image class="feature-image" src="/pages/index/assets/lenticular.png" mode="aspectFit" data-asset-id="lenticular" data-src="/pages/index/assets/lenticular.png" bind:load="onAssetLoad" bind:error="onAssetError" aria-hidden="true" />
+          </block>
+          <block wx:elif="{{item.id == 'anime-checklist'}}">
+            <image class="feature-image" src="/pages/index/assets/anime-tracker.png" mode="aspectFit" data-asset-id="anime-checklist" data-src="/pages/index/assets/anime-tracker.png" bind:load="onAssetLoad" bind:error="onAssetError" aria-hidden="true" />
+          </block>
+          <block wx:elif="{{item.id == 'pilgrimage'}}">
+            <image class="feature-image" src="/pages/index/assets/pilgrimage.png" mode="aspectFit" data-asset-id="pilgrimage" data-src="/pages/index/assets/pilgrimage.png" bind:load="onAssetLoad" bind:error="onAssetError" aria-hidden="true" />
+          </block>
+          <block wx:elif="{{item.id == 'mahjong-score'}}">
+            <image class="feature-image" src="/pages/index/assets/mahjong.png" mode="aspectFit" data-asset-id="mahjong-score" data-src="/pages/index/assets/mahjong.png" bind:load="onAssetLoad" bind:error="onAssetError" aria-hidden="true" />
+          </block>
+        </view>
+        <view class="feature-body">
+          <text class="feature-title">{{item.title}}</text>
+          <text class="feature-desc">{{item.desc}}</text>
+        </view>
+        <view class="feature-arrow" aria-hidden="true">
+          <view class="feature-arrow__chevron"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="wide-list">
+    <view
+      class="feature-card feature-card--wide feature-card--{{item.tone}} feature-card--enter feature-card--enter-{{item.motion}}"
+      wx:for="{{wideFeatures}}"
+      wx:key="id"
+      data-path="{{item.path}}"
+      aria-label="打开{{item.title}}"
+      hover-class="feature-card--pressed"
+      hover-stay-time="80"
+      bind:tap="onNavigate"
+      >
+      <view class="feature-card__motion">
+        <view class="wide-media feature-media--{{item.tone}}">
+          <block wx:if="{{item.id == 'shared-board'}}">
+            <image class="feature-image" src="/pages/index/assets/shared-board.png" mode="aspectFit" data-asset-id="shared-board" data-src="/pages/index/assets/shared-board.png" bind:load="onAssetLoad" bind:error="onAssetError" aria-hidden="true" />
+          </block>
+        </view>
+        <view class="wide-body">
+          <text class="feature-title">{{item.title}}</text>
+          <text class="feature-desc">{{item.desc}}</text>
+        </view>
+        <view class="feature-arrow" aria-hidden="true">
+          <view class="feature-arrow__chevron"></view>
+        </view>
+      </view>
+    </view>
+  </view>
 </view>

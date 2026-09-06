@@ -11,7 +11,7 @@
 | 圣地巡礼 | 搜索番剧、收藏巡礼作品，并按地点/集数浏览 Anitabi 地图与参考图 | 分包 pages/pilgrimage |
 | 光栅卡 | 选择多张图片，倾斜手机体验百叶窗切换效果 | 分包 pages/lenticular |
 | 日麻点数计算 | 输入手牌自动计算符数、役种和点数 | 分包 pages/mahjong-score |
-| 世界杯赔率 | 2026 FIFA 世界杯赔率、赛程日历与赛事详情（静态快照） | 分包 pages/worldcup |
+| 世界杯赔率 | 2026 FIFA 世界杯赔率、赛程日历与赛事详情（静态快照；当前不在首页展示） | 分包 pages/worldcup |
 
 ## 技术栈
 
@@ -27,7 +27,7 @@
 otakumap/
 ├── miniprogram/                    # 小程序主体
 │   ├── pages/                      # 主包页面
-│   │   └── index/                  # 首页（功能入口，纯 CSS 日夜间适配）
+│   │   └── index/                  # 首页（图片入口卡、纸片氛围动效、透明导航栏，主包日夜间适配）
 │   ├── packageFeatures/            # 分包（功能模块）
 │   │   ├── pages/
 │   │   │   ├── anime-checklist/     # 番剧追踪
