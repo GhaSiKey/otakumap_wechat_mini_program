@@ -205,7 +205,9 @@ Page({
   onDragMove(e) {
     if (!this._dragSourceId || !this._dragRects || !this._dragRects.length) return;
     const touch = e.touches && e.touches[0];
-    if (!touch || typeof touch.clientY !== 'number') return;
+    if (!touch) return;
+    const fingerY = typeof touch.clientY === 'number' ? touch.clientY : touch.pageY;
+    if (typeof fingerY !== 'number') return;
     // Pick the card whose vertical centre is closest to the finger. This
     // allows dropping in the gaps between cards as well as directly on one.
     let targetIndex = 0;
@@ -213,7 +215,7 @@ Page({
     this._dragRects.forEach((rect, index) => {
       if (!rect) return;
       const center = rect.top + rect.height / 2;
-      const nextDistance = Math.abs(touch.clientY - center);
+      const nextDistance = Math.abs(fingerY - center);
       if (nextDistance < distance) { distance = nextDistance; targetIndex = index; }
     });
     const targetId = this._dragIds && this._dragIds[targetIndex];
