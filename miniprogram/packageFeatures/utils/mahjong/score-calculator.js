@@ -34,7 +34,8 @@ function calculateScore(fu, han, isParent, isTsumo, honba = 0, kyoutaku = 0) {
 
     if (isParent) {
       // 亲家自摸: 每位子家支付相同点数
-      const eachPayment = childPayment + Math.floor(honbaBonus / 3) * 100;
+      // 每本场每位子家额外支付 100 点。
+      const eachPayment = childPayment + honba * 100;
       const roundedEach = Math.ceil(eachPayment / 100) * 100;
 
       return {
@@ -54,8 +55,9 @@ function calculateScore(fu, han, isParent, isTsumo, honba = 0, kyoutaku = 0) {
     }
 
     // 子家自摸
-    const childPay = childPayment + Math.floor(honbaBonus / 3) * 100;
-    const parentPay = parentPayment + Math.floor(honbaBonus / 3) * 100;
+    // 子家自摸时，庄家和两位闲家均各支付每本场 100 点。
+    const childPay = childPayment + honba * 100;
+    const parentPay = parentPayment + honba * 100;
     const roundedChild = Math.ceil(childPay / 100) * 100;
     const roundedParent = Math.ceil(parentPay / 100) * 100;
 

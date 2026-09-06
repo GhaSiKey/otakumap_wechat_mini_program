@@ -288,6 +288,8 @@ function determineWaitType(pattern, agariTile, isTsumo) {
 
   // 检查面子中的听牌型
   for (const meld of melds) {
+    // 副露面子不包含和牌张，不能用于判定等待型；荣和双碰形成的刻子除外。
+    if (meld.isOpen && !meld.isAgariMeld) continue;
     if (meld.type === MELD_TYPES.KOUTSU) {
       // 刻子: 双碰听
       if (meld.suit === agariTile.suit && meld.value === agariTile.value) {
@@ -325,6 +327,19 @@ function determineWaitType(pattern, agariTile, isTsumo) {
 
   // 默认返回两面 (理论上不应该到这里)
   return WAIT_TYPES.RYANMEN;
+}
+
+/** 将荣和牌所在的暗刻标记为明刻：荣和双碰不计三暗刻，且明刻符按规则计算。 */
+function markRonAgariMeld(melds, agariTile, isTsumo) {
+  if (isTsumo || !agariTile) return;
+  const meld = melds.find((m) =>
+    !m.isOpen && m.type === MELD_TYPES.KOUTSU &&
+    m.suit === agariTile.suit && m.value === agariTile.value
+  );
+  if (meld) {
+    meld.isOpen = true;
+    meld.isAgariMeld = true;
+  }
 }
 
 /**
@@ -403,11 +418,13 @@ function parseHand(hand) {
     // 门前: 分割所有14张
     const standardPatterns = splitStandardHand(counts);
     for (const pattern of standardPatterns) {
-      const waitType = determineWaitType(pattern, agariTile, isTsumo);
+      const parsedMelds = pattern.melds.map((m) => ({ ...m, isOpen: false }));
+      markRonAgariMeld(parsedMelds, agariTile, isTsumo);
+      const waitType = determineWaitType({ ...pattern, melds: parsedMelds }, agariTile, isTsumo);
       results.push({
         type: 'standard',
         head: pattern.head,
-        melds: pattern.melds.map((m) => ({ ...m, isOpen: false })),
+        melds: parsedMelds,
         waitType,
       });
     }
@@ -444,6 +461,7 @@ function parseHand(hand) {
           ...pattern.melds.map((m) => ({ ...m, isOpen: false })),
           ...normalizedMelds.map((m) => ({ ...m })),
         ];
+        markRonAgariMeld(allMelds, agariTile, isTsumo);
         const waitType = determineWaitType(
           { head: pattern.head, melds: allMelds },
           agariTile,

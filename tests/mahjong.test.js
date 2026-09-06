@@ -102,6 +102,39 @@ eq('听牌型-12听3为边张', waitOf('12m999p555s333z11p', '3m'), 'penchan');
 eq('听牌型-45听3为两面', waitOf('45m999p555s333z11p', '3m'), 'ryanmen');
 
 // ============================================================
+// 回归：本场、自摸状态、严格牌面和副露边界
+// ============================================================
+const { calculateScore } = mahjong.scoreCalculator;
+const tsumoHonba = calculateScore(30, 1, false, true, 2, 0);
+eq('本场-子家自摸每家各加200', tsumoHonba.payments, { fromEachChild: 500, fromParent: 700, total: 1700 });
+
+eq('严格牌面-赤字牌与越界牌', mahjong.parseTile('0m') && mahjong.parseTile('0m').isRed, true);
+eq('严格牌面-0z非法', mahjong.parseTile('0z'), null);
+eq('严格牌面-8z非法', mahjong.parseTile('8z'), null);
+
+const stateYaku = mahjong.calculateFromString('234567m234p78s33z', '6s', {
+  isTsumo: true, isRiichi: true, isDoubleRiichi: true, isIppatsu: true,
+  bakaze: 'east', jikaze: 'south',
+});
+eq('双立直与一发状态', stateYaku.success && stateYaku.yakuList.map((y) => y.id).filter((id) => id === 'doubleRiichi' || id === 'ippatsu'), ['doubleRiichi', 'ippatsu']);
+
+const openRiichi = mahjong.calculate({ hand: { closed: parseTiles('23456m234p78s'), melds: [{ type: 'pon', tiles: parseTiles('111z') }], agariTile: parseTiles('6s')[0] }, situation: { isTsumo: true, isRiichi: true, bakaze: 'east', jikaze: 'south' } });
+eq('副露不能获得立直役', openRiichi.success && openRiichi.yakuList.some((y) => y.id === 'riichi'), false);
+
+const invalidTile = mahjong.calculate({ hand: { closed: parseTiles('123m456p789s11z'), melds: [], agariTile: { suit: 'z', value: 8 } }, situation: { isTsumo: true } });
+eq('计算入口拒绝非法牌面', invalidTile.success, false);
+
+const chanta = mahjong.calculateFromString('123m789p111s999s1z', '1z', {
+  isTsumo: true, bakaze: 'east', jikaze: 'south',
+});
+eq('混全带幺九要求至少一个顺子', chanta.success && chanta.yakuList.some((y) => y.id === 'chanta'), true);
+
+const ronShanpon = mahjong.calculateFromString('111m22p345s777s99z', '2p', {
+  isTsumo: false, bakaze: 'east', jikaze: 'south',
+});
+eq('荣和双碰不计三暗刻', ronShanpon.success && ronShanpon.yakuList.some((y) => y.id === 'sanankou'), false);
+
+// ============================================================
 // 汇总输出
 // ============================================================
 console.log('\n日麻核心模块测试');

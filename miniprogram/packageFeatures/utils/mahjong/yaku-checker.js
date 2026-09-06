@@ -237,6 +237,9 @@ function checkChanta(pattern) {
   // 雀头必须含幺九
   if (!isTerminalOrHonor(pattern.head.tiles[0])) return false;
 
+  // 至少包含一个顺子；纯刻子幺九牌型应判混老头，而不是混全带幺九。
+  if (!pattern.melds.some((m) => m.type === MELD_TYPES.SHUNTSU)) return false;
+
   // 每个面子必须含幺九
   for (const meld of pattern.melds) {
     const hasYaochu = meld.tiles.some((t) => isTerminalOrHonor(t));
@@ -260,6 +263,9 @@ function checkJunchan(pattern) {
 
   // 雀头必须是数牌幺九
   if (!isTerminal(pattern.head.tiles[0])) return false;
+
+  // 至少包含一个顺子；纯刻子幺九牌型应判清老头，而不是纯全带幺九。
+  if (!pattern.melds.some((m) => m.type === MELD_TYPES.SHUNTSU)) return false;
 
   // 每个面子必须含数牌幺九
   for (const meld of pattern.melds) {
@@ -610,12 +616,12 @@ function checkAllYaku(pattern, situation, isMenzen, agariTile) {
   const isTsumo = situation.isTsumo !== false;
 
   // ========== 特殊状态役 ==========
-  if (situation.isTenhou) {
+  if (situation.isTenhou && isMenzen && isTsumo && situation.isParent) {
     yakuList.push({ ...YAKU_LIST.tenhou });
     return yakuList; // 天和直接返回
   }
 
-  if (situation.isChiihou) {
+  if (situation.isChiihou && isMenzen && isTsumo && !situation.isParent) {
     yakuList.push({ ...YAKU_LIST.chiihou });
     return yakuList; // 地和直接返回
   }
@@ -690,14 +696,14 @@ function checkAllYaku(pattern, situation, isMenzen, agariTile) {
   }
 
   // 立直系
-  if (situation.isRiichi) {
+  if (isMenzen && situation.isRiichi) {
     if (situation.isDoubleRiichi) {
       yakuList.push({ ...YAKU_LIST.doubleRiichi });
     } else {
       yakuList.push({ ...YAKU_LIST.riichi });
     }
 
-    if (situation.isIppatsu) {
+    if (situation.isIppatsu && isMenzen) {
       yakuList.push({ ...YAKU_LIST.ippatsu });
     }
   }
@@ -708,10 +714,10 @@ function checkAllYaku(pattern, situation, isMenzen, agariTile) {
   }
 
   // 特殊状态役
-  if (situation.isRinshan) {
+  if (situation.isRinshan && isTsumo) {
     yakuList.push({ ...YAKU_LIST.rinshan });
   }
-  if (situation.isChankan) {
+  if (situation.isChankan && !isTsumo) {
     yakuList.push({ ...YAKU_LIST.chankan });
   }
   if (situation.isHaitei && isTsumo) {
