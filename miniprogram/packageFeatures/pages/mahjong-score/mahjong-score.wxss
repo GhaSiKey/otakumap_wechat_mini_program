@@ -546,3 +546,16 @@ page {
   .tile, .tile-slot { width: 50rpx; }
   .bottom-dock { padding-left: 20rpx; padding-right: 20rpx; }
 }
+
+
+/* 对比度修正：选中态和禁用态都保留清晰文字 */
+.seat-value {
+  color: #FFFFFF;
+  background: linear-gradient(145deg, #5146AD, #6B5BCE);
+  box-shadow: 0 6rpx 14rpx rgba(81,70,173,.18);
+}
+.calculate-button:not(.ready) {
+  color: #5146AD;
+  background: #E9E6FF;
+}
+
