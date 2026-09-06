@@ -48,7 +48,7 @@
       <view class="cover-wrap">
         <image wx:if="{{item.cover && !item.coverError}}" class="cover" src="{{item.cover}}" mode="aspectFill" data-id="{{item.id}}" binderror="onCoverError" />
         <view wx:else class="cover-fallback">{{item.initial}}</view>
-        <view wx:if="{{item.status === 'done'}}" class="done-mark" bind:tap="onToggleWatched" data-id="{{item.id}}"><t-icon name="check" size="24rpx" /></view>
+        <view wx:if="{{item.status === 'done'}}" class="done-mark" aria-hidden="true"><t-icon name="check" size="24rpx" /></view>
       </view>
       <view class="card-body">
         <view class="card-heading"><text class="anime-name">{{item.name}}</text><t-tag size="small" variant="light" theme="{{item.status === 'done' ? 'success' : item.status === 'watching' ? 'primary' : 'default'}}">{{item.statusLabel}}</t-tag></view>
