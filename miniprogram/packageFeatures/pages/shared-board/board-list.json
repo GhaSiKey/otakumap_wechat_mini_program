@@ -4,7 +4,6 @@
   "usingComponents": {
     "t-empty": "tdesign-miniprogram/empty/empty",
     "t-button": "tdesign-miniprogram/button/button",
-    "t-avatar": "tdesign-miniprogram/avatar/avatar",
     "t-fab": "tdesign-miniprogram/fab/fab",
     "t-popup": "tdesign-miniprogram/popup/popup",
     "t-input": "tdesign-miniprogram/input/input"

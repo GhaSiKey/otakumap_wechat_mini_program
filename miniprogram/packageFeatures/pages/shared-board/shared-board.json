@@ -2,7 +2,6 @@
   "navigationBarTitleText": "共享番单",
   "enablePullDownRefresh": true,
   "usingComponents": {
-    "t-avatar": "tdesign-miniprogram/avatar/avatar",
     "t-button": "tdesign-miniprogram/button/button",
     "t-fab": "tdesign-miniprogram/fab/fab",
     "t-popup": "tdesign-miniprogram/popup/popup",
