@@ -190,14 +190,16 @@ Page({
     const id = e.currentTarget.dataset.id;
     if (!id) return;
     this._dragSourceId = id;
+    // Show feedback immediately; the geometry query below completes
+    // asynchronously on device.
+    this.setData({ draggingId: id, dragOverId: id });
+    if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
     // Cache card positions at the start of the gesture. Querying on every
     // touchmove is unreliable on device while the page is scrolling.
     this.createSelectorQuery().selectAll('.anime-card').boundingClientRect((rects) => {
       if (this._dragSourceId !== id) return;
       this._dragRects = rects || [];
       this._dragIds = this.data.filteredList.map((item) => item.id);
-      this.setData({ draggingId: id, dragOverId: id });
-      if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
     }).exec();
   },
   onDragMove(e) {
