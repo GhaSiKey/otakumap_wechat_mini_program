@@ -44,7 +44,7 @@
   <view wx:elif="{{!filteredList.length}}" class="empty-filter"><text>{{copy.FILTER_EMPTY}}</text></view>
 
   <view wx:else class="anime-list">
-    <view wx:for="{{filteredList}}" wx:key="id" class="anime-card {{item.status === 'done' ? 'anime-card--done' : ''}} {{draggingId === item.id ? 'anime-card--dragging' : ''}} {{dragOverId === item.id ? 'anime-card--drag-over' : ''}}" data-id="{{item.id}}" bind:longpress="onDragStart" catch:touchmove="onDragMove" catch:touchend="onDragEnd" catch:touchcancel="onDragEnd">
+    <view wx:for="{{filteredList}}" wx:key="id" class="anime-card {{item.status === 'done' ? 'anime-card--done' : ''}} {{draggingId === item.id ? 'anime-card--dragging' : ''}} {{dragOverId === item.id ? 'anime-card--drag-over' : ''}}" data-id="{{item.id}}" bind:longpress="onDragStart" bind:touchmove="onDragMove" bind:touchend="onDragEnd" bind:touchcancel="onDragEnd">
       <view class="cover-wrap">
         <image wx:if="{{item.cover && !item.coverError}}" class="cover" src="{{item.cover}}" mode="aspectFill" data-id="{{item.id}}" binderror="onCoverError" />
         <view wx:else class="cover-fallback">{{item.initial}}</view>
