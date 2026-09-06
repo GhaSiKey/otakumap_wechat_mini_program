@@ -69,7 +69,7 @@ Page({
     currentSuit: 'm',
     selectorMode: 'hand', // 'hand' | 'agari' | 'dora' | 'ura' | 'meld'
     expandedPanel: '',
-    showTilePicker: true,
+    showTilePicker: false,
     errorMessage: '',
 
     // 副露编辑状态

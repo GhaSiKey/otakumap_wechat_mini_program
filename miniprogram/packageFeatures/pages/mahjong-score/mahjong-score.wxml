@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page {{showTilePicker ? 'picker-open' : 'picker-closed'}}">
   <view class="page-header">
     <view class="brand-mark">✿</view>
     <view class="page-title-group">
