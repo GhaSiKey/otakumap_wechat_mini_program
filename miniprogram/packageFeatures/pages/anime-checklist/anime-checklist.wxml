@@ -69,10 +69,10 @@
 <view wx:if="{{showSearch}}" class="sheet-mask" bind:tap="onCloseSearch"><view class="search-sheet" catch:tap="noop">
   <view class="sheet-handle"></view><view class="sheet-header"><text class="sheet-title">{{copy.SEARCH_TITLE}}</text><view bind:tap="onCloseSearch"><t-icon name="close" size="38rpx" /></view></view>
   <text class="sheet-hint">{{copy.SEARCH_HINT}}</text>
-  <view class="sheet-search"><t-search value="{{searchKeyword}}" placeholder="{{copy.SEARCH_PLACEHOLDER}}" action="搜索" bind:change="onSearchChange" bind:submit="onSearch" bind:action-click="onSearch" /></view>
+  <view class="sheet-search"><t-input value="{{searchKeyword}}" placeholder="{{copy.SEARCH_PLACEHOLDER}}" clearable confirm-type="search" bind:change="onSearchChange" bind:enter="onSearch" /><view class="sheet-search__submit" aria-role="button" aria-label="搜索" bind:tap="onSearch"><t-icon name="search" size="30rpx" /><text>{{copy.SEARCH_SUBMIT}}</text></view></view>
   <view wx:if="{{searchLoading}}" class="sheet-state"><t-loading theme="circular" size="36rpx" text="搜索中…" /></view>
   <view wx:elif="{{!searchResults.length}}" class="sheet-state">{{searchHint}}</view>
   <scroll-view wx:else scroll-y class="search-results">
-    <view wx:for="{{searchResults}}" wx:key="sourceId" class="search-result" data-index="{{index}}" bind:tap="onPickAnime"><image class="result-cover" src="{{item.cover}}" mode="aspectFill" /><view class="result-info"><text class="result-name">{{item.name}}</text><text class="result-meta">{{item.year || copy.YEAR_UNKNOWN}} · {{item.totalEp ? item.totalEp + ' 集' : copy.UNKNOWN_EP}}</text></view><text class="result-action">{{copy.SEARCH_ACTION}}</text></view>
+    <view wx:for="{{searchResults}}" wx:key="sourceId" class="search-result" data-index="{{index}}" bind:tap="onPickAnime"><image class="result-cover" src="{{item.cover}}" mode="aspectFill" /><view class="result-info"><text class="result-name">{{item.name}}</text><text class="result-meta">{{item.year || copy.YEAR_UNKNOWN}} · {{item.totalEp ? item.totalEp + ' 集' : copy.UNKNOWN_EP}}</text></view><view class="result-action {{item.added ? 'result-action--added' : ''}}" aria-role="button" aria-label="{{item.added ? copy.ADDED : copy.SEARCH_ACTION}}"><t-icon wx:if="{{item.added}}" name="check" size="24rpx" /><text>{{item.added ? copy.ADDED : copy.SEARCH_ACTION}}</text></view></view>
   </scroll-view>
 </view></view>

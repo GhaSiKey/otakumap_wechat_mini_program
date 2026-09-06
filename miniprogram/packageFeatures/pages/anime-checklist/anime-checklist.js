@@ -24,7 +24,7 @@ Page({
     animatingId: '', animPhase: '', animDirection: '',
   },
 
-  onLoad() { this._unloaded = false; this._pickedMeta = null; this._airMetaWait = null; this._loadStored(); },
+  onLoad() { this._unloaded = false; this._pickedMeta = null; this._airMetaWait = null; this._searchRequestId = 0; this._loadStored(); },
   onShow() { if (this._loadedOnce) this._loadStored(); },
   onUnload() { this._unloaded = true; this._pickedMeta = null; this._airMetaWait = null; },
 
@@ -52,19 +52,34 @@ Page({
   _saveData(items) { try { wx.setStorageSync(STORAGE_KEY, { version: T.VERSION, items }); } catch (e) {} },
 
   onInputChange(e) { this.setData({ inputValue: (e.detail && (e.detail.value ?? e.detail)) || '' }); },
-  onOpenSearch() { this.setData({ showSearch: true, searchKeyword: '', searchResults: [], searched: false, searchHint: COPY.SEARCH_INITIAL }); },
-  onCloseSearch() { if (!this.data.searchLoading) this.setData({ showSearch: false }); },
+  onOpenSearch() {
+    // 每次打开都开启一轮全新的搜索会话，避免上一次关闭前的请求迟到回写。
+    this._searchRequestId += 1;
+    this.setData({ showSearch: true, searchKeyword: '', searchResults: [], searchLoading: false, searched: false, searchHint: COPY.SEARCH_INITIAL });
+  },
+  onCloseSearch() {
+    // 关闭只影响展示状态；递增请求序号，让已关闭弹层的迟到结果失效。
+    this._searchRequestId += 1;
+    this.setData({ showSearch: false });
+  },
   noop() {},
   onSearchChange(e) { this.setData({ searchKeyword: (e.detail && (e.detail.value ?? e.detail)) || '' }); },
   async onSearch() {
+    if (this.data.searchLoading) return;
     const keyword = String(this.data.searchKeyword || '').trim(); if (!keyword) return;
+    const requestId = ++this._searchRequestId;
     this.setData({ searchLoading: true, searched: true, searchResults: [], searchHint: COPY.SEARCHING });
     const result = await searchAnime(keyword);
+    if (this._unloaded || requestId !== this._searchRequestId) return;
     if (!result || !result.ok) { this.setData({ searchLoading: false, searchHint: COPY.SEARCH_ERROR }); return; }
-    const searchResults = ((result.data && result.data.animes) || []).map((item) => ({ ...item, initial: (item.name || '?').slice(0, 1) }));
+    const searchResults = ((result.data && result.data.animes) || []).map((item) => ({ ...item, initial: (item.name || '?').slice(0, 1), added: this.data.animeList.some((entry) => (item.sourceId && entry.sourceId === item.sourceId) || entry.name === item.name) }));
     this.setData({ searchLoading: false, searchResults, searchHint: searchResults.length ? '' : COPY.SEARCH_EMPTY });
   },
-  onPickAnime(e) { const item = this.data.searchResults[e.currentTarget.dataset.index]; if (item) { this.setData({ showSearch: false }); this._onPickedForAdd(item); } },
+  onPickAnime(e) {
+    const item = this.data.searchResults[e.currentTarget.dataset.index];
+    // 选中即加入，但保留搜索弹层，方便继续查看和添加其他番剧。
+    if (item && !item.added) this._onPickedForAdd(item);
+  },
   onAddTap() { this._pickedMeta = null; this._airMetaWait = null; this.setData({ showAdd: true, newItemName: '', newItemTotalEp: '', newItemPicked: false, newItemCover: '', newItemCoverError: false, metaError: '' }); },
   onAddVisibleChange(e) { if (this.data.adding && !(e.detail && e.detail.visible)) return; this.setData({ showAdd: !!(e.detail && e.detail.visible) }); },
 
@@ -73,7 +88,7 @@ Page({
     wx.navigateTo({ url: `${ANIME_SEARCH_URL}?mode=${SEARCH_MODE.PICK}`, events: { [PICK_EVENT]: (picked) => this._onPickedForAdd(picked) } });
   },
   _onPickedForAdd(picked) {
-    if (!picked || this.data.adding) return;
+    if (!picked) return;
     const sourceId = T.positiveId(picked.sourceId); const name = String(picked.name || '').trim(); const cover = String(picked.cover || '').trim(); const totalEp = T.totalEpOf(picked.totalEp);
     this._pickedMeta = { sourceId, cover };
     this.setData({ newItemName: name || this.data.newItemName, newItemTotalEp: totalEp ? String(totalEp) : this.data.newItemTotalEp, newItemCover: cover, newItemCoverError: false, newItemPicked: true, pickedAnime: picked, metaLoading: !!sourceId, metaError: '' });
@@ -81,17 +96,34 @@ Page({
     this._commitPickedAnime(name, totalEp, this._pickedMeta, picked);
   },
   async _commitPickedAnime(name, totalEp, pickedMeta, picked) {
-    if (this.data.adding) return;
-    if (this.data.animeList.some((item) => item.name === name)) { wx.showToast({ title: '已经添加过了', icon: 'none' }); return; }
-    this.setData({ adding: true });
-    await Promise.race([this._airMetaWait.catch(() => {}), new Promise((resolve) => setTimeout(resolve, 3000))]);
-    if (this._unloaded || this._pickedMeta !== pickedMeta) { if (!this._unloaded) this.setData({ adding: false }); return; }
+    if (this.data.animeList.some((item) => item.name === name)) {
+      this._markSearchResultAdded(picked);
+      this._pickedMeta = null;
+      this._airMetaWait = null;
+      this.setData({ newItemPicked: false, metaLoading: false, metaError: '' });
+      wx.showToast({ title: '已经添加过了', icon: 'none' });
+      return;
+    }
     const now = Date.now();
     const item = T.normalizeItem({ id: generateId(), name, totalEp, ...(pickedMeta || {}), typeDesc: picked.typeDesc, year: picked.year, startDate: picked.startDate, rating: picked.rating, createTime: now, updateTime: now, status: 'want', watched: false }, now);
     this._setLists([item, ...this.data.animeList]);
-    this._pickedMeta = null; this._airMetaWait = null;
+    this._markSearchResultAdded(picked);
     this.setData({ adding: false, newItemPicked: false });
     wx.showToast({ title: '已加入追踪', icon: 'success' });
+
+    // 详情请求在后台补齐高清封面和放送信息，弹窗保持可用，不阻塞继续浏览。
+    const detailWait = this._airMetaWait;
+    await (detailWait ? detailWait.catch(() => {}) : Promise.resolve());
+    if (this._unloaded || this._pickedMeta !== pickedMeta) return;
+    const enriched = T.normalizeItem({ ...this.data.animeList.find((entry) => entry.id === item.id), ...pickedMeta }, now);
+    this._setLists(this.data.animeList.map((entry) => entry.id === item.id ? enriched : entry));
+    this._pickedMeta = null;
+    this._airMetaWait = null;
+  },
+  _markSearchResultAdded(picked) {
+    const sourceId = T.positiveId(picked && picked.sourceId);
+    const name = String((picked && picked.name) || '').trim();
+    this.setData({ searchResults: this.data.searchResults.map((item) => sourceId && T.positiveId(item.sourceId) === sourceId || (!sourceId && item.name === name) ? { ...item, added: true } : item) });
   },
   async _fetchDetailMeta(sourceId, pickedMeta) {
     const r = await getAnimeDetail(sourceId);

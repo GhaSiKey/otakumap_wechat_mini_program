@@ -22,6 +22,8 @@ const COPY = {
   SEARCH_ERROR: '番剧数据暂时不可用，请稍后重试',
   YEAR_UNKNOWN: '年份未知',
   SEARCH_ACTION: '添加',
+  SEARCH_SUBMIT: '搜索',
+  ADDED: '已添加',
   FILTER_EMPTY: '这个分类还没有番剧',
   ADVANCE: '看到下一集',
   DONE_ACTION: '已追平',
