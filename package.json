@@ -4,7 +4,7 @@
   "private": true,
   "description": "OtakuMap 开发辅助（测试入口 + 小程序 npm 依赖源）。node_modules 装在根，不落 miniprogramRoot，避免被算进主包",
   "scripts": {
-    "test": "node tests/mahjong.test.js && node tests/worldcup.test.js && node tests/shared-board.test.js && node tests/update-progress-cloud.test.js && node tests/together-watch-cloud.test.js && node tests/together-watch-page.test.js && node tests/anime-meta.test.js && node tests/anime-meta-cloud.test.js && node tests/pilgrimage.test.js && node tests/pilgrimage-cloud.test.js && node tests/pilgrimage-pages.test.js"
+    "test": "node tests/mahjong.test.js && node tests/worldcup.test.js && node tests/shared-board.test.js && node tests/update-progress-cloud.test.js && node tests/together-watch-cloud.test.js && node tests/together-watch-page.test.js && node tests/anime-meta.test.js && node tests/anime-meta-cloud.test.js && node tests/pilgrimage.test.js && node tests/pilgrimage-cloud.test.js && node tests/pilgrimage-pages.test.js && node tests/homepage.test.js"
   },
   "dependencies": {
     "tdesign-miniprogram": "^1.5.0"

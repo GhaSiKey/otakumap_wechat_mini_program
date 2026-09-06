@@ -78,7 +78,36 @@
         "value": "node_modules"
       }
     ],
-    "include": []
+    "include": [
+      {
+        "type": "file",
+        "value": "pages/index/assets/otakumap-wordmark.png"
+      },
+      {
+        "type": "file",
+        "value": "pages/index/assets/lenticular.png"
+      },
+      {
+        "type": "file",
+        "value": "pages/index/assets/anime-tracker.png"
+      },
+      {
+        "type": "file",
+        "value": "pages/index/assets/pilgrimage.png"
+      },
+      {
+        "type": "file",
+        "value": "pages/index/assets/mahjong.png"
+      },
+      {
+        "type": "file",
+        "value": "pages/index/assets/shared-board.png"
+      },
+      {
+        "type": "file",
+        "value": "pages/index/assets/header-paper-banner.png"
+      }
+    ]
   },
   "editorSetting": {
     "tabIndent": "insertSpaces",
