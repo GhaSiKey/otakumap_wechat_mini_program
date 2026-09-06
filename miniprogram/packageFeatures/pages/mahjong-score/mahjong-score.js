@@ -106,7 +106,7 @@ Page({
 
   syncNavigationTheme() {
     wx.setNavigationBarColor({
-      frontColor: '#11295C',
+      frontColor: '#000000',
       backgroundColor: '#FAF9F5',
       animation: { duration: 180, timingFunc: 'easeIn' },
     });
