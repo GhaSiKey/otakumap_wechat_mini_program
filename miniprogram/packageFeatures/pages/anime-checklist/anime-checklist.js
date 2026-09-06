@@ -190,24 +190,39 @@ Page({
     const id = e.currentTarget.dataset.id;
     if (!id) return;
     this._dragSourceId = id;
-    this.setData({ draggingId: id, dragOverId: id });
-    if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
+    // Cache card positions at the start of the gesture. Querying on every
+    // touchmove is unreliable on device while the page is scrolling.
+    this.createSelectorQuery().selectAll('.anime-card').boundingClientRect((rects) => {
+      if (this._dragSourceId !== id) return;
+      this._dragRects = rects || [];
+      this._dragIds = this.data.filteredList.map((item) => item.id);
+      this.setData({ draggingId: id, dragOverId: id });
+      if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
+    }).exec();
   },
   onDragMove(e) {
-    if (!this._dragSourceId) return;
+    if (!this._dragSourceId || !this._dragRects || !this._dragRects.length) return;
     const touch = e.touches && e.touches[0];
     if (!touch || typeof touch.clientY !== 'number') return;
-    this.createSelectorQuery().selectAll('.anime-card').fields({ rect: true, dataset: true }, (cards) => {
-      if (!this._dragSourceId || !Array.isArray(cards)) return;
-      const target = cards.find((card) => touch.clientY >= card.top && touch.clientY <= card.bottom);
-      const targetId = target && target.dataset && target.dataset.id;
-      if (targetId && targetId !== this.data.dragOverId) this.setData({ dragOverId: targetId });
-    }).exec();
+    // Pick the card whose vertical centre is closest to the finger. This
+    // allows dropping in the gaps between cards as well as directly on one.
+    let targetIndex = 0;
+    let distance = Infinity;
+    this._dragRects.forEach((rect, index) => {
+      if (!rect) return;
+      const center = rect.top + rect.height / 2;
+      const nextDistance = Math.abs(touch.clientY - center);
+      if (nextDistance < distance) { distance = nextDistance; targetIndex = index; }
+    });
+    const targetId = this._dragIds && this._dragIds[targetIndex];
+    if (targetId && targetId !== this.data.dragOverId) this.setData({ dragOverId: targetId });
   },
   onDragEnd() {
     const sourceId = this._dragSourceId;
     const targetId = this.data.dragOverId;
     this._dragSourceId = '';
+    this._dragRects = [];
+    this._dragIds = [];
     this.setData({ draggingId: '', dragOverId: '' });
     if (!sourceId || !targetId || sourceId === targetId) return;
     const sourceIndex = this.data.animeList.findIndex((item) => item.id === sourceId);
