@@ -1,17 +1,17 @@
-/* 日麻点数计算器：夜鸦牌桌主题 */
+/* 日麻点数计算器：OtakuMap 轻纸张贴纸主题 */
 page {
-  --mahjong-bg: #0a0a14;
-  --mahjong-surface: rgba(255, 255, 255, 0.06);
-  --mahjong-surface-strong: #141428;
-  --mahjong-border: rgba(255, 255, 255, 0.1);
-  --mahjong-text: #f7efe4;
-  --mahjong-muted: rgba(247, 239, 228, 0.58);
-  --mahjong-faint: rgba(247, 239, 228, 0.34);
-  --mahjong-purple: #9d4edd;
-  --mahjong-coral: #ff6b6b;
-  --mahjong-teal: #00d4aa;
-  --mahjong-gold: #ffd93d;
-  --mahjong-danger: #ff7b86;
+  --mahjong-bg: #FAF9F5;
+  --mahjong-surface: #FFFFFF;
+  --mahjong-surface-strong: #FFFFFF;
+  --mahjong-border: #E7E8F2;
+  --mahjong-text: #11295C;
+  --mahjong-muted: #66708A;
+  --mahjong-faint: #9BA3B8;
+  --mahjong-purple: #5146AD;
+  --mahjong-coral: #F27670;
+  --mahjong-teal: #477BD9;
+  --mahjong-gold: #F2B638;
+  --mahjong-danger: #D54941;
 }
 
 @media (prefers-color-scheme: light) {
@@ -65,7 +65,7 @@ page {
 }
 
 .page-title-group { flex: 1; }
-.page-title { display: block; font-family: Georgia, "Songti SC", serif; font-size: 42rpx; font-weight: 600; letter-spacing: 2rpx; }
+.page-title { display: block; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 42rpx; font-weight: 600; letter-spacing: 2rpx; }
 .page-subtitle { display: block; margin-top: 4rpx; color: var(--mahjong-muted); font-size: 21rpx; }
 .header-help { width: 56rpx; height: 56rpx; border: 1rpx solid var(--mahjong-border); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--mahjong-muted); font-size: 30rpx; }
 
@@ -108,7 +108,7 @@ page {
 }
 .tile { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1rpx solid rgba(0,0,0,0.08); background: #f8f0df; box-shadow: 0 5rpx 0 #b0a694, 0 8rpx 14rpx rgba(0,0,0,0.18); }
 .tile:active { transform: translateY(2rpx); box-shadow: 0 3rpx 0 #b0a694, 0 5rpx 10rpx rgba(0,0,0,0.14); }
-.tile-value { color: #25202b; font-family: Georgia, "Songti SC", serif; font-size: 30rpx; font-weight: 700; line-height: 1; }
+.tile-value { color: #25202b; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 30rpx; font-weight: 700; line-height: 1; }
 .tile-suit { margin-top: 5rpx; color: #675d64; font-size: 15rpx; line-height: 1; }
 .tile-m .tile-value { color: #b33445; }
 .tile-p .tile-value { color: #195aa8; }
@@ -141,7 +141,7 @@ page {
 .settings-list { margin-bottom: 22rpx; }
 .settings-panel { margin-bottom: 12rpx; overflow: hidden; }
 .settings-header { min-height: 92rpx; padding: 16rpx 20rpx; box-sizing: border-box; }
-.settings-icon { width: 48rpx; height: 48rpx; margin-right: 14rpx; border-radius: 15rpx; display: flex; align-items: center; justify-content: center; color: var(--mahjong-text); background: rgba(255,255,255,0.1); font-family: Georgia, serif; }
+.settings-icon { width: 48rpx; height: 48rpx; margin-right: 14rpx; border-radius: 15rpx; display: flex; align-items: center; justify-content: center; color: var(--mahjong-text); background: rgba(255,255,255,0.1); font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
 .settings-icon.accent { color: #fff; background: var(--mahjong-purple); }
 .settings-icon.gold { color: #291f04; background: var(--mahjong-gold); }
 .settings-copy { flex: 1; }
@@ -177,7 +177,7 @@ page {
 .picker-tab { flex: 1; min-height: 54rpx; display: flex; align-items: center; justify-content: center; color: var(--mahjong-muted); font-size: 21rpx; }
 .picker-tab.active { color: var(--mahjong-teal); border-bottom: 4rpx solid var(--mahjong-teal); }
 .picker-grid { display: flex; flex-wrap: wrap; justify-content: center; padding-top: 12rpx; }
-.picker-tile { width: 58rpx; height: 68rpx; margin: 0 5rpx 8rpx; border-radius: 9rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #24202b; background: #f8f0df; box-shadow: 0 4rpx 0 #b0a694; font-family: Georgia, serif; }
+.picker-tile { width: 58rpx; height: 68rpx; margin: 0 5rpx 8rpx; border-radius: 9rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #24202b; background: #f8f0df; box-shadow: 0 4rpx 0 #b0a694; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
 .picker-tile text { font-size: 28rpx; font-weight: 700; line-height: 1; }
 .picker-tile small { margin-top: 4rpx; color: #6d6265; font-size: 13rpx; }
 .picker-tile:active { transform: translateY(2rpx); }
@@ -210,7 +210,7 @@ page {
 .sheet-handle { width: 90rpx; height: 8rpx; margin: 14rpx auto 4rpx; border-radius: 8rpx; background: var(--mahjong-faint); }
 .sheet-header { justify-content: space-between; padding: 18rpx 28rpx 20rpx; }
 .sheet-kicker { display: block; color: var(--mahjong-muted); font-size: 21rpx; }
-.sheet-total { display: block; margin-top: 6rpx; font-family: Georgia, serif; font-size: 66rpx; font-weight: 700; letter-spacing: 2rpx; }
+.sheet-total { display: block; margin-top: 6rpx; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 66rpx; font-weight: 700; letter-spacing: 2rpx; }
 .sheet-meta { display: block; margin-top: 4rpx; color: var(--mahjong-muted); font-size: 21rpx; }
 .limit-label { padding: 12rpx 16rpx; border: 1rpx solid rgba(255,217,61,0.42); border-radius: 12rpx; color: var(--mahjong-gold); background: rgba(255,217,61,0.1); font-size: 22rpx; }
 .sheet-body { max-height: 58vh; padding: 0 24rpx; box-sizing: border-box; }
@@ -228,3 +228,153 @@ page {
 .inline-small { margin-left: 6rpx; color: var(--mahjong-muted); font-size: 17rpx; }
 .strong { color: var(--mahjong-text); font-size: 25rpx; }
 .total-unit { margin-left: 8rpx; align-self: flex-end; padding-bottom: 10rpx; font-size: 24rpx; }
+
+
+/* OtakuMap 日麻工具箱主题：轻快、圆润、带一点贴纸感 */
+page {
+  --mahjong-bg: #FAF9F5;
+  --mahjong-surface: #FFFFFF;
+  --mahjong-surface-soft: #F1F0FF;
+  --mahjong-border: #E7E8F2;
+  --mahjong-text: #11295C;
+  --mahjong-muted: #66708A;
+  --mahjong-faint: #9BA3B8;
+  --mahjong-green: #5146AD;
+  --mahjong-green-dark: #392F8A;
+  --mahjong-red: #F27670;
+  --mahjong-gold: #F2B638;
+  --mahjong-danger: #D54941;
+  background: #FAF9F5;
+}
+
+.page {
+  padding: 20rpx 28rpx calc(env(safe-area-inset-bottom) + 276rpx);
+  color: var(--mahjong-text);
+  background:
+    radial-gradient(circle at 100% 0, rgba(81,70,173,.08), transparent 34%),
+    radial-gradient(circle at 0 36%, rgba(242,118,112,.06), transparent 28%),
+    var(--mahjong-bg);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+}
+
+.page-header { margin: 10rpx 2rpx 28rpx; }
+.brand-mark {
+  width: 68rpx;
+  height: 68rpx;
+  margin-right: 16rpx;
+  border-radius: 22rpx;
+  color: #fff;
+  background: linear-gradient(145deg, #6B5BCE, #5146AD);
+  box-shadow: 0 10rpx 24rpx rgba(81,70,173,.22);
+  font-size: 32rpx;
+  transform: rotate(-4deg);
+}
+.page-title { color: var(--mahjong-text); font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 40rpx; font-weight: 700; letter-spacing: 1rpx; }
+.page-subtitle { color: var(--mahjong-muted); font-size: 21rpx; }
+.header-help { border: 0; color: #fff; background: var(--mahjong-coral); box-shadow: 0 7rpx 16rpx rgba(242,118,112,.22); font-size: 27rpx; }
+
+.summary-card, .hand-card, .section-card, .settings-panel {
+  border: 0;
+  border-radius: 26rpx;
+  background: rgba(255,255,255,.94);
+  box-shadow: 0 10rpx 28rpx rgba(36,37,48,.06);
+}
+.summary-card { padding: 24rpx; margin-bottom: 18rpx; }
+.summary-label, .card-caption, .settings-summary, .block-title { color: var(--mahjong-muted); }
+.wind-buttons, .seat-buttons { padding: 5rpx; border-radius: 16rpx; background: #F1F0FF; }
+.wind-button, .seat-button { border-radius: 12rpx; color: var(--mahjong-muted); font-size: 23rpx; }
+.wind-button.active, .seat-button.active { color: #fff; background: var(--mahjong-green); box-shadow: 0 5rpx 12rpx rgba(81,70,173,.20); }
+.seat-value { color: var(--mahjong-green); }
+.win-type-option { border: 0; border-radius: 14rpx; color: var(--mahjong-muted); background: #F7F7FB; }
+.win-type-option.active { color: var(--mahjong-green-dark); background: #E9E6FF; box-shadow: inset 0 0 0 2rpx rgba(81,70,173,.16); }
+
+.hand-card, .section-card { padding: 24rpx; }
+.card-title { color: var(--mahjong-text); font-size: 28rpx; }
+.ready-state { color: var(--mahjong-muted); background: #F1F0FF; }
+.ready-state.ready { color: var(--mahjong-green-dark); background: #E9E6FF; }
+.tile-grid { padding-top: 14rpx; }
+.tile, .tile-slot {
+  width: 54rpx;
+  height: 72rpx;
+  margin: 0 6rpx 12rpx 0;
+  border: 0;
+  border-radius: 11rpx;
+  background: #FFF;
+  box-shadow: 0 5rpx 0 #DDE0ED, 0 8rpx 12rpx rgba(36,37,48,.08);
+}
+.tile-value { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 29rpx; font-weight: 600; }
+.tile-suit { color: #8C93A8; }
+.tile-m .tile-value { color: #D54941; }
+.tile-p .tile-value { color: #477BD9; }
+.tile-s .tile-value { color: #2BA471; }
+.tile-z .tile-value { color: #5146AD; }
+.tile-agari { border: 3rpx solid var(--mahjong-coral); box-shadow: 0 5rpx 0 rgba(242,118,112,.24), 0 8rpx 14rpx rgba(242,118,112,.16); transform: translateY(-6rpx) rotate(1deg); }
+.tile-slot { border: 2rpx dashed #D5D8E6; background: #F8F8FC; box-shadow: none; }
+.agari-row { border-top-color: #ECECF4; }
+.agari-label { color: var(--mahjong-muted); }
+.agari-action, .text-action { color: var(--mahjong-green); font-weight: 600; }
+.error-banner { color: #AD352F; background: #FFF0ED; }
+
+.settings-panel { margin-bottom: 14rpx; }
+.settings-header { min-height: 86rpx; padding: 18rpx 22rpx; }
+.settings-icon { width: 48rpx; height: 48rpx; border-radius: 15rpx; color: var(--mahjong-green); background: #E9E6FF; }
+.settings-icon.accent { color: var(--mahjong-coral); background: #FFF0ED; }
+.settings-icon.gold { color: #BE7D00; background: #FFF5D9; }
+.settings-title { color: var(--mahjong-text); font-size: 25rpx; }
+.settings-chevron { color: var(--mahjong-faint); }
+.settings-body { border-top-color: #ECECF4; }
+.option-chip { border: 0; border-radius: 999rpx; color: var(--mahjong-muted); background: #F5F5FA; }
+.option-chip.selected { color: var(--mahjong-green-dark); background: #E9E6FF; }
+.counter-btn { border: 0; color: var(--mahjong-green); background: #F1F0FF; }
+.tile-add { border-color: #C9C7E7; color: var(--mahjong-green); background: #F7F6FF; }
+
+.bottom-dock {
+  padding: 14rpx 28rpx calc(env(safe-area-inset-bottom) + 18rpx);
+  border-top: 1rpx solid rgba(81,70,173,.12);
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 -10rpx 28rpx rgba(36,37,48,.10);
+}
+.calculate-button { height: 88rpx; border-radius: 18rpx; background: var(--mahjong-green); box-shadow: 0 10rpx 18rpx rgba(81,70,173,.20); font-size: 27rpx; }
+.calculate-button.ready { background: var(--mahjong-coral); box-shadow: 0 10rpx 18rpx rgba(242,118,112,.20); }
+.picker-toggle { border: 0; border-radius: 18rpx; color: var(--mahjong-green); background: #F1F0FF; }
+.tile-picker { border: 0; border-radius: 20rpx; background: #fff; box-shadow: 0 8rpx 20rpx rgba(36,37,48,.06); }
+.picker-tab.active { color: var(--mahjong-green-dark); border-bottom-color: var(--mahjong-green); }
+.picker-tile { border: 0; border-radius: 11rpx; background: #F7F7FB; box-shadow: 0 3rpx 0 #E0E2EE; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-weight: 600; }
+
+.meld-editor-content, .sheet-content { background: #fff; }
+.meld-editor-content, .result-sheet.show .sheet-content { border-radius: 28rpx 28rpx 0 0; }
+.sheet-total { color: var(--mahjong-text); font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; }
+.limit-label { color: #AD352F; background: #FFF0ED; }
+.payment-card, .result-block { background: #F7F7FB; }
+.yaku-chip { color: var(--mahjong-green-dark); background: #E9E6FF; }
+.sheet-footer button, .modal-actions button.primary { background: var(--mahjong-green); }
+
+@media (prefers-color-scheme: dark) {
+  page {
+    --mahjong-bg: #FAF9F5;
+    --mahjong-surface: #FFFFFF;
+    --mahjong-surface-soft: #F1F0FF;
+    --mahjong-border: #E7E8F2;
+    --mahjong-text: #11295C;
+    --mahjong-muted: #66708A;
+    --mahjong-faint: #9BA3B8;
+    --mahjong-green: #5146AD;
+    --mahjong-green-dark: #392F8A;
+    --mahjong-red: #F27670;
+    --mahjong-gold: #F2B638;
+    --mahjong-danger: #D54941;
+    background: #FAF9F5;
+  }
+  .bottom-dock { background: rgba(255,255,255,.96); box-shadow: 0 -10rpx 28rpx rgba(36,37,48,.10); }
+  .tile, .tile-slot, .picker-tile { border-color: transparent; background: #FFF; }
+  .tile-slot { background: #F8F8FC; }
+}
+
+
+
+/* 主操作遵循 OtakuMap 品牌紫，珊瑚色保留给和牌状态 */
+.calculate-button,
+.calculate-button.ready {
+  background: linear-gradient(135deg, #5146AD 0%, #8B68D8 100%);
+  box-shadow: 0 10rpx 18rpx rgba(81,70,173,.22);
+}
