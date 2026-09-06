@@ -559,3 +559,19 @@ page {
   background: #E9E6FF;
 }
 
+
+
+/* 允许页面滚动到最后一项：固定操作区只接收自身控件的触摸 */
+.page {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 540rpx);
+}
+.bottom-dock {
+  pointer-events: none;
+}
+.bottom-dock > .calculate-row,
+.bottom-dock > .picker-toggle,
+.bottom-dock > .picker-mode,
+.bottom-dock > .tile-picker {
+  pointer-events: auto;
+}
+
