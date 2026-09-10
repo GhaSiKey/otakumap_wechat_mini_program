@@ -106,7 +106,7 @@ try {
   const wxss = fs.readFileSync(wxssPath, 'utf8');
   assert.ok(/^page\s*\{[\s\S]*overflow:\s*hidden/m.test(wxss), '页面根节点应关闭滚动');
   assert.ok(
-    /@media\s*\(prefers-color-scheme:\s*dark\)[\s\S]*page,\s*\.page\s*\{[\s\S]*background-color:\s*#181818/m.test(wxss),
+    /@media\s*\(prefers-color-scheme:\s*dark\)[\s\S]*page,\s*\.page\s*\{[\s\S]*background-color:\s*#000000/m.test(wxss),
     '夜间首页背景应与小程序深色导航栏保持一致'
   );
   assert.ok(wxss.includes('.page.page--compact'), '短屏应提供紧凑布局');
@@ -114,6 +114,10 @@ try {
   assert.ok(
     /\.header-ambient\s*\{[\s\S]*height:\s*calc\(500rpx\s*\+\s*var\(--index-navbar-height/.test(wxss),
     '标题背景应连续覆盖导航栏和大字标区域'
+  );
+  assert.ok(
+    /\.header-ambient::after\s*\{[\s\S]*#000000/m.test(wxss),
+    '夜间标题背景底部应渐变衔接深色页面底色'
   );
 
   const assetDir = path.join(__dirname, '../miniprogram/pages/index/assets');
