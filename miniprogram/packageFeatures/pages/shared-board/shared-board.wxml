@@ -89,6 +89,19 @@
         <t-icon name="{{reportCopy.ENTRY_ICON}}" size="{{itemViewInteraction.ICON_SIZE}}" aria-hidden="true" />
         <text>{{reportCopy.TITLE}}</text>
       </view>
+
+      <view
+        wx:if="{{vm.sections.length > 0}}"
+        class="board-tool board-tool--ranking"
+        hover-class="board-tool--pressed"
+        hover-stay-time="{{itemViewInteraction.HOVER_STAY_MS}}"
+        aria-role="button"
+        aria-label="番剧排行"
+        bindtap="onRankingTap"
+      >
+        <text class="board-tool__emoji" aria-hidden="true">🏆</text>
+        <text>番剧排行</text>
+      </view>
     </view>
 
     <view

@@ -288,6 +288,11 @@ page {
   color: var(--td-warning-color, #ed7b2f);
 }
 
+.board-tool--ranking {
+  background: var(--td-brand-color-light, #eef4ff);
+  color: var(--td-brand-color-7, #477bd9);
+}
+
 .board-tool__emoji {
   font-size: 26rpx;
   line-height: 1;
