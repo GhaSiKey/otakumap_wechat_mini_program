@@ -29,5 +29,8 @@ const COPY = {
   MARK_DONE: '一键看完',
   REOPEN: '重新追踪',
   DRAG_HINT: '长按卡片拖动排序',
+  RANKING_TITLE: '从夯到拉',
+  RANKING_HINT: '把追踪清单排成你的番剧品味',
+  RANKING_EMPTY: '先添加番剧，再开始排行',
 };
 module.exports = { STATUS, STATUS_LABELS, FILTERS, COPY };

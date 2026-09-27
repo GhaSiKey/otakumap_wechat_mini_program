@@ -16,6 +16,7 @@
         "pages/shared-board/board-list",
         "pages/shared-board/shared-board",
         "pages/shared-board/ranking",
+        "pages/hang-to-la/hang-to-la",
         "pages/together-watch/together-watch",
         "pages/board-history/board-history",
         "pages/board-report/board-report",

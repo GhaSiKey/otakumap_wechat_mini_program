@@ -8,6 +8,7 @@
 - 支持手动输入，兼容迁移旧版追番清单
 - 记录当前看到第几集，支持快捷前进/回退；中间操作可一键标记看完或重新追踪
 - 按想看、在追、看完筛选，支持长按拖拽排序、上下移动、删除和分享
+- 可从添加面板进入「从夯到拉」排行；排行页通过 `source=anime-checklist` 读取本地追踪清单，全部有效条目（含已看完、弃番）均可参与排序
 - 封面加载失败时显示首字占位，亮色/暗色主题均可用
 
 ## 页面路径
@@ -61,3 +62,11 @@ interface AnimeChecklistItem {
 - 数据归一化：`miniprogram/packageFeatures/utils/anime-checklist/transform.js`
 - 展示配置：`miniprogram/packageFeatures/utils/anime-checklist/config.js`
 - 元数据接口：`miniprogram/packageFeatures/utils/anime-meta/cloud-api.js`
+
+## 从夯到拉入口
+
+入口位于番剧追踪页的添加面板下方，点击前会读取 `anime_checklist_data` 做空清单提示；有数据时跳转到公共排行页：
+
+```
+/packageFeatures/pages/hang-to-la/hang-to-la?source=anime-checklist
+```

@@ -1,0 +1,16 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="state">正在读取番单…</view>
+  <view wx:elif="{{failed}}" class="state state--error">番单读取失败，请返回重试</view>
+  <hang-to-la-board
+    wx:else
+    id="rankingBoard"
+    heading="{{heading}}"
+    subtitle="{{subtitle}}"
+    source-items="{{items}}"
+    initial-title="{{rankingTitle}}"
+    bind:change="onItemsChange"
+    bind:titlechange="onTitleChange"
+    bind:export="onExport"
+  />
+  <canvas type="2d" id="rankingCanvas" canvas-id="rankingCanvas" class="export-canvas"></canvas>
+</view>

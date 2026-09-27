@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "番剧排行",
+  "usingComponents": {
+    "hang-to-la-board": "../../components/hang-to-la-board/hang-to-la-board"
+  }
+}

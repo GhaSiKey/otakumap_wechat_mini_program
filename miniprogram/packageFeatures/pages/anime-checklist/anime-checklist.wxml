@@ -28,6 +28,12 @@
     </view>
   </view>
 
+  <view class="ranking-entry" hover-class="ranking-entry--pressed" aria-role="button" aria-label="{{copy.RANKING_TITLE}}" bind:tap="onOpenRanking">
+    <view class="ranking-entry-mark" aria-hidden="true">夯</view>
+    <view class="ranking-entry-copy"><text class="ranking-entry-title">{{copy.RANKING_TITLE}}</text><text class="ranking-entry-hint">{{copy.RANKING_HINT}}</text></view>
+    <t-icon name="chevron-right" size="36rpx" />
+  </view>
+
   <view class="toolbar" wx:if="{{summary.total}}">
     <scroll-view scroll-x class="filter-scroll" enhanced show-scrollbar="{{false}}">
       <view class="filters">

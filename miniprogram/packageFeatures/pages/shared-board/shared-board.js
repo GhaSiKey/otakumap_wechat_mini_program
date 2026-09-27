@@ -916,7 +916,7 @@ Page({
   // 进入本机番剧排行：排行结果按「当前板 × 当前设备」保存，不改共享板数据。
   onRankingTap() {
     if (!this.data.boardId || !this.data.vm || !this.data.vm.sections.length) return;
-    wx.navigateTo({ url: `/packageFeatures/pages/shared-board/ranking?boardId=${this.data.boardId}` });
+    wx.navigateTo({ url: `/packageFeatures/pages/hang-to-la/hang-to-la?source=shared-board&boardId=${this.data.boardId}` });
   },
 
   // 进持久「一起看」清单；已归档的双人板也保留入口，由子页切为只读。

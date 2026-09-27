@@ -17,7 +17,12 @@
 
 导出标题、说明、底部广告文案、档位颜色及画布参数统一维护在：
 
-`miniprogram/packageFeatures/utils/shared-board/ranking.js` 的 `RANKING_POSTER_CONFIG` 与 `RANKING_TIERS`。
+公共模型位于 `miniprogram/packageFeatures/utils/hang-to-la/ranking-model.js`，统一维护
+`RANKING_POSTER_CONFIG`、`RANKING_TIERS`、档位操作和本地序列化；
+`utils/shared-board/ranking.js` 仅保留旧路径兼容导出。
+
+模型接收共享板的 `_id` / `name`，也接收番剧追踪的 `id` / `title`，统一转换为排行条目。
+不同业务使用 `getRankingStorageKey(scope, sourceId, suffix)` 生成隔离的本地存储键，避免共享板与个人追番的排行互相覆盖。
 
 文案是确定性内容，使用 Canvas 绘制，不交给图片生成工具重写，保证番名、数量和榜单数据准确。
 
@@ -29,6 +34,12 @@
 - 横向列表默认保留滑动；长按进入拖动后会临时锁定横向滚动，避免滑动和拖动互相抢手势。
 - 拖动时只有进入档位或待排区的有效范围才会高亮并接受放置，移出范围松手会取消；待排区也会显示可放置反馈。
 - 待排区和超出一屏的档位会显示轻量的「左右滑动」提示；提示不替代点击封面查看番名。
+
+## 公共组件与来源
+
+- 排行交互组件位于 `miniprogram/packageFeatures/components/hang-to-la-board/`，只接收番剧列表和标题，不直接读写业务数据；宿主页面通过 `change`、`titlechange`、`export` 事件接入各自的存储和导出逻辑。
+- 通用页面位于 `/packageFeatures/pages/hang-to-la/hang-to-la`，通过 `source=shared-board&boardId=...` 接入共享追番板，通过 `source=anime-checklist` 接入番剧追踪。
+- 共享追番板原来的 `/packageFeatures/pages/shared-board/ranking` 路径保留为兼容入口，会自动转到通用页面；共享板排行仍按板独立保存，番剧追踪排行保存到本机默认清单，互不覆盖。
 
 ## 分包体积
 

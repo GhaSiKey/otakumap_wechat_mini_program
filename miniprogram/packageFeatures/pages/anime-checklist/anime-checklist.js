@@ -5,6 +5,8 @@ const { COPY, FILTERS } = require('../../utils/anime-checklist/config');
 
 const STORAGE_KEY = 'anime_checklist_data';
 const ANIME_SEARCH_URL = '/packageFeatures/pages/anime-search/anime-search';
+const RANKING_PAGE_URL = '/packageFeatures/pages/hang-to-la/hang-to-la';
+const RANKING_SOURCE = 'anime-checklist';
 const ANIM = { PHASE1: 400, PHASE2: 350, PHASE3: 400 };
 
 function generateId() { return `anime_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`; }
@@ -51,6 +53,19 @@ Page({
   // 旧页面/调试脚本仍可能调用此名称，保留别名避免迁移期间断链。
   _updateLists(items) { this._setLists(items); },
   _saveData(items) { try { wx.setStorageSync(STORAGE_KEY, { version: T.VERSION, items }); } catch (e) {} },
+
+  // 排行页会按 source 重新读取清单；这里先读一次做空态判断，避免用户进入后才发现没有可排内容。
+  onOpenRanking() {
+    let saved;
+    try { saved = wx.getStorageSync(STORAGE_KEY); } catch (e) { saved = null; }
+    const items = Array.isArray(saved) ? saved : (saved && Array.isArray(saved.items) ? saved.items : []);
+    const validItems = items.filter((item) => item && item.id && String(item.name || '').trim());
+    if (!validItems.length) {
+      wx.showToast({ title: COPY.RANKING_EMPTY, icon: 'none' });
+      return;
+    }
+    wx.navigateTo({ url: `${RANKING_PAGE_URL}?source=${RANKING_SOURCE}` });
+  },
 
   onInputChange(e) { this.setData({ inputValue: (e.detail && (e.detail.value ?? e.detail)) || '' }); },
   onOpenSearch() {
