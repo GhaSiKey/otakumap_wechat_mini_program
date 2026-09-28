@@ -56,6 +56,12 @@ interface AnimeChecklistItem {
 
 空清单提供搜索引导；筛选无结果时显示分类空态；封面失败回退到首字色块。所有颜色使用 TDesign CSS 变量并适配暗色模式。
 
+## 性能约定
+
+- 页面只把用于展示的番单和当前筛选结果送入 `setData`；看完/在追列表保存在页面私有缓存中，避免长清单重复序列化。
+- 进度、排序和添加操作的本地保存会在短时间内合并，页面隐藏或销毁前会立即 flush，避免 `setStorageSync` 阻塞连续操作。
+- 卡片封面和搜索结果使用懒加载，封面加载失败只更新对应卡片，不重新发送整张列表。
+
 ## 相关代码
 
 - 页面：`miniprogram/packageFeatures/pages/anime-checklist/`

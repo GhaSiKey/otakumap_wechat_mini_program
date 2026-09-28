@@ -47,6 +47,7 @@
               class="tier-cover__image"
               src="{{coverItem.cover}}"
               mode="aspectFill"
+              lazy-load
               data-id="{{coverItem.id}}"
               binderror="onCoverError"
             />
@@ -87,6 +88,7 @@
             class="pool-cover__image"
             src="{{item.cover}}"
             mode="aspectFill"
+            lazy-load
             data-id="{{item.id}}"
             binderror="onCoverError"
           />
@@ -113,6 +115,7 @@
             class="picker-preview__image"
             src="{{selectedItem.cover}}"
             mode="aspectFill"
+            lazy-load
             data-id="{{selectedItem.id}}"
             binderror="onCoverError"
           />

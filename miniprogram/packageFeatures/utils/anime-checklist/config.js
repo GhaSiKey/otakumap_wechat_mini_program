@@ -7,6 +7,7 @@ const FILTERS = [
   { key: STATUS.WANT, label: STATUS_LABELS.want },
   { key: STATUS.DONE, label: STATUS_LABELS.done },
 ];
+const STORAGE_SAVE_DELAY_MS = 220;
 const COPY = {
   ADD_TITLE: '添加番剧',
   SEARCH_TITLE: '搜索真实番剧',
@@ -33,4 +34,4 @@ const COPY = {
   RANKING_HINT: '把追踪清单排成你的番剧品味',
   RANKING_EMPTY: '先添加番剧，再开始排行',
 };
-module.exports = { STATUS, STATUS_LABELS, FILTERS, COPY };
+module.exports = { STATUS, STATUS_LABELS, FILTERS, COPY, STORAGE_SAVE_DELAY_MS };

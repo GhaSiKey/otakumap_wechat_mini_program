@@ -52,7 +52,7 @@
   <view wx:else class="anime-list">
     <view wx:for="{{filteredList}}" wx:key="id" class="anime-card {{item.status === 'done' ? 'anime-card--done' : ''}} {{draggingId === item.id ? 'anime-card--dragging' : ''}} {{dragOverId === item.id ? 'anime-card--drag-over' : ''}}" data-id="{{item.id}}" bind:longpress="onDragStart" catch:touchmove="onDragMove" catch:touchend="onDragEnd" catch:touchcancel="onDragEnd">
       <view class="cover-wrap">
-        <image wx:if="{{item.cover && !item.coverError}}" class="cover" src="{{item.cover}}" mode="aspectFill" data-id="{{item.id}}" binderror="onCoverError" />
+        <image wx:if="{{item.cover && !item.coverError}}" class="cover" src="{{item.cover}}" mode="aspectFill" lazy-load data-id="{{item.id}}" binderror="onCoverError" />
         <view wx:else class="cover-fallback">{{item.initial}}</view>
         <view wx:if="{{item.status === 'done'}}" class="done-mark" aria-hidden="true"><t-icon name="check" size="24rpx" /></view>
       </view>
@@ -79,6 +79,6 @@
   <view wx:if="{{searchLoading}}" class="sheet-state"><t-loading theme="circular" size="36rpx" text="搜索中…" /></view>
   <view wx:elif="{{!searchResults.length}}" class="sheet-state">{{searchHint}}</view>
   <scroll-view wx:else scroll-y class="search-results">
-    <view wx:for="{{searchResults}}" wx:key="sourceId" class="search-result" data-index="{{index}}" bind:tap="onPickAnime"><image class="result-cover" src="{{item.cover}}" mode="aspectFill" /><view class="result-info"><text class="result-name">{{item.name}}</text><text class="result-meta">{{item.year || copy.YEAR_UNKNOWN}} · {{item.totalEp ? item.totalEp + ' 集' : copy.UNKNOWN_EP}}</text></view><view class="result-action {{item.added ? 'result-action--added' : ''}}" aria-role="button" aria-label="{{item.added ? copy.ADDED : copy.SEARCH_ACTION}}"><t-icon wx:if="{{item.added}}" name="check" size="24rpx" /><text>{{item.added ? copy.ADDED : copy.SEARCH_ACTION}}</text></view></view>
+    <view wx:for="{{searchResults}}" wx:key="sourceId" class="search-result" data-index="{{index}}" bind:tap="onPickAnime"><image class="result-cover" src="{{item.cover}}" mode="aspectFill" lazy-load /><view class="result-info"><text class="result-name">{{item.name}}</text><text class="result-meta">{{item.year || copy.YEAR_UNKNOWN}} · {{item.totalEp ? item.totalEp + ' 集' : copy.UNKNOWN_EP}}</text></view><view class="result-action {{item.added ? 'result-action--added' : ''}}" aria-role="button" aria-label="{{item.added ? copy.ADDED : copy.SEARCH_ACTION}}"><t-icon wx:if="{{item.added}}" name="check" size="24rpx" /><text>{{item.added ? copy.ADDED : copy.SEARCH_ACTION}}</text></view></view>
   </scroll-view>
 </view></view>

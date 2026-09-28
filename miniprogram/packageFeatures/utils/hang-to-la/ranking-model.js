@@ -18,6 +18,8 @@ const RANKING_UI_CONFIG = {
 const RANKING_POSTER_CONFIG = {
   canvasWidth: 750,
   scale: 2,
+  fallbackScale: 1,
+  imageLoadConcurrency: 4,
   title: '我的番剧排行',
   subtitle: '番剧排行 · 从夯到拉',
   rankingNote: '排名仅代表个人口味',

@@ -46,6 +46,23 @@ async function loadCanvasImage(canvas, src) {
   }
 }
 
+async function loadCanvasImages(canvas, items, concurrency) {
+  const list = Array.isArray(items) ? items : [];
+  const limit = Math.max(1, Math.min(Number(concurrency) || 1, list.length || 1));
+  const imageMap = {};
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < list.length) {
+      const item = list[nextIndex];
+      nextIndex += 1;
+      const image = await loadCanvasImage(canvas, item.cover);
+      if (image) imageMap[item.id] = image;
+    }
+  }
+  await Promise.all(Array.from({ length: limit }, () => worker()));
+  return imageMap;
+}
+
 function drawImageAspectFill(ctx, image, x, y, width, height, radius) {
   if (!image) return false;
   const imageWidth = image.width || width;
@@ -176,4 +193,4 @@ function drawPoster(ctx, height, imageMap, rowHeights, tiers, wordmark, rankedCo
   ctx.fillText(C.footerTitle, 44, footerY + 60);
 }
 
-module.exports = { imageInfoPath, loadCanvasImage, drawPoster };
+module.exports = { imageInfoPath, loadCanvasImage, loadCanvasImages, drawPoster };

@@ -45,7 +45,9 @@ const pageConfig = JSON.parse(fs.readFileSync(path.join(featuresRoot, 'pages/han
 assert.ok(Object.values(pageConfig.usingComponents).some((value) => value.includes('/components/hang-to-la-board/hang-to-la-board')), '公共排行页应注册共用榜单组件');
 assert.ok(oldPage.includes('redirectTo') && oldPage.includes('rankingUrl') && oldPage.includes('SOURCES.SHARED_BOARD'), '旧共享板排行地址应兼容跳转到公共页');
 assert.ok(rankingPage.includes('snapshotTiers.reduce'), '导出只应读取已入榜档位的封面');
-assert.ok(rankingPage.includes('canvas.width = CANVAS_WIDTH * config.scale'), '导出应使用高清实际画布');
+assert.ok(rankingPage.includes('canvas.width = Math.round(CANVAS_WIDTH * scale)'), '导出应使用可降级的高清实际画布');
+assert.ok(rankingPage.includes('fallbackScale'), '大画布导出失败时应降级重试');
+assert.ok(rankingPage.includes('loadCanvasImages'), '导出封面应限制并发加载');
 assert.ok(poster.includes('footerTitle') && poster.includes('footerCopy'), '导出图应包含品牌推广文案');
 assert.ok(component.includes('rankedCount') && component.includes('selectedTierLabel'), '共用榜单组件应提供进度和当前档位状态');
 assert.ok(component.includes('dragHitSlop') && component.includes('onDragCancel'), '拖动应限制命中范围并支持取消');

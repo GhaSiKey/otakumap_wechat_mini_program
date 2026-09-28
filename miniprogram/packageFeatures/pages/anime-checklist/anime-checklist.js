@@ -1,7 +1,7 @@
 const { searchAnime, getAnimeDetail } = require('../../utils/anime-meta/cloud-api');
 const { SEARCH_MODE, PICK_EVENT, preferDetailCover, airStatusOf } = require('../../utils/anime-meta/config');
 const T = require('../../utils/anime-checklist/transform');
-const { COPY, FILTERS } = require('../../utils/anime-checklist/config');
+const { COPY, FILTERS, STORAGE_SAVE_DELAY_MS } = require('../../utils/anime-checklist/config');
 
 const STORAGE_KEY = 'anime_checklist_data';
 const ANIME_SEARCH_URL = '/packageFeatures/pages/anime-search/anime-search';
@@ -27,9 +27,10 @@ Page({
     draggingId: '', dragOverId: '',
   },
 
-  onLoad() { this._unloaded = false; this._pickedMeta = null; this._airMetaWait = null; this._searchRequestId = 0; this._loadStored(); },
+  onLoad() { this._unloaded = false; this._pickedMeta = null; this._airMetaWait = null; this._searchRequestId = 0; this._saveTimer = null; this._pendingSaveItems = null; this._loadStored(); },
   onShow() { if (this._loadedOnce) this._loadStored(); },
-  onUnload() { this._unloaded = true; this._pickedMeta = null; this._airMetaWait = null; },
+  onHide() { this._flushSave(); },
+  onUnload() { this._flushSave(); this._unloaded = true; this._pickedMeta = null; this._airMetaWait = null; },
 
   _loadStored() {
     let saved; try { saved = wx.getStorageSync(STORAGE_KEY); } catch (e) { saved = []; }
@@ -38,21 +39,39 @@ Page({
     if (!saved || Array.isArray(saved) || saved.version !== T.VERSION) this._saveData(migrated.items);
   },
 
-  _setLists(items, save = true) {
-    const vm = T.splitLists(items); const filter = this.data.activeFilter || 'all';
+  _setLists(items, save = true, activeFilter) {
+    const vm = T.splitLists(items); const filter = activeFilter || this.data.activeFilter || 'all';
+    this._unwatchedList = vm.unwatchedList;
+    this._watchedList = vm.watchedList;
     const filteredList = filter === 'all' ? vm.animeList : vm.animeList.filter((it) => filter === 'watching' ? ['watching', 'caught_up'].includes(it.status) : it.status === filter);
     const coverErrors = this.data.coverErrors || {};
     vm.animeList.forEach((item) => { item.coverError = !!coverErrors[item.id]; });
-    const watching = vm.animeList.filter((it) => it.status === 'watching' || it.status === 'caught_up').length;
-    const progressItems = vm.animeList.filter((it) => typeof it.progressPercent === 'number');
-    const summary = { total: vm.totalCount, watched: vm.watchedCount, done: vm.watchedCount, watching, progress: progressItems.length ? Math.round(progressItems.reduce((sum, it) => sum + it.progressPercent, 0) / progressItems.length) : 0 };
-    const countOf = (key) => key === 'all' ? vm.totalCount : key === 'watching' ? watching : vm.animeList.filter((it) => it.status === key).length;
+    const stats = { watching: 0, progressTotal: 0, progressCount: 0, statusCounts: {} };
+    vm.animeList.forEach((item) => {
+      stats.statusCounts[item.status] = (stats.statusCounts[item.status] || 0) + 1;
+      if (item.status === 'watching' || item.status === 'caught_up') stats.watching += 1;
+      if (typeof item.progressPercent === 'number') { stats.progressTotal += item.progressPercent; stats.progressCount += 1; }
+    });
+    const summary = { total: vm.totalCount, watched: vm.watchedCount, done: vm.watchedCount, watching: stats.watching, progress: stats.progressCount ? Math.round(stats.progressTotal / stats.progressCount) : 0 };
+    const countOf = (key) => key === 'all' ? vm.totalCount : key === 'watching' ? stats.watching : (stats.statusCounts[key] || 0);
     const filters = FILTERS.map((item) => ({ ...item, count: countOf(item.key) }));
-    this.setData({ ...vm, filteredList, summary, filters, activeFilter: filter }); if (save) this._saveData(vm.animeList);
+    const { unwatchedList, watchedList, ...viewModel } = vm;
+    this.setData({ ...viewModel, filteredList, summary, filters, activeFilter: filter }); if (save) this._saveData(vm.animeList);
   },
   // 旧页面/调试脚本仍可能调用此名称，保留别名避免迁移期间断链。
   _updateLists(items) { this._setLists(items); },
-  _saveData(items) { try { wx.setStorageSync(STORAGE_KEY, { version: T.VERSION, items }); } catch (e) {} },
+  _saveData(items) {
+    this._pendingSaveItems = items;
+    if (this._saveTimer) return;
+    this._saveTimer = setTimeout(() => this._flushSave(), STORAGE_SAVE_DELAY_MS);
+  },
+  _flushSave() {
+    if (this._saveTimer) { clearTimeout(this._saveTimer); this._saveTimer = null; }
+    if (!this._pendingSaveItems) return;
+    const items = this._pendingSaveItems;
+    this._pendingSaveItems = null;
+    try { wx.setStorageSync(STORAGE_KEY, { version: T.VERSION, items }); } catch (e) {}
+  },
 
   // 排行页会按 source 重新读取清单；这里先读一次做空态判断，避免用户进入后才发现没有可排内容。
   onOpenRanking() {
@@ -88,7 +107,9 @@ Page({
     const result = await searchAnime(keyword);
     if (this._unloaded || requestId !== this._searchRequestId) return;
     if (!result || !result.ok) { this.setData({ searchLoading: false, searchHint: COPY.SEARCH_ERROR }); return; }
-    const searchResults = ((result.data && result.data.animes) || []).map((item) => ({ ...item, initial: (item.name || '?').slice(0, 1), added: this.data.animeList.some((entry) => (item.sourceId && entry.sourceId === item.sourceId) || entry.name === item.name) }));
+    const sourceIds = new Set(this.data.animeList.map((entry) => entry.sourceId).filter(Boolean));
+    const names = new Set(this.data.animeList.map((entry) => entry.name));
+    const searchResults = ((result.data && result.data.animes) || []).map((item) => ({ ...item, initial: (item.name || '?').slice(0, 1), added: (item.sourceId && sourceIds.has(item.sourceId)) || names.has(item.name) }));
     this.setData({ searchLoading: false, searchResults, searchHint: searchResults.length ? '' : COPY.SEARCH_EMPTY });
   },
   onPickAnime(e) {
@@ -150,7 +171,16 @@ Page({
   },
   onReselectAnime() { if (this.data.adding) return; this._pickedMeta = null; this._airMetaWait = null; this.setData({ newItemPicked: false, newItemCover: '', newItemCoverError: false, metaLoading: false, metaError: '' }); this.onAddSearchTap(); },
   onAddCoverError() { this.setData({ newItemCoverError: true }); },
-  onCoverError(e) { const id = e.currentTarget.dataset.id; const coverErrors = { ...(this.data.coverErrors || {}), [id]: true }; const animeList = this.data.animeList.map((item) => item.id === id ? { ...item, coverError: true } : item); this.setData({ coverErrors, animeList, filteredList: this.data.filteredList.map((item) => item.id === id ? { ...item, coverError: true } : item) }); },
+  onCoverError(e) {
+    const id = e.currentTarget.dataset.id;
+    if (!id || (this.data.coverErrors && this.data.coverErrors[id])) return;
+    const patch = { ['coverErrors.' + id]: true };
+    const listIndex = this.data.animeList.findIndex((item) => item.id === id);
+    const filteredIndex = this.data.filteredList.findIndex((item) => item.id === id);
+    if (listIndex >= 0) patch['animeList[' + listIndex + '].coverError'] = true;
+    if (filteredIndex >= 0) patch['filteredList[' + filteredIndex + '].coverError'] = true;
+    this.setData(patch);
+  },
   onItemNameInput(e) { if (!this.data.adding) this.setData({ newItemName: e.detail.value }); },
   onAddTotalEpInput(e) { if (!this.data.adding) this.setData({ newItemTotalEp: String(e.detail.value || '').replace(/[^\d]/g, '') }); },
 
@@ -177,7 +207,7 @@ Page({
     if (this.data.isEditMode) return;
     const id = e.currentTarget.dataset.id; const target = this.data.animeList.find((item) => item.id === id); if (!target || this.data.animatingId) return;
     const status = target.status === 'done' ? 'watching' : 'done'; const updated = this.data.animeList.map((item) => item.id === id ? { ...item, status, watched: status === 'done', currentEp: status === 'done' ? (item.totalEp || item.currentEp) : item.currentEp, updateTime: Date.now() } : item);
-    const direction = status === 'done' ? 'check' : 'uncheck'; const source = status === 'done' ? this.data.unwatchedList : this.data.watchedList;
+    const direction = status === 'done' ? 'check' : 'uncheck'; const source = status === 'done' ? (this._unwatchedList || []) : (this._watchedList || []);
     this.setData({ animeList: updated, watchedCount: updated.filter((item) => item.status === 'done').length, animatingId: id, animPhase: 'phase1', animDirection: direction });
     if (source.length <= 1) { setTimeout(() => this._finishAnimation(updated), ANIM.PHASE1); return; }
     setTimeout(() => { if (!this._unloaded) this.setData({ animPhase: 'phase2' }); }, ANIM.PHASE1);
@@ -252,6 +282,6 @@ Page({
     items.splice(targetIndex, 0, moved);
     this._setLists(items);
   },
-  onFilterChange(e) { const activeFilter = e.currentTarget.dataset.filter || (e.detail && e.detail.value) || 'all'; this.setData({ activeFilter }, () => this._setLists(this.data.animeList, false)); },
+  onFilterChange(e) { const activeFilter = e.currentTarget.dataset.filter || (e.detail && e.detail.value) || 'all'; this._setLists(this.data.animeList, false, activeFilter); },
   onShareAppMessage() { return { title: '我的番剧追踪清单', path: '/packageFeatures/pages/anime-checklist/anime-checklist' }; },
 });

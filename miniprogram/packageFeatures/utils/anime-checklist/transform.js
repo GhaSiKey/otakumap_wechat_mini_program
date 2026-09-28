@@ -119,6 +119,7 @@ function decorateItem(item) {
   const totalEp = totalEpOf(item.totalEp);
   const currentEp = currentEpOf(item.currentEp, totalEp);
   const status = statusOf(item);
+  const percent = progressPercent({ ...item, totalEp, currentEp, status });
   return {
     ...item,
     totalEp,
@@ -126,8 +127,8 @@ function decorateItem(item) {
     status,
     watched: status === 'done',
     statusLabel: STATUS_LABELS[status] || STATUS_LABELS.want,
-    progressPercent: progressPercent({ ...item, totalEp, currentEp, status }),
-    progress: progressPercent({ ...item, totalEp, currentEp, status }) || 0,
+    progressPercent: percent,
+    progress: percent || 0,
     initial: Array.from(item.name || '?')[0] || '?',
     coverError: false,
     airLabel: item.airStatus === 'airing' ? '放送中' : item.airStatus === 'finished' ? '已完结' : '',
@@ -138,12 +139,20 @@ function decorateItem(item) {
 }
 
 function splitLists(items) {
-  const list = (items || []).map(decorateItem);
+  const list = [];
+  const unwatchedList = [];
+  const watchedList = [];
+  (items || []).forEach((item) => {
+    const decorated = decorateItem(item);
+    list.push(decorated);
+    if (decorated.status === 'done') watchedList.push(decorated);
+    else unwatchedList.push(decorated);
+  });
   return {
     animeList: list,
-    unwatchedList: list.filter((item) => item.status !== 'done'),
-    watchedList: list.filter((item) => item.status === 'done'),
-    watchedCount: list.filter((item) => item.status === 'done').length,
+    unwatchedList,
+    watchedList,
+    watchedCount: watchedList.length,
     totalCount: list.length,
   };
 }

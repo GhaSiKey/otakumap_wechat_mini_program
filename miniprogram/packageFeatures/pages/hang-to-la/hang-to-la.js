@@ -1,6 +1,6 @@
 const R = require('../../utils/hang-to-la/ranking-model');
 const { SOURCES, isValidSource, loadSource, rankingUrl } = require('../../utils/hang-to-la/sources');
-const { loadCanvasImage, drawPoster } = require('../../utils/hang-to-la/poster');
+const { loadCanvasImages, loadCanvasImage, drawPoster } = require('../../utils/hang-to-la/poster');
 
 const POSTER = R.RANKING_POSTER_CONFIG;
 const CANVAS_WIDTH = POSTER.canvasWidth;
@@ -119,7 +119,10 @@ Page({
       const finish = () => { this._exporting = false; if (wx.hideLoading) wx.hideLoading(); };
       try {
         const info = result && result[0];
-        if (!info || !info.node) throw new Error('canvas unavailable');
+        if (!info || !info.node) {
+          console.warn('[hang-to-la] ranking canvas unavailable', { source: this._source });
+          throw new Error('canvas unavailable');
+        }
         const rowHeights = snapshotTiers.map((tier) => {
           const lines = Math.max(1, Math.ceil(tier.items.length / config.rowColumns));
           return Math.max(config.rowMinHeight, config.rowContentPadding * 2 + lines * config.rowCoverHeight + (lines - 1) * config.rowCoverGapY);
@@ -127,31 +130,49 @@ Page({
         const rowsHeight = rowHeights.reduce((sum, value) => sum + value, 0) + (snapshotTiers.length - 1) * config.rowGap;
         const height = config.topHeight + rowsHeight + config.footerGap + config.footerHeight + config.bottomPadding;
         const canvas = info.node;
-        canvas.width = CANVAS_WIDTH * config.scale;
-        canvas.height = height * config.scale;
-        const ctx = canvas.getContext('2d');
-        if (ctx.setTransform) ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.scale(config.scale, config.scale);
-        const imageMap = {};
         const coverErrorIds = detail.coverErrorIds || {};
         const imageItems = snapshotTiers.reduce((all, tier) => all.concat(tier.items), []).filter((item) => item.cover && !coverErrorIds[item.id]);
-        await Promise.all(imageItems.map(async (item) => { imageMap[item.id] = await loadCanvasImage(canvas, item.cover); }));
+        const imageMap = await loadCanvasImages(canvas, imageItems, config.imageLoadConcurrency);
         const wordmark = await loadCanvasImage(canvas, config.wordmarkPath);
         if (this._disposed) { finish(); return; }
-        drawPoster(ctx, height, imageMap, rowHeights, snapshotTiers, wordmark, rankedCount, detail.rankingTitle || this.data.rankingTitle, config);
-        wx.canvasToTempFilePath({
-          canvas,
-          x: 0,
-          y: 0,
-          width: canvas.width,
-          height: canvas.height,
-          destWidth: canvas.width,
-          destHeight: canvas.height,
-          success: (response) => { finish(); if (!this._disposed) this._saveExport(response.tempFilePath); },
-          fail: () => { finish(); wx.showToast({ title: '图片生成失败，请重试', icon: 'none' }); },
+        const renderAndExport = (scale) => new Promise((resolve, reject) => {
+          canvas.width = Math.round(CANVAS_WIDTH * scale);
+          canvas.height = Math.round(height * scale);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('canvas context unavailable'));
+          if (ctx.setTransform) ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.scale(scale, scale);
+          drawPoster(ctx, height, imageMap, rowHeights, snapshotTiers, wordmark, rankedCount, detail.rankingTitle || this.data.rankingTitle, config);
+          wx.canvasToTempFilePath({
+            canvas,
+            x: 0,
+            y: 0,
+            width: canvas.width,
+            height: canvas.height,
+            destWidth: canvas.width,
+            destHeight: canvas.height,
+            success: resolve,
+            fail: reject,
+          });
         });
+        let response;
+        try {
+          response = await renderAndExport(config.scale);
+        } catch (firstError) {
+          console.warn('[hang-to-la] ranking canvas export failed', {
+            errMsg: firstError && firstError.errMsg,
+            width: CANVAS_WIDTH * config.scale,
+            height: height * config.scale,
+            rankedCount,
+          });
+          if (!(config.fallbackScale < config.scale)) throw firstError;
+          response = await renderAndExport(config.fallbackScale);
+        }
+        finish();
+        if (!this._disposed) this._saveExport(response.tempFilePath);
       } catch (error) {
         finish();
+        console.warn('[hang-to-la] ranking export aborted', { errMsg: error && (error.errMsg || error.message), rankedCount });
         wx.showToast({ title: '图片生成失败，请重试', icon: 'none' });
       }
     });
@@ -162,7 +183,7 @@ Page({
       filePath,
       success: () => wx.showToast({ title: '已保存到相册', icon: 'success' }),
       fail: (error) => {
-        if (error && /auth deny|auth denied|authorize no response/i.test(error.errMsg || '')) {
+        if (error && /auth deny|auth denied|authorize no response|permission denied|privacy permission/i.test(error.errMsg || '')) {
           wx.showModal({
             title: '需要相册权限',
             content: '开启权限后才能保存排行图片',

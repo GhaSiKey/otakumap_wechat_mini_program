@@ -30,5 +30,14 @@ assert.ok(checklistConfig.COPY.RANKING_TITLE && checklistConfig.COPY.RANKING_HIN
 assert.ok(checklistPage.includes("wx.getStorageSync(STORAGE_KEY)"), '进入排行前应读取番剧追踪本地清单');
 assert.ok(checklistPage.includes("/packageFeatures/pages/hang-to-la/hang-to-la"), '番剧追踪应跳转公共排行页');
 assert.ok(checklistPage.includes('source=') && checklistPage.includes('anime-checklist'), '番剧追踪入口应标记数据来源');
+assert.strictEqual(checklistConfig.STORAGE_SAVE_DELAY_MS > 0, true, '番单写入应使用可配置的合并延迟');
+const split = T.splitLists([
+  { id: 'want', name: '想看', status: 'want', totalEp: 12, currentEp: 2 },
+  { id: 'done', name: '看完', status: 'done', totalEp: 12, currentEp: 12 },
+]);
+assert.deepStrictEqual(split.watchedList.map((item) => item.id), ['done']);
+assert.deepStrictEqual(split.unwatchedList.map((item) => item.id), ['want']);
+assert.strictEqual(split.animeList[0].progress, 17, '进度派生值应只计算一次后复用');
+assert.ok(checklistWxml.includes('lazy-load'), '番剧封面应使用懒加载');
 
 console.log('anime-checklist tests: passed');

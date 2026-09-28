@@ -1,7 +1,7 @@
 const assert = require('assert');
 const api = require('../miniprogram/packageFeatures/utils/shared-board/cloud-api');
 const R = require('../miniprogram/packageFeatures/utils/hang-to-la/ranking-model');
-const { drawPoster } = require('../miniprogram/packageFeatures/utils/hang-to-la/poster');
+const { drawPoster, loadCanvasImages } = require('../miniprogram/packageFeatures/utils/hang-to-la/poster');
 
 const pagePath = require.resolve('../miniprogram/packageFeatures/pages/hang-to-la/hang-to-la');
 const componentPath = require.resolve('../miniprogram/packageFeatures/components/hang-to-la-board/hang-to-la-board');
@@ -349,6 +349,54 @@ test('page export carries source subtitle, uses high resolution, and loads only 
     assert.ok(!state.images.includes(rawItems[1].cover), '待排区封面不应进入导出图片读取');
     assert.strictEqual(page._exporting, false);
   }
+});
+
+test('poster image loading limits concurrent network work', async () => {
+  setup();
+  let active = 0;
+  let peak = 0;
+  const canvas = {
+    createImage() {
+      const image = { width: 100, height: 150 };
+      Object.defineProperty(image, 'src', {
+        set() {
+          active += 1;
+          peak = Math.max(peak, active);
+          setTimeout(() => { active -= 1; image.onload(); }, 2);
+        },
+      });
+      return image;
+    },
+  };
+  const items = Array.from({ length: 6 }, (_, index) => ({ id: String(index), cover: 'cover-' + index }));
+  const imageMap = await loadCanvasImages(canvas, items, 2);
+  assert.strictEqual(Object.keys(imageMap).length, items.length);
+  assert.ok(peak <= 2, '封面加载并发应受限');
+});
+
+test('page export retries with a lower scale when the high-resolution canvas is rejected', async () => {
+  const rawItems = [{ id: 'a', name: '甲', cover: 'https://example.com/a.jpg' }];
+  const state = setup({ [CHECKLIST_KEY]: rawItems });
+  const page = await openPage({ source: 'anime-checklist' });
+  const { canvas } = mockCanvas();
+  page.createSelectorQuery = () => {
+    const query = { select() { return query; }, fields() { return query; }, exec(callback) { callback([{ node: canvas }]); } };
+    return query;
+  };
+  let attempts = 0;
+  global.wx.canvasToTempFilePath = (options) => {
+    attempts += 1;
+    if (attempts === 1) options.fail({ errMsg: 'canvasToTempFilePath:fail canvas too large' });
+    else options.success({ tempFilePath: '/tmp/fallback-ranking.png' });
+  };
+  const saved = new Promise((resolve) => { state.onSaved = resolve; });
+  const items = R.moveItem(page.data.items, 'a', 'hang');
+  const tiers = R.RANKING_TIERS.map((tier) => Object.assign({}, tier, { items: R.getTierItems(items, tier.id) }));
+  page.onExport({ detail: { tiers, rankedCount: 1, rankingTitle: '降级导出' } });
+  await saved;
+  assert.strictEqual(attempts, 2);
+  assert.strictEqual(canvas.width, R.RANKING_POSTER_CONFIG.canvasWidth * R.RANKING_POSTER_CONFIG.fallbackScale);
+  assert.strictEqual(page._exporting, false);
 });
 
 async function run() {
