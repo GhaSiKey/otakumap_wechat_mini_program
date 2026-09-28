@@ -39,5 +39,7 @@ assert.deepStrictEqual(split.watchedList.map((item) => item.id), ['done']);
 assert.deepStrictEqual(split.unwatchedList.map((item) => item.id), ['want']);
 assert.strictEqual(split.animeList[0].progress, 17, '进度派生值应只计算一次后复用');
 assert.ok(checklistWxml.includes('lazy-load'), '番剧封面应使用懒加载');
+assert.ok(checklistWxml.includes('bind:touchmove="onDragMove"'), '拖拽处理应保留触摸移动监听');
+assert.ok(!checklistWxml.includes('catch:touchmove="onDragMove"'), '卡片不能拦截页面触摸移动，否则列表无法上下滚动');
 
 console.log('anime-checklist tests: passed');
