@@ -4,6 +4,8 @@ const { loadCanvasImages, loadCanvasImage, drawPoster } = require('../../utils/h
 
 const POSTER = R.RANKING_POSTER_CONFIG;
 const CANVAS_WIDTH = POSTER.canvasWidth;
+const PHOTO_ALBUM_SCOPE = 'scope.writePhotosAlbum';
+const PHOTO_PERMISSION_ERROR_RE = /auth deny|auth denied|authorize no response|permission denied|privacy|writePhotosAlbum|need auth|auth required|not authorized/i;
 
 function readStorage(key, fallback) {
   try {
@@ -117,7 +119,9 @@ Page({
     query.select('#rankingCanvas').fields({ node: true, size: true });
     query.exec(async (result) => {
       const finish = () => { this._exporting = false; if (wx.hideLoading) wx.hideLoading(); };
+      let stage = 'authorization';
       try {
+        await this._ensurePhotoAlbumAuthorization();
         const info = result && result[0];
         if (!info || !info.node) {
           console.warn('[hang-to-la] ranking canvas unavailable', { source: this._source });
@@ -156,8 +160,10 @@ Page({
           });
         });
         let response;
+        let exportScale = config.scale;
+        stage = 'render';
         try {
-          response = await renderAndExport(config.scale);
+          response = await renderAndExport(exportScale);
         } catch (firstError) {
           console.warn('[hang-to-la] ranking canvas export failed', {
             errMsg: firstError && firstError.errMsg,
@@ -166,32 +172,83 @@ Page({
             rankedCount,
           });
           if (!(config.fallbackScale < config.scale)) throw firstError;
-          response = await renderAndExport(config.fallbackScale);
+          exportScale = config.fallbackScale;
+          response = await renderAndExport(exportScale);
+        }
+        if (!this._disposed) {
+          stage = 'save';
+          try {
+            await this._saveExport(response.tempFilePath);
+          } catch (saveError) {
+            console.warn('[hang-to-la] ranking image save failed', {
+              errMsg: saveError && (saveError.errMsg || saveError.message),
+              filePath: response && response.tempFilePath,
+              width: CANVAS_WIDTH * exportScale,
+              height: height * exportScale,
+              rankedCount,
+            });
+            if (this._isPhotoPermissionError(saveError)) throw saveError;
+            if (!(config.fallbackScale < exportScale)) throw saveError;
+            exportScale = config.fallbackScale;
+            stage = 'render-retry';
+            response = await renderAndExport(exportScale);
+            stage = 'save-retry';
+            await this._saveExport(response.tempFilePath);
+          }
         }
         finish();
-        if (!this._disposed) this._saveExport(response.tempFilePath);
       } catch (error) {
         finish();
         console.warn('[hang-to-la] ranking export aborted', { errMsg: error && (error.errMsg || error.message), rankedCount });
-        wx.showToast({ title: '图片生成失败，请重试', icon: 'none' });
+        if (this._isPhotoPermissionError(error)) this._showPhotoAlbumPermission();
+        else wx.showToast({ title: stage === 'save' || stage === 'save-retry' ? '保存失败，请重试' : '图片生成失败，请重试', icon: 'none' });
       }
     });
   },
 
+  _ensurePhotoAlbumAuthorization() {
+    const privacy = typeof wx.requirePrivacyAuthorize === 'function'
+      ? new Promise((resolve, reject) => wx.requirePrivacyAuthorize({ success: resolve, fail: reject }))
+      : Promise.resolve();
+    return privacy.then(() => new Promise((resolve, reject) => {
+      if (typeof wx.getSetting !== 'function') return resolve();
+      wx.getSetting({
+        success: (result) => {
+          const authSetting = result && result.authSetting ? result.authSetting : {};
+          const status = authSetting[PHOTO_ALBUM_SCOPE];
+          if (status === true) return resolve();
+          if (status === false || typeof wx.authorize !== 'function') return reject({ errMsg: 'authorize no response' });
+          wx.authorize({ scope: PHOTO_ALBUM_SCOPE, success: resolve, fail: reject });
+        },
+        fail: resolve,
+      });
+    }));
+  },
+
+  _isPhotoPermissionError(error) {
+    return PHOTO_PERMISSION_ERROR_RE.test(error && (error.errMsg || error.message) || '');
+  },
+
+  _showPhotoAlbumPermission() {
+    if (!wx.showModal) {
+      wx.showToast({ title: '需要相册权限', icon: 'none' });
+      return;
+    }
+    wx.showModal({
+      title: '需要相册权限',
+      content: '开启相册权限后才能保存排行图片',
+      confirmText: '去设置',
+      success: (res) => { if (res.confirm && wx.openSetting) wx.openSetting(); },
+    });
+  },
+
   _saveExport(filePath) {
-    wx.saveImageToPhotosAlbum({
-      filePath,
-      success: () => wx.showToast({ title: '已保存到相册', icon: 'success' }),
-      fail: (error) => {
-        if (error && /auth deny|auth denied|authorize no response|permission denied|privacy permission/i.test(error.errMsg || '')) {
-          wx.showModal({
-            title: '需要相册权限',
-            content: '开启权限后才能保存排行图片',
-            confirmText: '去设置',
-            success: (res) => { if (res.confirm) wx.openSetting(); },
-          });
-        } else wx.showToast({ title: '保存失败，请重试', icon: 'none' });
-      },
+    return new Promise((resolve, reject) => {
+      wx.saveImageToPhotosAlbum({
+        filePath,
+        success: () => { wx.showToast({ title: '已保存到相册', icon: 'success' }); resolve(); },
+        fail: reject,
+      });
     });
   },
 

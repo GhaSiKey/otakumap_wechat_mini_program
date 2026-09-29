@@ -37,6 +37,11 @@
     "navigationBarTitleText": "OtakuMap",
     "navigationBarTextStyle": "@navigationBarTextStyle"
   },
+  "permission": {
+    "scope.writePhotosAlbum": {
+      "desc": "用于保存生成的番剧排行图片到相册"
+    }
+  },
   "usingComponents": {},
   "sitemapLocation": "sitemap.json",
   "style": "v2",

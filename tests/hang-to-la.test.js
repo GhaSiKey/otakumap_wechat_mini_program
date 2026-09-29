@@ -340,6 +340,7 @@ test('page export carries source subtitle, uses high resolution, and loads only 
     const tiers = R.RANKING_TIERS.map((tier) => Object.assign({}, tier, { items: R.getTierItems(items, tier.id) }));
     await page.onExport({ detail: { tiers, rankedCount: 1, rankingTitle: '导出标题' } });
     await saved;
+    await Promise.resolve();
     assert.ok(ctx.text.includes(subtitle));
     assert.ok(ctx.text.includes('导出标题'));
     assert.strictEqual(canvas.width, R.RANKING_POSTER_CONFIG.canvasWidth * R.RANKING_POSTER_CONFIG.scale);
@@ -394,6 +395,36 @@ test('page export retries with a lower scale when the high-resolution canvas is 
   const tiers = R.RANKING_TIERS.map((tier) => Object.assign({}, tier, { items: R.getTierItems(items, tier.id) }));
   page.onExport({ detail: { tiers, rankedCount: 1, rankingTitle: '降级导出' } });
   await saved;
+  await Promise.resolve();
+  assert.strictEqual(attempts, 2);
+  assert.strictEqual(canvas.width, R.RANKING_POSTER_CONFIG.canvasWidth * R.RANKING_POSTER_CONFIG.fallbackScale);
+  assert.strictEqual(page._exporting, false);
+});
+
+test('page export retries a smaller image when saving the high-resolution file fails', async () => {
+  const rawItems = [{ id: 'a', name: '甲', cover: 'https://example.com/a.jpg' }];
+  const state = setup({ [CHECKLIST_KEY]: rawItems });
+  const page = await openPage({ source: 'anime-checklist' });
+  const { canvas } = mockCanvas();
+  page.createSelectorQuery = () => {
+    const query = { select() { return query; }, fields() { return query; }, exec(callback) { callback([{ node: canvas }]); } };
+    return query;
+  };
+  let attempts = 0;
+  global.wx.saveImageToPhotosAlbum = (options) => {
+    attempts += 1;
+    if (attempts === 1) options.fail({ errMsg: 'saveImageToPhotosAlbum:fail file too large' });
+    else {
+      options.success();
+      if (state.onSaved) state.onSaved();
+    }
+  };
+  const saved = new Promise((resolve) => { state.onSaved = resolve; });
+  const items = R.moveItem(page.data.items, 'a', 'hang');
+  const tiers = R.RANKING_TIERS.map((tier) => Object.assign({}, tier, { items: R.getTierItems(items, tier.id) }));
+  page.onExport({ detail: { tiers, rankedCount: 1, rankingTitle: '保存降级' } });
+  await saved;
+  await Promise.resolve();
   assert.strictEqual(attempts, 2);
   assert.strictEqual(canvas.width, R.RANKING_POSTER_CONFIG.canvasWidth * R.RANKING_POSTER_CONFIG.fallbackScale);
   assert.strictEqual(page._exporting, false);
