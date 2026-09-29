@@ -20,6 +20,16 @@ function writeStorage(key, value) {
   try { wx.setStorageSync(key, value); } catch (error) {}
 }
 
+function writeRealtimeError(message, details) {
+  try {
+    if (typeof wx.getRealtimeLogManager !== 'function') return;
+    const logger = wx.getRealtimeLogManager();
+    if (logger && typeof logger.error === 'function') logger.error(message, details);
+  } catch (error) {
+    console.warn('[hang-to-la] realtime log unavailable', error);
+  }
+}
+
 Page({
   data: {
     source: '',
@@ -247,7 +257,16 @@ Page({
       wx.saveImageToPhotosAlbum({
         filePath,
         success: () => { wx.showToast({ title: '已保存到相册', icon: 'success' }); resolve(); },
-        fail: reject,
+        fail: (error) => {
+          writeRealtimeError('ranking image save failed', {
+            source: this._source,
+            boardId: this._boardId,
+            filePath,
+            errMsg: error && (error.errMsg || error.message) || '',
+            errno: error && error.errno,
+          });
+          reject(error);
+        },
       });
     });
   },

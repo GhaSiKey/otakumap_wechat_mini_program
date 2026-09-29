@@ -52,6 +52,7 @@ assert.ok(rankingPage.includes('fallbackScale'), '大画布导出失败时应降
 assert.ok(rankingPage.includes('loadCanvasImages'), '导出封面应限制并发加载');
 assert.ok(rankingPage.includes('_ensurePhotoAlbumAuthorization'), '保存前应检查相册权限');
 assert.ok(rankingPage.includes('ranking image save failed'), '保存失败应记录正式版诊断信息');
+assert.ok(rankingPage.includes('getRealtimeLogManager'), '保存失败应写入实时日志');
 assert.ok(poster.includes('footerTitle') && poster.includes('footerCopy'), '导出图应包含品牌推广文案');
 assert.ok(component.includes('rankedCount') && component.includes('selectedTierLabel'), '共用榜单组件应提供进度和当前档位状态');
 assert.ok(component.includes('dragHitSlop') && component.includes('onDragCancel'), '拖动应限制命中范围并支持取消');

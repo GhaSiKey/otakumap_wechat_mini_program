@@ -17,7 +17,7 @@ let environment;
 
 function setup(initialStorage, boards) {
   const storage = new Map(Object.entries(clone(initialStorage || {})));
-  const state = { storage, writes: [], reads: [], toasts: [], modals: [], images: [], saved: [] };
+  const state = { storage, writes: [], reads: [], toasts: [], modals: [], images: [], saved: [], realtimeLogs: [] };
   state.getBoardDetail = async (boardId) => {
     const result = boards && boards[boardId];
     return result ? clone(result) : { ok: false, code: 'ERR_NOT_FOUND' };
@@ -37,6 +37,9 @@ function setup(initialStorage, boards) {
       state.saved.push(options.filePath);
       options.success();
       if (state.onSaved) state.onSaved();
+    },
+    getRealtimeLogManager() {
+      return { error(...args) { state.realtimeLogs.push(args); } };
     },
   };
   return state;
@@ -413,7 +416,7 @@ test('page export retries a smaller image when saving the high-resolution file f
   let attempts = 0;
   global.wx.saveImageToPhotosAlbum = (options) => {
     attempts += 1;
-    if (attempts === 1) options.fail({ errMsg: 'saveImageToPhotosAlbum:fail file too large' });
+    if (attempts === 1) options.fail({ errMsg: 'saveImageToPhotosAlbum:fail file too large', errno: 1001 });
     else {
       options.success();
       if (state.onSaved) state.onSaved();
@@ -428,6 +431,9 @@ test('page export retries a smaller image when saving the high-resolution file f
   assert.strictEqual(attempts, 2);
   assert.strictEqual(canvas.width, R.RANKING_POSTER_CONFIG.canvasWidth * R.RANKING_POSTER_CONFIG.fallbackScale);
   assert.strictEqual(page._exporting, false);
+  assert.strictEqual(state.realtimeLogs.length, 1);
+  assert.strictEqual(state.realtimeLogs[0][1].errMsg, 'saveImageToPhotosAlbum:fail file too large');
+  assert.strictEqual(state.realtimeLogs[0][1].errno, 1001);
 });
 
 async function run() {
