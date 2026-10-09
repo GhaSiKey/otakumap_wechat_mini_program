@@ -110,6 +110,9 @@
 | 未读红点 | 自绘 `view.unread-dot`（板名右侧） | `--td-error-color`（红点=通用未读语义，非落后惩罚，允许用红） |
 | 归档卡 | `view.board-card--archived` | 去阴影 + `opacity:0.6` + 📁 前缀（ARCHIVED_PREFIX） |
 | 建板 FAB | `t-fab`(icon add) | `--td-brand-color` |
+| 改板名弹层 | 长按板卡 → `t-popup` + `.sheet` 外壳 + `t-input`（`maxlength=BOARD_NAME_MAX`）+ 保存按钮 | 文案 `BOARD_LIST_COPY.RENAME_*`；长按轻震反馈；归档板不响应 |
+
+**改板名（2026-10-09）：** 入口放在 P1 长按板卡，不占 P2 首屏空间；`bindlongpress` 与 `bindtap` 并存时，长按不会再触发进板。弹层预填当前板名，保存调 `renameBoard`，成功后重拉列表以服务端截断结果为准。代价是长按入口可发现性弱，后续如有反馈可在 P2 补可见入口。
 
 **封面墙数据来源：** `listMyBoards` 云函数按 `cloudfunctions/_shared-board/constants.js` 的 `BOARD_PREVIEW_COVERS`（=4）做 `.limit()` 取番名 + 封面（`previewItems`），并单独 `count()` 拿准确总数 `itemCount`；前端只渲染已截断的 `previewItems`，溢出（itemCount − 预览数）计入「+N」。番剧数据源被墙、封面基本为空，故封面墙实为**首字色块墙**（`pickCoverColor` 取番名首字 + 哈希配色，双方一致零成本）。
 

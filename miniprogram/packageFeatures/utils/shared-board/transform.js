@@ -527,6 +527,10 @@ function describeEvent(e, myOpenid) {
       return ep > max ? ep : max;
     }, 0);
     vars.to = typeof p.targetEp === 'number' ? p.targetEp : maxEp;
+  } else if (e && e.type === EVENT_TYPE.BOARD_RENAME) {
+    // 板级事件不挂番：新旧板名都从 payload 取，itemName 留空
+    vars.name = p.name || '';
+    vars.from = p.prevName || '';
   }
 
   return { mine, actionKey, vars };

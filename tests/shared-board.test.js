@@ -588,6 +588,23 @@ eq(
   eq('describeEvent 一起待看带目标集数', described.vars.to, 7);
 })();
 
+// 板改名：板级事件不挂番，新旧板名取自 payload，且必须有对应历史模板
+(() => {
+  const described = T.describeEvent(
+    ev({ type: C.EVENT_TYPE.BOARD_RENAME, itemName: '', payload: { name: '新板名', prevName: '旧板名' } }),
+    'me'
+  );
+  eq('describeEvent 板改名动作', described.actionKey, C.EVENT_TYPE.BOARD_RENAME);
+  eq('describeEvent 板改名新旧名', [described.vars.from, described.vars.name], ['旧板名', '新板名']);
+  eq('板改名有历史模板', Boolean(C.HISTORY_COPY.ACTION[described.actionKey]), true);
+  eq(
+    '改板名弹层文案完整',
+    ['RENAME_TITLE', 'RENAME_PLACEHOLDER', 'RENAME_NOTE', 'RENAME_CTA', 'RENAME_EMPTY', 'RENAME_SUCCESS', 'RENAME_FAIL']
+      .every((k) => Boolean(C.BOARD_LIST_COPY[k])),
+    true
+  );
+})();
+
 // item_edit：改名分流 item_rename（带 from），非改名走 item_edit
 (() => {
   const renamed = T.describeEvent(

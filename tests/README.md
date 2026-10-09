@@ -22,6 +22,7 @@ node tests/mahjong.test.js
 | `mahjong.test.js` | 宝牌三维度计数、符数（平和/七对子）、听牌型判定 |
 | `worldcup.test.js` | 世界杯数据变换与展示规则 |
 | `shared-board.test.js` 等 | 共享板视图模型、云函数事务与页面流程 |
+| `rename-board-cloud.test.js` | 改板名：成员校验、trim/截断/拒空、同名不写、只写三字段、历史事件与副本逐字守卫 |
 | `anime-meta.test.js` / `anime-meta-cloud.test.js` | 弹弹play封面策略、请求契约与 Bangumi Subject ID 安全解析 |
 | `pilgrimage.test.js` | 巡礼筛选、坐标、Marker、本机收藏与前端 API 封装 |
 | `pilgrimage-cloud.test.js` | Anitabi 路径白名单、响应归一、缓存和错误降级 |

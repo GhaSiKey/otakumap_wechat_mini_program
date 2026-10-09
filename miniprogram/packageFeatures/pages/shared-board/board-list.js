@@ -3,7 +3,7 @@
 // 允许一人加入多个板（PRD §5.4）。onShow 拉列表（打开即最新，MVP 不做 watch）。
 const api = require('../../utils/shared-board/cloud-api');
 const { pickCoverColor, sanitizeAvatar, relativeTime } = require('../../utils/shared-board/transform');
-const { BOARD_STATUS, BOARD_LIST_COPY } = require('../../utils/shared-board/config');
+const { BOARD_STATUS, BOARD_LIST_COPY, BOARD_NAME_MAX } = require('../../utils/shared-board/config');
 
 // 占位符插值：{key} → vars[key]。回调式 replace，避免番名含 $&/$1 被当特殊模式（与 board-report/history 同一约定）
 function fillTemplate(tpl, vars) {
@@ -19,6 +19,11 @@ Page({
     showCreate: false, // 建板弹层
     newBoardName: '',
     creating: false,
+    boardNameMax: BOARD_NAME_MAX, // 建板/改名输入框共用上限，与云函数截断同源
+    showRename: false, // 改板名弹层（长按板卡唤起）
+    renameBoardId: '',
+    renameValue: '',
+    renaming: false,
     avatarErr: {},    // {boardId: true} 对方头像加载失败 → 回退首字母（不开云存储时常见）
     coverErr: {},     // {coverKey: true} 封面失败 → 当前 URL 回退首字色块；URL 升级后会生成新 key 重试
   },
@@ -167,5 +172,42 @@ Page({
   onBoardTap(e) {
     const { boardId } = e.currentTarget.dataset;
     wx.navigateTo({ url: `/packageFeatures/pages/shared-board/shared-board?boardId=${boardId}` });
+  },
+
+  // 长按板卡 → 改板名弹层。绑定 longpress 后同一次按压不会再触发 tap，不会误进板。
+  // 归档板只读，不提供改名。
+  onBoardLongPress(e) {
+    const { boardId } = e.currentTarget.dataset;
+    const board = this.data.boards.find((b) => b.boardId === boardId);
+    if (!board || board.archived) return;
+    if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
+    this.setData({ showRename: true, renameBoardId: boardId, renameValue: board.name || '' });
+  },
+
+  onRenameVisibleChange(e) {
+    this.setData({ showRename: e.detail.visible });
+  },
+
+  onRenameInput(e) {
+    this.setData({ renameValue: e.detail.value });
+  },
+
+  async onConfirmRename() {
+    if (this.data.renaming) return;
+    const name = (this.data.renameValue || '').trim();
+    if (!name) {
+      wx.showToast({ title: BOARD_LIST_COPY.RENAME_EMPTY, icon: 'none' });
+      return;
+    }
+    this.setData({ renaming: true });
+    const r = await api.renameBoard(this.data.renameBoardId, name);
+    this.setData({ renaming: false });
+    if (!r.ok) {
+      wx.showToast({ title: BOARD_LIST_COPY.RENAME_FAIL, icon: 'none' });
+      return;
+    }
+    this.setData({ showRename: false });
+    wx.showToast({ title: BOARD_LIST_COPY.RENAME_SUCCESS, icon: 'success' });
+    this._loadBoards(); // 以服务端为准（含截断后的最终名）
   },
 });

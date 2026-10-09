@@ -24,6 +24,7 @@
       hover-stay-time="80"
       data-board-id="{{item.boardId}}"
       bindtap="onBoardTap"
+      bindlongpress="onBoardLongPress"
     >
       <!-- ① 头部行：双人同轴头像 + 板名 + 未读红点 -->
       <view class="board-card__head">
@@ -102,7 +103,7 @@
         <t-input
           placeholder="{{copy.CREATE_PLACEHOLDER}}"
           value="{{newBoardName}}"
-          maxlength="20"
+          maxlength="{{boardNameMax}}"
           bind:change="onBoardNameInput"
         />
         <t-button
@@ -112,6 +113,31 @@
           loading="{{creating}}"
           bindtap="onConfirmCreate"
         >{{copy.CREATE_CTA}}</t-button>
+      </view>
+    </view>
+  </t-popup>
+
+  <!-- 改板名弹层（长按板卡唤起，同款 .sheet 外壳）-->
+  <t-popup visible="{{showRename}}" placement="bottom" close-on-overlay-click bind:visible-change="onRenameVisibleChange">
+    <view class="sheet">
+      <view class="sheet__handle"></view>
+      <view class="sheet__header"><text class="sheet__title">{{copy.RENAME_TITLE}}</text></view>
+      <view class="sheet__body">
+        <t-input
+          placeholder="{{copy.RENAME_PLACEHOLDER}}"
+          value="{{renameValue}}"
+          maxlength="{{boardNameMax}}"
+          clearable
+          bind:change="onRenameInput"
+        />
+        <view class="sheet__note">{{copy.RENAME_NOTE}}</view>
+        <t-button
+          theme="primary"
+          size="large"
+          block
+          loading="{{renaming}}"
+          bindtap="onConfirmRename"
+        >{{copy.RENAME_CTA}}</t-button>
       </view>
     </view>
   </t-popup>

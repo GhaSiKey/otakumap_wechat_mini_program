@@ -48,6 +48,7 @@ function getMyOpenid() {
 const listMyBoards = () => invoke('listMyBoards');
 const getBoardDetail = (boardId) => invoke('getBoardDetail', { boardId });
 const createBoard = (name, profile) => invoke('createBoard', { name, profile });
+const renameBoard = (boardId, name) => invoke('renameBoard', { boardId, name });
 const joinBoard = (boardId, token, profile) => invoke('joinBoard', { boardId, token, profile });
 const addItem = (boardId, name, extra) => invoke('addItem', Object.assign({ boardId, name }, extra || {}));
 const updateProgress = (itemId, ep, status, expectedRev) =>
@@ -87,6 +88,7 @@ module.exports = {
   listMyBoards,
   getBoardDetail,
   createBoard,
+  renameBoard,
   joinBoard,
   addItem,
   updateProgress,

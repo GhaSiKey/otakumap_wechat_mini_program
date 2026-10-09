@@ -1,0 +1,9 @@
+{
+  "name": "renameBoard",
+  "version": "1.0.0",
+  "description": "修改共享板板名（任一成员可改，改名写历史事件）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

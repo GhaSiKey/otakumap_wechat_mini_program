@@ -25,6 +25,7 @@ const EVENT_TYPE = {
   ITEM_EDIT: 'item_edit',
   PROGRESS: 'progress',
   TOGETHER_ADVANCE: 'together_advance',
+  BOARD_RENAME: 'board_rename',
 };
 
 const BOARD_MEMBER_LIMIT = 2;

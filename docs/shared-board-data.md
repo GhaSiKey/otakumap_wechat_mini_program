@@ -42,7 +42,7 @@
 |------|------|-----|------|-----|------|
 | `_id` | string | 否 | 云生成 | ✅ | 板 ID，分享卡片携带 |
 | `_openid` | string | 否 | 云自动写 | ✅ | 建板人（审计，不参与权限判断） |
-| `name` | string | 否 | config `DEFAULT_BOARD_NAME` | ✅ | 板名 |
+| `name` | string | 否 | config `DEFAULT_BOARD_NAME` | ✅ | 板名；任一成员可经 `renameBoard` 修改（§4.8） |
 | `members` | Array\<Member> | 否 | 建板时含 owner 一人 | ✅ | 成员数组，长度 ≤ `BOARD_MEMBER_LIMIT` |
 | `memberOpenids` | Array\<string> | 否 | `[ownerOpenid]` | ✅ | **扁平冗余**，供读规则 `in` 判断（数组索引） |
 | `status` | string | 否 | `'active'` | ✅ | `active` / `full` / `archived` |
@@ -310,6 +310,18 @@ return ok({ itemId, deleted: !!deleted });
 | `updateProgress` | itemId, ep, status | 成员/未删/status/ep clamp | ✅ | ✅ |
 | `updateItem` | itemId, patch | 成员/白名单/改名去重 | ✅ | ✅ |
 | `deleteItem` | itemId, deleted? | 成员/存在 | ✅ | ✅ |
+| `renameBoard` | boardId, name | 成员/trim 非空/截断 `BOARD_NAME_MAX` | ✅(同名不写) | ✅ |
+
+### 4.8 `renameBoard` — 改板名（2026-10-09）
+
+- **入口**：P1 长按板卡（归档板不提供）。板名双方共享，任一成员可改。
+- **入参**：`{ boardId, name }`。trim 后截断到 `BOARD_NAME_MAX`，与 `createBoard` 同口径；空白直接拒绝 `ERR_INVALID_PARAM`（改名不回退默认名）。
+- **写边界**：只写 `name`、`updateTime` 和 `lastViewedAt.<我>` 三个字段，**不读改写整组 `members`**，避免与 `joinBoard` 的 `_.push` 并发时把新成员覆盖掉。
+  - bump `updateTime`：让对方 P1 红点亮起。
+  - 同时写自己的 `lastViewedAt`：否则改名人回到列表会看到自己这张卡也亮红点。
+- **历史**：主写成功后 `appendEvent` 追加 `EVENT_TYPE.BOARD_RENAME`，`itemId/itemName` 留空，`payload: { name, prevName }`；历史页文案 `HISTORY_COPY.ACTION.board_rename`。新旧名相同时不写库、不记历史。
+- **副本**：目录内 `constants.js`、`event-log.js` 由 `_shared-board` 逐字复制，`tests/rename-board-cloud.test.js` 守卫逐字一致。
+- **未做**：内容安全检测（`security.msgSecCheck`）。建板同样没有，留待与 `createBoard` 一起接入。
 
 ---
 

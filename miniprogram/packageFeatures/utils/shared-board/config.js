@@ -38,6 +38,7 @@ const EVENT_TYPE = {
   ITEM_EDIT: 'item_edit', // 改共享字段（番名/总集数/放送状态等）
   PROGRESS: 'progress', // 改自己进度（集数 / 状态）
   TOGETHER_ADVANCE: 'together_advance', // 一起待看页一次推进两人的进度
+  BOARD_RENAME: 'board_rename', // 改板名（板是双方共享的，改名需让对方在历史里看见）
 };
 
 // ── 人数上限（固定 2 人配对，不写死数字 2）──
@@ -340,6 +341,7 @@ const HISTORY_COPY = {
     progress_from_to: '把《{name}》从第 {from} 话追到第 {to} 话', // 折叠区间
     progress_status: '把《{name}》标记为「{status}」', // 仅状态变化
     together_advance: '记录了我俩一起看《{name}》到第 {to} 话',
+    board_rename: '把板名从「{from}」改为「{name}」',
   },
 };
 
@@ -491,6 +493,14 @@ const BOARD_LIST_COPY = {
   CREATE_TITLE: '新建共享番单', // 建板弹层标题
   CREATE_PLACEHOLDER: '给这个板起个名（可留空）', // 建板输入占位
   CREATE_CTA: '建板', // 建板按钮
+  // 改板名（长按板卡唤起）：板名双方共享，改后对方在历史里能看到
+  RENAME_TITLE: '修改板名',
+  RENAME_PLACEHOLDER: '给这个板起个新名字',
+  RENAME_NOTE: '板名双方都能看到，改名会记进改动历史',
+  RENAME_CTA: '保存',
+  RENAME_EMPTY: '板名不能为空',
+  RENAME_SUCCESS: '已改名',
+  RENAME_FAIL: '改名失败，请重试',
 };
 
 // ── 首字色块调色板（封面为空时占位）──
