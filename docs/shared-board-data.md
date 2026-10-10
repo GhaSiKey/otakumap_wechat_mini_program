@@ -83,6 +83,7 @@ pairing: {
 | `deleted` | boolean | 否 | `false` | ✅ | 软删除标记（冲突 B） |
 | `deletedBy` | string | 是 | `''` | ✅ | 谁移出的（openid） |
 | `deletedAt` | Date | 是 | `null` | ✅ | 移出时间 |
+| `movedAt` | Date | 是 | 无（未搬过不存在） | ✅ | 最近一次从其他板搬入的时间（`moveItems` 写）。「TA 更新了」只算此后的进度，见 [shared-board-move-items.md](shared-board-move-items.md) |
 | `createTime` | Date | 否 | `serverDate()` | ✅ | |
 | `updateTime` | Date | 否 | `serverDate()` | ✅ | 任一字段变更都 bump |
 
@@ -311,6 +312,7 @@ return ok({ itemId, deleted: !!deleted });
 | `updateItem` | itemId, patch | 成员/白名单/改名去重 | ✅ | ✅ |
 | `deleteItem` | itemId, deleted? | 成员/存在 | ✅ | ✅ |
 | `renameBoard` | boardId, name | 成员/trim 非空/截断 `BOARD_NAME_MAX` | ✅(同名不写) | ✅ |
+| `moveItems` | fromBoardId, toBoardId, itemIds | 双板成员/成员集合相同/未归档/单次与目标板上限/判重 | ✅(已在目标板算成功) | ✅ |
 
 ### 4.8 `renameBoard` — 改板名（2026-10-09）
 

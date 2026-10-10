@@ -1,0 +1,9 @@
+{
+  "name": "moveItems",
+  "version": "1.0.0",
+  "description": "板间搬番：把番连同双方进度从来源板搬到成员相同的目标板",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

@@ -1,0 +1,154 @@
+<view class="page">
+  <!-- 状态链：wx:if / wx:elif / wx:else 须紧邻，中间不夹注释（旧基础库 FLOW_DEPTH） -->
+  <view wx:if="{{loading}}" class="state">
+    <t-loading theme="circular" size="48rpx" />
+  </view>
+  <view wx:elif="{{loadFailed}}" class="state">
+    <t-empty icon="error-circle" description="{{copy.LOAD_FAIL}}" />
+    <t-button class="state__action" size="medium" variant="outline" theme="primary" bindtap="onRetry">{{copy.RETRY}}</t-button>
+  </view>
+  <view wx:elif="{{!canMove}}" class="state">
+    <t-empty icon="usergroup" description="{{copy.ENTRY_DISABLED}}" />
+  </view>
+  <view wx:elif="{{!sources.length}}" class="state">
+    <t-empty icon="folder-open" description="{{copy.EMPTY_BOARDS}}" />
+    <view class="state__sub">{{copy.EMPTY_BOARDS_SUB}}</view>
+  </view>
+  <block wx:else>
+    <!-- 页头：始终说明往哪个板搬，以及进度会一起带走 -->
+    <view class="move-head">
+      <view class="move-head__target">{{headerTarget}}</view>
+      <view class="move-head__note">{{copy.HEADER_NOTE}}</view>
+    </view>
+
+    <!-- ① 来源板：横向胶囊，默认选中最近活跃的一个 -->
+    <view class="source-label">{{copy.PICK_BOARD_TITLE}}</view>
+    <scroll-view class="source-strip" scroll-x enable-flex enhanced show-scrollbar="{{false}}">
+      <view
+        wx:for="{{sources}}"
+        wx:key="boardId"
+        class="source-chip {{item.boardId === sourceBoardId ? 'source-chip--active' : ''}}"
+        hover-class="source-chip--pressed"
+        aria-role="radio"
+        aria-checked="{{item.boardId === sourceBoardId}}"
+        aria-label="{{item.name}}"
+        data-board-id="{{item.boardId}}"
+        bindtap="onSourceTap"
+      >
+        <text class="source-chip__name">{{item.name}}</text>
+        <text class="source-chip__count">{{item.countText}}</text>
+      </view>
+    </scroll-view>
+
+    <!-- ② 选番：与板页同一套分区，分区标题即状态；不默认勾选，分区可一键全选 -->
+    <view wx:if="{{itemsLoading}}" class="state state--inline">
+      <t-loading theme="circular" size="40rpx" />
+    </view>
+    <view wx:elif="{{itemsFailed}}" class="state state--inline">
+      <t-empty icon="error-circle" description="{{copy.LOAD_FAIL}}" />
+      <t-button class="state__action" size="medium" variant="outline" theme="primary" bindtap="onItemsRetry">{{copy.RETRY}}</t-button>
+    </view>
+    <view wx:elif="{{!sections.length && !duplicates.length}}" class="state state--inline">
+      <t-empty description="{{copy.EMPTY_ITEMS}}" />
+    </view>
+    <block wx:else>
+      <view wx:for="{{sections}}" wx:for-item="section" wx:for-index="s" wx:key="sectionKey" class="group">
+        <view class="group__head">
+          <text class="group__title">{{section.title}}</text>
+          <text class="group__count">{{section.rows.length}}</text>
+          <text
+            class="group__toggle"
+            aria-role="button"
+            data-section="{{s}}"
+            bindtap="onToggleSection"
+          >{{section.checkedCount === section.rows.length ? copy.SECTION_SELECT_NONE : copy.SECTION_SELECT_ALL}}</text>
+        </view>
+        <view class="group__list">
+          <view
+            wx:for="{{section.rows}}"
+            wx:for-item="row"
+            wx:key="itemId"
+            class="row {{row.checked ? 'row--checked' : ''}}"
+            hover-class="row--pressed"
+            aria-role="checkbox"
+            aria-checked="{{row.checked}}"
+            aria-label="{{row.name}}"
+            data-section="{{s}}"
+            data-index="{{index}}"
+            bindtap="onToggleItem"
+          >
+            <t-icon
+              class="row__check {{row.checked ? 'row__check--on' : ''}}"
+              name="{{row.checked ? 'check-circle-filled' : 'circle'}}"
+              size="44rpx"
+              aria-hidden="true"
+            />
+            <image
+              wx:if="{{row.cover && !coverErr[row.itemId]}}"
+              class="row__cover"
+              src="{{row.cover}}"
+              mode="aspectFill"
+              lazy-load
+              data-item-id="{{row.itemId}}"
+              binderror="onCoverError"
+            />
+            <view wx:else class="row__cover row__cover--fallback" style="background:{{row.coverFallback.color}}">{{row.coverFallback.char}}</view>
+            <view class="row__body">
+              <view class="row__name">{{row.name}}</view>
+              <view class="row__eps">
+                <text class="row__ep row__ep--me">{{row.mineEpText}}</text>
+                <text class="row__ep {{row.peerUnset ? 'row__ep--unset' : 'row__ep--peer'}}">{{row.peerEpText}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 当前板已有的番：沉底、淡化、不可勾选（搬了也会被跳过） -->
+      <view wx:if="{{duplicates.length}}" class="group group--disabled">
+        <view class="group__head">
+          <text class="group__title">{{copy.DUPLICATE_SECTION}}</text>
+          <text class="group__count">{{duplicates.length}}</text>
+        </view>
+        <view class="group__list">
+          <view wx:for="{{duplicates}}" wx:for-item="row" wx:key="itemId" class="row" aria-disabled="true" aria-label="{{row.name}}">
+            <image
+              wx:if="{{row.cover && !coverErr[row.itemId]}}"
+              class="row__cover"
+              src="{{row.cover}}"
+              mode="aspectFill"
+              lazy-load
+              data-item-id="{{row.itemId}}"
+              binderror="onCoverError"
+            />
+            <view wx:else class="row__cover row__cover--fallback" style="background:{{row.coverFallback.color}}">{{row.coverFallback.char}}</view>
+            <view class="row__body">
+              <view class="row__name">{{row.name}}</view>
+              <view class="row__eps">
+                <text class="row__ep">{{row.mineEpText}}</text>
+                <text class="row__ep">{{row.peerEpText}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </block>
+  </block>
+
+  <!-- 底部固定条：左侧已选数量 + 清空，右侧短按钮（目标板名放在确认弹窗，避免按钮文案过长被截断） -->
+  <view wx:if="{{sourceBoardId && sections.length}}" class="submit-bar">
+    <view class="submit-bar__info">
+      <text class="submit-bar__count {{checkedCount ? '' : 'submit-bar__count--none'}}">{{selectedText}}</text>
+      <text wx:if="{{checkedCount}}" class="submit-bar__clear" aria-role="button" bindtap="onClear">{{copy.CLEAR}}</text>
+    </view>
+    <t-button
+      class="submit-bar__btn"
+      theme="primary"
+      size="medium"
+      shape="round"
+      disabled="{{!checkedCount || moving}}"
+      loading="{{moving}}"
+      bindtap="onSubmit"
+    >{{copy.SUBMIT}}</t-button>
+  </view>
+</view>

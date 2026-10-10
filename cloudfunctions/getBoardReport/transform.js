@@ -29,6 +29,8 @@ const {
   TOTAL_EP_MIN,
   VIEW,
   REPORT,
+  HISTORY_COPY,
+  MOVE_HISTORY_NAME_PREVIEW,
 } = require('./config');
 
 // ── 基础工具 ──
@@ -378,7 +380,10 @@ function buildPeerUpdates(board, items, myOpenid) {
       const peerP = (it.progress || {})[peerOpenid];
       if (!peerP) return;
       const peerAt = toMillis(peerP.updateTime);
-      if (Number.isNaN(peerAt) || peerAt <= myViewed) return;
+      // 从其他板搬来的番带着原板里的旧进度时间；只算搬进本板之后的进度，避免误报「新动向」
+      const movedAt = toMillis(it.movedAt);
+      const since = Number.isNaN(movedAt) ? myViewed : Math.max(myViewed, movedAt);
+      if (Number.isNaN(peerAt) || peerAt <= since) return;
       // 只报「真看了至少第 1 话」的进度。对方新加番（ep=0/want）也会写 updateTime，
       // 若不滤会报成「TA 追到了《X》第 0 话」措辞失真——加番不是「追进度」这件事。
       const peerEp = typeof peerP.ep === 'number' ? peerP.ep : 0;
@@ -531,9 +536,104 @@ function describeEvent(e, myOpenid) {
     // 板级事件不挂番：新旧板名都从 payload 取，itemName 留空
     vars.name = p.name || '';
     vars.from = p.prevName || '';
+  } else if (e && (e.type === EVENT_TYPE.ITEMS_MOVE_IN || e.type === EVENT_TYPE.ITEMS_MOVE_OUT)) {
+    // 板间搬番汇总：{board}=对面板名快照，{names}=番名片段（超出预览数收成「等 N 部番」）
+    vars.board = p.board || '';
+    vars.names = moveNamesText(Array.isArray(p.items) ? p.items : []);
   }
 
   return { mine, actionKey, vars };
+}
+
+// 占位符插值（与页面 fillTemplate 同约定：回调式 replace，番名含 $& 等不会被当特殊模式）
+function fillCopy(tpl, vars) {
+  return String(tpl).replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? String(vars[k]) : m));
+}
+
+/** 搬番历史的番名片段：《A》《B》等 N 部番（N 为本次总部数，只列前 MOVE_HISTORY_NAME_PREVIEW 个）。 */
+function moveNamesText(items) {
+  const names = items.map((it) => (it && it.name) || '').filter(Boolean);
+  const preview = names
+    .slice(0, MOVE_HISTORY_NAME_PREVIEW)
+    .map((name) => fillCopy(HISTORY_COPY.MOVE_NAME, { name }))
+    .join('');
+  return items.length > MOVE_HISTORY_NAME_PREVIEW
+    ? preview + fillCopy(HISTORY_COPY.MOVE_NAMES_MORE, { n: items.length })
+    : preview;
+}
+
+// ── 板间搬番（搬番页数据层，docs/shared-board-move-items.md）──
+
+/** 两个板的成员集合是否完全相同（与顺序无关；云函数 moveItems 用同一口径校验）。 */
+function sameMembers(a, b) {
+  const x = Array.isArray(a) ? a.slice().sort() : [];
+  const y = Array.isArray(b) ? b.slice().sort() : [];
+  return x.length === y.length && x.every((openid, i) => openid === y[i]);
+}
+
+/** 当前板能否作为搬番目标：已配对满员且未归档（筹备态没有 TA，无从「同样两个人」）。 */
+function canMoveInto(board) {
+  return !!board
+    && board.status !== BOARD_STATUS.ARCHIVED
+    && Array.isArray(board.memberOpenids)
+    && board.memberOpenids.length === BOARD_MEMBER_LIMIT;
+}
+
+/**
+ * 可作为搬番来源的板：成员与目标板完全相同、不是目标板本身、未归档、且有番可搬。
+ * boards 为 listMyBoards 原始返回（带 itemCount）。返回 [{ boardId, name, itemCount }]。
+ */
+function pickMoveSourceBoards(boards, targetBoard) {
+  if (!canMoveInto(targetBoard)) return [];
+  return (boards || [])
+    .filter((b) => b
+      && b._id !== targetBoard._id
+      && b.status !== BOARD_STATUS.ARCHIVED
+      && (b.itemCount || 0) > 0
+      && sameMembers(b.memberOpenids, targetBoard.memberOpenids))
+    .map((b) => ({ boardId: b._id, name: b.name || '', itemCount: b.itemCount || 0 }));
+}
+
+// 判重口径（D2）：同名，或绑定的是同一个弹弹play条目（名字写法不同的同一部番也能拦住）
+function moveDuplicateIndex(items) {
+  const names = new Set();
+  const sourceIds = new Set();
+  (items || []).forEach((it) => {
+    if (!it || it.deleted) return;
+    if (it.name) names.add(it.name);
+    if (Number.isInteger(it.sourceId) && it.sourceId > 0) sourceIds.add(it.sourceId);
+  });
+  return { names, sourceIds };
+}
+
+function isMoveDuplicate(item, index) {
+  return index.names.has(item.name)
+    || (Number.isInteger(item.sourceId) && item.sourceId > 0 && index.sourceIds.has(item.sourceId));
+}
+
+/**
+ * 选番页分组：与板页同一套分区和顺序（复用 groupItems），分区标题已经说明状态，行内不再重复状态标签。
+ * 与目标板重复的番单独收进 duplicates，页面放在最底部且不可勾选。
+ * 不做默认勾选：搬哪些由用户自己挑，分区可一键全选。
+ * 返回 { sections: [{ sectionKey, title, items: [单番 VM] }], duplicates: [单番 VM] }。
+ */
+function buildMoveSections(sourceItems, targetItems, myOpenid, peerOpenid) {
+  const index = moveDuplicateIndex(targetItems);
+  const rawById = {};
+  (sourceItems || []).forEach((it) => { if (it && it._id) rawById[it._id] = it; });
+  const duplicates = [];
+  const sections = groupItems(sourceItems, myOpenid, peerOpenid)
+    .map((group) => ({
+      sectionKey: group.sectionKey,
+      title: group.title,
+      items: group.items.filter((vm) => {
+        if (!isMoveDuplicate(rawById[vm.itemId], index)) return true;
+        duplicates.push(vm);
+        return false;
+      }),
+    }))
+    .filter((group) => group.items.length);
+  return { sections, duplicates };
 }
 
 /**
@@ -1301,6 +1401,11 @@ module.exports = {
   foldEvents,
   describeEvent,
   relativeTime,
+  // 板间搬番
+  sameMembers,
+  canMoveInto,
+  pickMoveSourceBoards,
+  buildMoveSections,
   // 报告数据层
   localDayIndex,
   dayIndexToMD,

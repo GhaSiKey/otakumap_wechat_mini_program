@@ -28,6 +28,7 @@ const {
   REPORT_COPY,
   STORAGE_KEY,
   ADD_ITEM_FAB,
+  MOVE_COPY,
   ITEM_VIEW,
   ITEM_VIEW_INTERACTION,
   ITEM_VIEW_SWITCH,
@@ -45,6 +46,7 @@ const {
 const animeApi = require('../../utils/anime-meta/cloud-api');
 
 const ANIME_SEARCH_URL = '/packageFeatures/pages/anime-search/anime-search';
+const MOVE_ITEMS_URL = '/packageFeatures/pages/shared-board/move-items';
 
 // 占位符插值：{key} → vars[key]。用回调式 replace，避免番名等值含 $&/$1 等
 // 被 String.replace 第二参当特殊模式解析（番名用户可自由输入，属必防的注入面）。
@@ -78,6 +80,8 @@ Page({
     pickerCopy: PICKER_COPY, // 选集器取消/确认按钮文案（覆盖 t-picker 布尔默认值渲染成 "true" 的问题）
     peerUpdateCopy: PEER_UPDATE_COPY, // 「TA 更新了」信息条图标等视觉文案（正文已在 _load 插值成 peerUpdateText）
     animeBindCopy: ANIME_BIND_COPY, // 关联番剧（搜索区标题/入口/手填分隔/预览提示 + 补绑入口）文案
+    moveCopy: MOVE_COPY, // 加番面板「从其他板搬来」入口文案
+    canMoveIn: false, // 当前板能否从其他板搬番（已配对且未归档），_load 时按权威 board 计算
     historyCopy: HISTORY_COPY, // 改动历史入口文案
     reportCopy: REPORT_COPY, // 追番小结入口文案
     addItemFab: ADD_ITEM_FAB, // 右下角圆形加番 FAB 的图标与无障碍文案
@@ -290,7 +294,7 @@ Page({
     // 累积（_commitProgress 直接改 raw.progress[myOpenid]），此处每次 _load 用最新权威值整份替换。
     this._rawBoard = board;
     this._rawItems = items;
-    const patch = { vm, loading: false };
+    const patch = { vm, loading: false, canMoveIn: T.canMoveInto(board) };
     if (peerUrlChanged) patch.peerAvatarError = false; // 对方头像换了新 URL，给一次加载机会
     if (coverErrorChanged) patch.coverErrorIds = coverErrorIds;
     // 详情弹层打开时用最新数据重建 detailItem，否则改了总集数/放送状态/进度后弹层仍显示旧值。
@@ -710,6 +714,14 @@ Page({
         [PICK_EVENT]: (picked) => this._onPickedForAdd(picked),
       },
     });
+  },
+
+  // 加番面板「从其他板搬来」：先收起面板再进搬番页；搬完返回时 onShow 会重拉番单。
+  // 筹备态入口灰显，副文案已说明原因，点击不再额外提示。
+  onMoveInTap() {
+    if (this.data.adding || !this.data.canMoveIn) return;
+    this.setData({ showAdd: false });
+    wx.navigateTo({ url: `${MOVE_ITEMS_URL}?boardId=${this.data.boardId}` });
   },
 
   // 加番场景收到选中番剧：回填番名 + 总集数，并暂存封面/sourceId 待提交时随 addItem 存。

@@ -26,6 +26,8 @@ const EVENT_TYPE = {
   PROGRESS: 'progress',
   TOGETHER_ADVANCE: 'together_advance',
   BOARD_RENAME: 'board_rename',
+  ITEMS_MOVE_IN: 'items_move_in',
+  ITEMS_MOVE_OUT: 'items_move_out',
 };
 
 const BOARD_MEMBER_LIMIT = 2;
@@ -54,6 +56,11 @@ const ITEM_SHARED_FIELDS = ['name', 'totalEp', 'airStatus', 'cover', 'airDay'];
 // listMyBoards 逐板取前 N 部番名做首字色块墙；纯展示阈值，不参与漂移守卫结构比对。
 const BOARD_PREVIEW_COVERS = 4;
 
+// 板间搬番（与前端 config 同源，docs/shared-board-move-items.md）
+const BOARD_ITEM_MAX = 200;
+const MOVE_ITEMS_MAX = 50;
+const MOVE_SKIP_REASON = { DUPLICATE: 'DUPLICATE', NOT_IN_SOURCE: 'NOT_IN_SOURCE' };
+
 const ERR = {
   OK: 'OK',
   UNAUTHENTICATED: 'ERR_UNAUTHENTICATED',
@@ -70,6 +77,9 @@ const ERR = {
   INVALID_EP: 'ERR_INVALID_EP',
   INVALID_STATUS: 'ERR_INVALID_STATUS',
   CONFLICT: 'ERR_CONFLICT',
+  BOARD_ARCHIVED: 'ERR_BOARD_ARCHIVED',
+  MOVE_MEMBERS_MISMATCH: 'ERR_MOVE_MEMBERS_MISMATCH',
+  MOVE_TARGET_FULL: 'ERR_MOVE_TARGET_FULL',
 };
 
 module.exports = {
@@ -91,5 +101,8 @@ module.exports = {
   ITEM_NAME_MAX,
   ITEM_SHARED_FIELDS,
   BOARD_PREVIEW_COVERS,
+  BOARD_ITEM_MAX,
+  MOVE_ITEMS_MAX,
+  MOVE_SKIP_REASON,
   ERR,
 };

@@ -327,6 +327,22 @@
           </view>
           <t-icon name="chevron-right" size="36rpx" class="add-search-block__arrow" />
         </view>
+        <!-- 板间搬番：只有已配对（同样两个人）的板能搬入；筹备态灰显并说明原因 -->
+        <view
+          class="add-search-block add-search-block--move {{canMoveIn ? '' : 'add-search-block--disabled'}}"
+          aria-role="button"
+          aria-disabled="{{!canMoveIn}}"
+          bindtap="onMoveInTap"
+        >
+          <view class="add-search-block__main">
+            <t-icon name="{{moveCopy.ENTRY_ICON}}" size="40rpx" aria-hidden="true" />
+            <view class="add-search-block__text">
+              <view class="add-search-block__title">{{moveCopy.ENTRY_TITLE}}</view>
+              <view class="add-search-block__sub">{{canMoveIn ? moveCopy.ENTRY_SUB : moveCopy.ENTRY_DISABLED}}</view>
+            </view>
+          </view>
+          <t-icon wx:if="{{canMoveIn}}" name="chevron-right" size="36rpx" class="add-search-block__arrow" />
+        </view>
       </block>
       <view wx:else class="picked-preview">
         <image

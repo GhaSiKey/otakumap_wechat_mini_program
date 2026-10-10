@@ -962,6 +962,22 @@ page {
   color: var(--td-brand-color, #0052d9);
 }
 
+/* 「从其他板搬来」与搜番剧同款区块，紧随其下；筹备态灰显（副文案说明原因） */
+.add-search-block--move {
+  margin-top: var(--td-spacer, 16rpx);
+}
+
+.add-search-block--disabled {
+  background: var(--td-bg-color-secondarycontainer, #f3f3f3);
+  border-color: var(--td-component-stroke, #e7e7e7);
+}
+
+.add-search-block--disabled .add-search-block__main,
+.add-search-block--disabled .add-search-block__title,
+.add-search-block--disabled .add-search-block__sub {
+  color: var(--td-text-color-placeholder, #b5b5b5);
+}
+
 /* ===== 加番弹层：已选中预览卡（封面缩略图 + 番名 + 重选，所见即所得） ===== */
 .picked-preview {
   display: flex;

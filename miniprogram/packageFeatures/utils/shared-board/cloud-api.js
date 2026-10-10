@@ -49,6 +49,8 @@ const listMyBoards = () => invoke('listMyBoards');
 const getBoardDetail = (boardId) => invoke('getBoardDetail', { boardId });
 const createBoard = (name, profile) => invoke('createBoard', { name, profile });
 const renameBoard = (boardId, name) => invoke('renameBoard', { boardId, name });
+// 板间搬番：把 itemIds 连同双方进度从 fromBoardId 搬到 toBoardId（两板成员须完全相同）
+const moveItems = (fromBoardId, toBoardId, itemIds) => invoke('moveItems', { fromBoardId, toBoardId, itemIds });
 const joinBoard = (boardId, token, profile) => invoke('joinBoard', { boardId, token, profile });
 const addItem = (boardId, name, extra) => invoke('addItem', Object.assign({ boardId, name }, extra || {}));
 const updateProgress = (itemId, ep, status, expectedRev) =>
@@ -89,6 +91,7 @@ module.exports = {
   getBoardDetail,
   createBoard,
   renameBoard,
+  moveItems,
   joinBoard,
   addItem,
   updateProgress,

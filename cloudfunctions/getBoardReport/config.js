@@ -39,6 +39,9 @@ const EVENT_TYPE = {
   PROGRESS: 'progress', // 改自己进度（集数 / 状态）
   TOGETHER_ADVANCE: 'together_advance', // 一起待看页一次推进两人的进度
   BOARD_RENAME: 'board_rename', // 改板名（板是双方共享的，改名需让对方在历史里看见）
+  // 板间搬番：每次搬家在两个板各记一条汇总事件（不是每部番一条）
+  ITEMS_MOVE_IN: 'items_move_in', // 目标板：从「X」搬来
+  ITEMS_MOVE_OUT: 'items_move_out', // 来源板：搬到了「X」
 };
 
 // ── 人数上限（固定 2 人配对，不写死数字 2）──
@@ -117,6 +120,9 @@ const ERR = {
   INVALID_EP: 'ERR_INVALID_EP',
   INVALID_STATUS: 'ERR_INVALID_STATUS',
   CONFLICT: 'ERR_CONFLICT',
+  BOARD_ARCHIVED: 'ERR_BOARD_ARCHIVED',
+  MOVE_MEMBERS_MISMATCH: 'ERR_MOVE_MEMBERS_MISMATCH', // 搬番：两个板成员不完全相同
+  MOVE_TARGET_FULL: 'ERR_MOVE_TARGET_FULL', // 搬番：目标板番数会超过 BOARD_ITEM_MAX
 };
 
 // 「加入板」场景各错误码对应的用户提示（标题 + 内容），集中配置不硬编码进页面
@@ -127,6 +133,59 @@ const JOIN_ERR_MESSAGES = {
   [ERR.TOKEN_EXPIRED]: { title: '邀请过期', content: '邀请链接已过期，让 TA 重新分享' },
   [ERR.TOKEN_USED]: { title: '邀请失效', content: '这个邀请已被使用，让 TA 重新分享' },
   _default: { title: '加入失败', content: '请稍后重试' },
+};
+
+// ── 板间搬番（docs/shared-board-move-items.md）──
+// 一个板的番数上限：getBoardDetail 一次最多读这么多部且无固定排序，超出部分会随机看不到，
+// 故搬番时目标板总数不得超过此值（加番路径暂未接入此校验）。
+const BOARD_ITEM_MAX = 200;
+const MOVE_ITEMS_MAX = 50; // 一次最多搬多少部（多选上限 + 云函数入参上限）
+// 云函数返回的跳过原因（前后端同源，页面据此选文案）
+const MOVE_SKIP_REASON = { DUPLICATE: 'DUPLICATE', NOT_IN_SOURCE: 'NOT_IN_SOURCE' };
+const MOVE_HISTORY_NAME_PREVIEW = 2; // 历史汇总行最多列出几个番名，其余收成「等 N 部番」
+
+// 搬番页 + 加番面板入口文案。{board}/{from}/{to}/{n}/{name}/{max} 由页面 fillTemplate 插值。
+const MOVE_COPY = {
+  ENTRY_ICON: 'swap', // 加番面板入口图标（t-icon）
+  ENTRY_TITLE: '从其他板搬来',
+  ENTRY_SUB: '连同你俩的进度一起搬过来',
+  ENTRY_DISABLED: 'TA 加入后才能从其他板搬番',
+  HEADER_TARGET: '搬进「{board}」', // 页头：目标板（让人始终知道往哪搬）
+  HEADER_NOTE: '双方集数、状态和封面会随番一起带过去',
+  PICK_BOARD_TITLE: '从哪个板搬',
+  BOARD_ITEM_COUNT: '{n} 部',
+  EMPTY_BOARDS: '没有可以搬番的板',
+  EMPTY_BOARDS_SUB: '只能从成员和当前板完全相同、且有番的板里搬',
+  EMPTY_ITEMS: '这个板里没有可以搬的番',
+  LOAD_FAIL: '加载失败',
+  RETRY: '重试',
+  SECTION_SELECT_ALL: '全选', // 分区标题右侧：一键勾选本分区
+  SECTION_SELECT_NONE: '取消全选',
+  DUPLICATE_SECTION: '当前板已有', // 重复番沉底分区标题（不可勾选）
+  SELECTED_COUNT: '已选 {n} 部',
+  SELECTED_NONE: '还没选番',
+  CLEAR: '清空',
+  SUBMIT: '搬过来',
+  SELECT_LIMIT: '一次最多搬 {max} 部',
+  CONFIRM_TITLE: '搬 {n} 部番到「{to}」？',
+  CONFIRM_CONTENT: '搬走后「{from}」不再显示这些番，你俩的进度会一起带过去。',
+  CONFIRM_OK: '搬过来',
+  MOVING: '搬番中…',
+  SUCCESS: '已搬来 {n} 部',
+  RESULT_TITLE: '有 {n} 部没搬',
+  RESULT_LINE: '《{name}》：{reason}',
+  RESULT_MOVED: '已搬来 {n} 部。',
+  RESULT_OK: '知道了',
+  SKIP_REASON: {
+    [MOVE_SKIP_REASON.DUPLICATE]: '当前板已有',
+    [MOVE_SKIP_REASON.NOT_IN_SOURCE]: '已不在原板',
+  },
+  ERR: {
+    [ERR.MOVE_MEMBERS_MISMATCH]: '两个板的成员不一致，不能搬',
+    [ERR.MOVE_TARGET_FULL]: '当前板最多放 {max} 部番，少选几部再试',
+    [ERR.BOARD_ARCHIVED]: '归档的板不能搬番',
+    _default: '搬番失败，请重试',
+  },
 };
 
 // ── 视图层阈值（transform.js 用，UI 规格 §8）──
@@ -342,7 +401,12 @@ const HISTORY_COPY = {
     progress_status: '把《{name}》标记为「{status}」', // 仅状态变化
     together_advance: '记录了我俩一起看《{name}》到第 {to} 话',
     board_rename: '把板名从「{from}」改为「{name}」',
+    // 板间搬番汇总：{board}=对面板名快照；{names}=番名片段（由下方 MOVE_NAME/MOVE_NAMES_MORE 拼成）
+    items_move_in: '从「{board}」搬来{names}',
+    items_move_out: '把{names}搬到了「{board}」',
   },
+  MOVE_NAME: '《{name}》', // 搬番汇总里单个番名的包装
+  MOVE_NAMES_MORE: '等 {n} 部番', // 番名超出预览数时的收尾，{n}=本次搬家总部数
 };
 
 // ── 周报 / 报告参数（board-report 数据层）──
@@ -540,6 +604,11 @@ module.exports = {
   NUDGE_COOLDOWN_MS,
   ERR,
   JOIN_ERR_MESSAGES,
+  BOARD_ITEM_MAX,
+  MOVE_ITEMS_MAX,
+  MOVE_SKIP_REASON,
+  MOVE_HISTORY_NAME_PREVIEW,
+  MOVE_COPY,
   VIEW,
   ADD_ITEM_FAB,
   ITEM_VIEW,

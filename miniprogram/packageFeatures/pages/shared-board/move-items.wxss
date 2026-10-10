@@ -1,0 +1,331 @@
+view, text {
+  box-sizing: border-box;
+}
+
+/* 间距一律用 margin，不用 flex gap：iOS 14.5 以下的 WebView 不支持 flex gap，元素会挤在一起 */
+
+/* 功能级变量定义在 page（真实根节点），与 shared-board / board-list 同源 */
+page {
+  background-color: var(--td-bg-color-page, #f5f5f5);
+  --sb-color-me: #0052d9; /* 我=品牌蓝 */
+  --sb-color-peer: #834ec2; /* TA=紫 */
+  --sb-move-cover-width: 60rpx;
+  --sb-move-cover-height: 80rpx; /* 3:4 竖版海报，缩小后单屏能看到更多番 */
+  --sb-move-row-gap: 20rpx;
+  --sb-move-row-padding-y: 20rpx;
+  --sb-move-eps-gap: 6rpx; /* 番名与双方集数行之间 */
+  --sb-move-row-padding-x: var(--td-spacer-1, 24rpx);
+  --sb-move-check-size: 44rpx; /* 与 wxml 勾选 t-icon 的 size 同值 */
+  /* 分隔线从番名起：行内边距 + 勾选框 + 封面 + 两段间距；已有区没有勾选框，再减去一段 */
+  --sb-move-divider-indent: calc(var(--sb-move-row-padding-x) + var(--sb-move-check-size) + var(--sb-move-cover-width) + var(--sb-move-row-gap) * 2);
+  --sb-move-chip-gap: 12rpx;
+  --sb-move-chip-max-width: 360rpx;
+  --sb-move-pressed-scale: 0.97;
+  --sb-move-press-duration: 0.12s;
+  --sb-move-disabled-opacity: 0.45;
+  --sb-move-submit-height: 112rpx;
+  --sb-move-submit-space: 160rpx; /* 列表底部给固定提交条让位 */
+}
+
+@media (prefers-color-scheme: dark) {
+  page {
+    --sb-color-me: #4582e6;
+    --sb-color-peer: #9560d0;
+  }
+}
+
+.page {
+  min-height: 100vh;
+  padding: var(--td-spacer-2, 32rpx);
+  padding-bottom: calc(var(--sb-move-submit-space) + env(safe-area-inset-bottom));
+}
+
+/* ==================== 状态（加载 / 失败 / 空态） ==================== */
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: var(--td-spacer-6, 160rpx);
+}
+
+.state__action {
+  margin-top: var(--td-spacer-1, 24rpx);
+}
+
+.state--inline {
+  padding-top: var(--td-spacer-3, 48rpx);
+}
+
+.state__sub {
+  margin-top: var(--td-spacer-1, 24rpx);
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-text-color-placeholder, #b5b5b5);
+  text-align: center;
+}
+
+/* ==================== 页头：目标板 ==================== */
+.move-head__target {
+  font-size: var(--td-font-size-title-large, 36rpx);
+  font-weight: 600;
+  color: var(--td-text-color-primary, #000000e6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.move-head__note {
+  margin-top: var(--sb-move-eps-gap);
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-text-color-secondary, #00000099);
+}
+
+/* ==================== ① 来源板胶囊 ==================== */
+.source-label {
+  margin-top: var(--td-spacer-3, 48rpx);
+  margin-bottom: var(--td-spacer, 16rpx);
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-text-color-secondary, #00000099);
+}
+
+.source-strip {
+  display: flex;
+  flex-direction: row;
+  white-space: nowrap;
+}
+
+.source-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  max-width: var(--sb-move-chip-max-width);
+  margin-right: var(--sb-move-chip-gap);
+  padding: var(--td-spacer, 16rpx) var(--td-spacer-1, 24rpx);
+  background-color: var(--td-bg-color-container, #ffffff);
+  border: 2rpx solid var(--td-component-stroke, #e7e7e7);
+  border-radius: var(--td-radius-round, 999rpx);
+  transition: transform var(--sb-move-press-duration) ease;
+}
+
+.source-chip--active {
+  background-color: var(--td-brand-color-light, #f2f3ff);
+  border-color: var(--td-brand-color, #0052d9);
+}
+
+.source-chip--pressed {
+  transform: scale(var(--sb-move-pressed-scale));
+}
+
+.source-chip__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--td-font-size-body-medium, 28rpx);
+  color: var(--td-text-color-primary, #000000e6);
+}
+
+.source-chip--active .source-chip__name {
+  font-weight: 600;
+  color: var(--td-brand-color, #0052d9);
+}
+
+.source-chip__count {
+  flex-shrink: 0;
+  margin-left: var(--td-spacer, 16rpx);
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-text-color-placeholder, #b5b5b5);
+}
+
+/* ==================== ② 分区 ==================== */
+.group {
+  margin-top: var(--td-spacer-3, 48rpx);
+}
+
+.group__head {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: var(--td-spacer, 16rpx);
+  padding: 0 var(--sb-move-eps-gap);
+}
+
+.group__title {
+  font-size: var(--td-font-size-title-small, 28rpx);
+  font-weight: 600;
+  color: var(--td-text-color-primary, #000000e6);
+}
+
+.group__count {
+  margin-left: var(--td-spacer, 16rpx);
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-text-color-placeholder, #b5b5b5);
+}
+
+.group__toggle {
+  margin-left: auto;
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-brand-color, #0052d9);
+}
+
+/* 分区内的番合在一张卡里，行间细分隔线；比一行一卡少一半视觉噪音 */
+.group__list {
+  overflow: hidden;
+  background-color: var(--td-bg-color-container, #ffffff);
+  border-radius: var(--td-radius-large, 18rpx);
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: var(--sb-move-row-padding-y) var(--sb-move-row-padding-x);
+  transition: background-color var(--sb-move-press-duration) ease;
+}
+
+.row + .row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--sb-move-divider-indent);
+  border-top: 2rpx solid var(--td-component-stroke, #e7e7e7);
+}
+
+.row--checked {
+  background-color: var(--td-brand-color-light, #f2f3ff);
+}
+
+.row--pressed {
+  background-color: var(--td-bg-color-container-active, #e7e7e7);
+}
+
+.row__check {
+  flex-shrink: 0;
+  margin-right: var(--sb-move-row-gap);
+  color: var(--td-text-color-placeholder, #b5b5b5);
+}
+
+.row__check--on {
+  color: var(--td-brand-color, #0052d9);
+}
+
+.row__cover {
+  flex-shrink: 0;
+  margin-right: var(--sb-move-row-gap);
+  width: var(--sb-move-cover-width);
+  height: var(--sb-move-cover-height);
+  border-radius: var(--td-radius-default, 12rpx);
+  background-color: var(--td-bg-color-secondarycontainer, #f3f3f3);
+}
+
+.row__cover--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--td-font-size-title-small, 28rpx);
+  font-weight: 600;
+  color: var(--td-text-color-anti, #ffffff);
+}
+
+.row__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--td-font-size-body-medium, 28rpx);
+  color: var(--td-text-color-primary, #000000e6);
+}
+
+.row__eps {
+  display: flex;
+  margin-top: var(--sb-move-eps-gap);
+  font-size: var(--td-font-size-body-small, 24rpx);
+}
+
+.row__ep {
+  margin-right: var(--td-spacer, 16rpx);
+}
+
+.row__ep--me {
+  color: var(--sb-color-me);
+}
+
+.row__ep--peer {
+  color: var(--sb-color-peer);
+}
+
+.row__ep--unset {
+  color: var(--td-text-color-placeholder, #b5b5b5);
+}
+
+/* 当前板已有：整组淡化，文字退为禁用色 */
+.group--disabled .row__cover {
+  opacity: var(--sb-move-disabled-opacity);
+}
+
+.group--disabled .row__name,
+.group--disabled .row__ep {
+  color: var(--td-text-color-disabled, #00000042);
+}
+
+/* 分隔线缩进：已有区无勾选框，从封面后起 */
+.group--disabled .row + .row::before {
+  left: calc(var(--sb-move-divider-indent) - var(--sb-move-row-gap) - var(--sb-move-check-size));
+}
+
+/* ==================== 底部固定提交条 ==================== */
+.submit-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--sb-move-submit-height);
+  padding: var(--td-spacer, 16rpx) var(--td-spacer-2, 32rpx);
+  padding-bottom: calc(var(--td-spacer, 16rpx) + env(safe-area-inset-bottom));
+  background-color: var(--td-bg-color-container, #ffffff);
+  border-top: 2rpx solid var(--td-component-stroke, #e7e7e7);
+}
+
+.submit-bar__info {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.submit-bar__count {
+  font-size: var(--td-font-size-body-large, 32rpx);
+  font-weight: 600;
+  color: var(--td-text-color-primary, #000000e6);
+}
+
+.submit-bar__count--none {
+  font-weight: 400;
+  color: var(--td-text-color-placeholder, #b5b5b5);
+}
+
+.submit-bar__clear {
+  margin-left: var(--td-spacer-1, 24rpx);
+  font-size: var(--td-font-size-body-small, 24rpx);
+  color: var(--td-text-color-secondary, #00000099);
+}
+
+.submit-bar__btn {
+  flex-shrink: 0;
+  margin-left: var(--td-spacer-1, 24rpx);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .source-chip,
+  .row {
+    transition: none;
+  }
+
+  .source-chip--pressed {
+    transform: none;
+  }
+}

@@ -425,6 +425,19 @@ const puM = T.buildPeerUpdates(puBoard(100), puMulti, 'me');
 eq('多部 TA 更新 count=2', puM.count, 2);
 eq('多部按更新时间倒序（最新在前）', puM.items[0].name, '晚更新');
 
+// 从其他板搬来的番：带着原板的旧进度时间，只算搬入（movedAt）之后的进度
+(() => {
+  const moved = (movedAt, peerAt) => [item({
+    _id: 'mv',
+    name: '搬来的番',
+    movedAt,
+    progress: { me: { ep: 3, status: 'watching', updateTime: 50 }, pe: { ep: 8, status: 'watching', updateTime: peerAt } },
+  })];
+  eq('搬入前的 TA 进度不算新动向', T.buildPeerUpdates(puBoard(100), moved(300, 200), 'me').count, 0);
+  eq('搬入后的 TA 进度照常报', T.buildPeerUpdates(puBoard(100), moved(150, 200), 'me').count, 1);
+  eq('搬入早于我上次查看时仍以查看时间为准', T.buildPeerUpdates(puBoard(250), moved(150, 200), 'me').count, 0);
+})();
+
 // ============================================================
 // ============================================================
 // airDayLabelOf / VM airDayLabel：更新日角标（仅在播 + airDay 合法才显示）
@@ -604,6 +617,101 @@ eq(
     true
   );
 })();
+
+// ============================================================
+// 板间搬番：历史汇总文案 / 来源板筛选 / 选番候选（docs/shared-board-move-items.md）
+// ============================================================
+(() => {
+  const moveEvent = (type, n) => ev({
+    type,
+    itemId: '',
+    itemName: '',
+    payload: { board: '七月新番', items: Array.from({ length: n }, (_, i) => ({ itemId: `i${i}`, name: `番${i}` })) },
+  });
+  const fill = (key, vars) => C.HISTORY_COPY.ACTION[key].replace(/\{(\w+)\}/g, (m, k) => vars[k]);
+  const textOf = (type, n) => {
+    const d = T.describeEvent(moveEvent(type, n), 'me');
+    return fill(d.actionKey, d.vars);
+  };
+  eq('搬入单部直接列番名', textOf(C.EVENT_TYPE.ITEMS_MOVE_IN, 1), '从「七月新番」搬来《番0》');
+  eq('搬出两部全部列出', textOf(C.EVENT_TYPE.ITEMS_MOVE_OUT, 2), '把《番0》《番1》搬到了「七月新番」');
+  eq(
+    '超出预览数收成「等 N 部番」',
+    textOf(C.EVENT_TYPE.ITEMS_MOVE_IN, C.MOVE_HISTORY_NAME_PREVIEW + 1),
+    '从「七月新番」搬来《番0》《番1》等 3 部番'
+  );
+})();
+
+(() => {
+  const pair = ['me', 'pe'];
+  const board = (o) => Object.assign({ _id: 'b', name: '板', status: 'full', memberOpenids: pair, itemCount: 3 }, o);
+  const target = board({ _id: 'oct', name: '十月新番' });
+  eq('sameMembers 与顺序无关', T.sameMembers(['a', 'b'], ['b', 'a']), true);
+  eq('sameMembers 人不同即不同', T.sameMembers(['a', 'b'], ['a', 'c']), false);
+  eq('筹备态不能作为搬入目标', T.canMoveInto(board({ memberOpenids: ['me'] })), false);
+  eq('归档板不能作为搬入目标', T.canMoveInto(board({ status: C.BOARD_STATUS.ARCHIVED })), false);
+  eq('配对板可作为搬入目标', T.canMoveInto(target), true);
+
+  const sources = T.pickMoveSourceBoards([
+    target,
+    board({ _id: 'jul', name: '七月新番', memberOpenids: ['pe', 'me'] }),
+    board({ _id: 'other', memberOpenids: ['me', 'x'] }),
+    board({ _id: 'old', status: C.BOARD_STATUS.ARCHIVED }),
+    board({ _id: 'empty', itemCount: 0 }),
+    board({ _id: 'solo', memberOpenids: ['me'] }),
+  ], target);
+  eq('只列成员相同、非本板、未归档、有番的来源板', sources, [{ boardId: 'jul', name: '七月新番', itemCount: 3 }]);
+  eq('目标板未配对时无来源板', T.pickMoveSourceBoards([board({ _id: 'jul' })], board({ memberOpenids: ['me'] })), []);
+
+  const p = (meStatus, peStatus) => {
+    const progress = { me: { ep: 3, status: meStatus } };
+    if (peStatus) progress.pe = { ep: 5, status: peStatus };
+    return progress;
+  };
+  const grouped = T.buildMoveSections(
+    [
+      item({ _id: 'done', name: '看完的', progress: p('done', 'done') }),
+      item({ _id: 'long', name: '长期番', progress: p('watching', 'watching') }),
+      item({ _id: 'dupName', name: '已在十月板', progress: p('watching') }),
+      item({ _id: 'dupSource', name: '芙莉莲 第二季', sourceId: 42, progress: p('watching') }),
+      item({ _id: 'paused', name: '暂缓的', progress: p('paused') }),
+      item({ _id: 'want', name: '想看的', progress: p('want') }),
+      item({ _id: 'gone', name: '软删的', deleted: true, progress: p('watching') }),
+    ],
+    [item({ _id: 't1', name: '已在十月板' }), item({ _id: 't2', name: '芙莉莲', sourceId: 42 })],
+    'me',
+    'pe'
+  );
+  const sectionView = grouped.sections.map((g) => [g.sectionKey, g.items.map((vm) => vm.itemId)]);
+  eq('按板页分区顺序分组，重复番不进分区', sectionView, [
+    [C.SECTION.TOGETHER, ['long']],
+    [C.SECTION.NOT_STARTED, ['want']],
+    [C.SECTION.DONE, ['done']],
+    [C.SECTION.PAUSED, ['paused']],
+  ]);
+  eq('分区带配对态标题', grouped.sections[0].title, C.SECTION_TITLES[C.SECTION.TOGETHER]);
+  eq('同名与同一弹弹play条目都算重复，单独沉底', grouped.duplicates.map((vm) => vm.itemId), ['dupName', 'dupSource']);
+  eq(
+    '软删番不出现',
+    grouped.sections.concat([{ items: grouped.duplicates }]).some((g) => g.items.some((vm) => vm.itemId === 'gone')),
+    false
+  );
+  eq('不默认勾选（VM 不带勾选态）', grouped.sections.every((g) => g.items.every((vm) => vm.checked === undefined)), true);
+  eq('候选带双方进度', grouped.sections[0].items[0].pair.peer.ep, 5);
+  eq('全是重复番时没有可选分区', T.buildMoveSections([item({ name: '已在十月板' })], [item({ _id: 't', name: '已在十月板' })], 'me', 'pe').sections, []);
+})();
+
+eq(
+  '搬番错误码都有文案',
+  [C.ERR.MOVE_MEMBERS_MISMATCH, C.ERR.MOVE_TARGET_FULL, C.ERR.BOARD_ARCHIVED].every((code) => Boolean(C.MOVE_COPY.ERR[code])),
+  true
+);
+eq(
+  '搬番跳过原因都有文案',
+  Object.values(C.MOVE_SKIP_REASON).every((reason) => Boolean(C.MOVE_COPY.SKIP_REASON[reason])),
+  true
+);
+eq('单次搬番上限不超过板上限', C.MOVE_ITEMS_MAX > 0 && C.MOVE_ITEMS_MAX <= C.BOARD_ITEM_MAX, true);
 
 // item_edit：改名分流 item_rename（带 from），非改名走 item_edit
 (() => {
@@ -1050,6 +1158,9 @@ eq('漂移守卫 TOTAL_EP_MAX 一致', S.TOTAL_EP_MAX, C.TOTAL_EP_MAX);
 eq('漂移守卫 TOTAL_EP_MIN 一致', S.TOTAL_EP_MIN, C.TOTAL_EP_MIN);
 eq('漂移守卫 ITEM_SHARED_FIELDS 一致', S.ITEM_SHARED_FIELDS, C.ITEM_SHARED_FIELDS);
 eq('漂移守卫 ERR 一致', S.ERR, C.ERR);
+eq('漂移守卫 BOARD_ITEM_MAX 一致', S.BOARD_ITEM_MAX, C.BOARD_ITEM_MAX);
+eq('漂移守卫 MOVE_ITEMS_MAX 一致', S.MOVE_ITEMS_MAX, C.MOVE_ITEMS_MAX);
+eq('漂移守卫 MOVE_SKIP_REASON 一致', S.MOVE_SKIP_REASON, C.MOVE_SKIP_REASON);
 
 // getBoardReport 云函数复用前端同构纯模块（config/transform 逐字拷贝，算法单一实现）。
 // 拷贝必须与前端逐字一致，否则「搬 transform 进云函数」会退化成两份各改各的实现。
